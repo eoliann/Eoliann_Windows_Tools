@@ -1,4 +1,4 @@
-# 🟢 Eoliann Windows Tools v1.0.1 (Retro Hacker Edition)
+# 🟢 Eoliann Windows Tools
 
 Un toolkit rapid pentru Windows 11, scris în Rust + egui, cu UI verde fluorescent retro hacker 🟩.  
 Include comenzi utile de administrare și tweak-uri pentru Windows 11.

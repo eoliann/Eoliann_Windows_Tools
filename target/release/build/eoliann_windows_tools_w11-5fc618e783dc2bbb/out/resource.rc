@@ -1,0 +1,40 @@
+#pragma code_page(65001)
+1 VERSIONINFO
+FILETYPE 0x1
+FILEFLAGS 0x0
+FILEVERSION 1, 0, 1, 0
+FILESUBTYPE 0x0
+PRODUCTVERSION 1, 0, 1, 0
+FILEOS 0x40004
+FILEFLAGSMASK 0x3f
+{
+BLOCK "StringFileInfo"
+{
+BLOCK "000004b0"
+{
+VALUE "FileDescription", "eoliann_windows_tools_w11"
+VALUE "ProductVersion", "1.0.1"
+VALUE "FileVersion", "1.0.1"
+VALUE "manifest", "app.manifest"
+VALUE "ProductName", "eoliann_windows_tools_w11"
+}
+}
+BLOCK "VarFileInfo" {
+VALUE "Translation", 0x0, 0x04b0
+}
+}
+1 ICON "assets/icon.ico"
+1 24
+{
+" <?xml version=""1.0"" encoding=""UTF-8"" standalone=""yes""?> "
+" <assembly xmlns=""urn:schemas-microsoft-com:asm.v1"" manifestVersion=""1.0""> "
+" <trustInfo xmlns=""urn:schemas-microsoft-com:asm.v3""> "
+" <security> "
+" <requestedPrivileges> "
+" <requestedExecutionLevel level=""requireAdministrator"" uiAccess=""false""/> "
+" </requestedPrivileges> "
+" </security> "
+" </trustInfo> "
+" </assembly> "
+}
+

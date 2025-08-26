@@ -1,0 +1,21 @@
+[package]
+name = "eoliann_windows_tools_w11"
+version = "1.0.1"
+edition = "2021"
+
+[dependencies]
+egui = "0.27"
+eframe = { version = "0.27", features = ["wgpu"] }
+winapi = { version = "0.3", features = ["winuser", "windef"] }
+
+[package.metadata.winres]
+manifest = "app.manifest"
+
+[build-dependencies]
+winres = "0.1"
+
+[[bin]]
+name = "eoliann_windows_tools_w11"
+path = "src/main.rs"
+# 👇 această linie ascunde fereastra CMD la pornire
+windows_subsystem = "windows"

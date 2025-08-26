@@ -45,5 +45,5 @@ Include comenzi utile de administrare și tweak-uri pentru Windows 11.
 
 ### 1. Clonează repo
 ```powershell
-git clone https://github.com/eoliann/Eoliann_Windows_Tools_W11
-cd Eoliann_Windows_Tools_W11
+git clone https://github.com/eoliann/Eoliann_Windows_Tools
+cd Eoliann_Windows_Tools

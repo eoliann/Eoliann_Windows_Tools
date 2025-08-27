@@ -82,3 +82,44 @@ pub fn change_theme(mode: &str) -> String {
         _ => "Invalid mode".to_string(),
     }
 }
+
+pub fn disable_sleep() -> String {
+    let cmds = [
+        "powercfg /change standby-timeout-ac 0",
+        "powercfg /change standby-timeout-dc 0",
+        "powercfg /change hibernate-timeout-ac 0",
+        "powercfg /change hibernate-timeout-dc 0",
+    ];
+
+    let mut results = String::new();
+    for cmd in cmds {
+        results.push_str(&format!("{}\n", crate::utils::run_command(cmd)));
+    }
+    "✅ Sleep & Hibernate disabled (AC + DC)".to_string()
+}
+
+pub fn disable_hdd() -> String {
+    let cmds = [
+        "powercfg /change disk-timeout-ac 0",
+        "powercfg /change disk-timeout-dc 0",
+    ];
+
+    let mut results = String::new();
+    for cmd in cmds {
+        results.push_str(&format!("{}\n", crate::utils::run_command(cmd)));
+    }
+    "✅ HDD/SSD turn off disabled (AC + DC)".to_string()
+}
+
+pub fn disable_monitor() -> String {
+    let cmds = [
+        "powercfg /change monitor-timeout-ac 0",
+        "powercfg /change monitor-timeout-dc 0",
+    ];
+
+    let mut results = String::new();
+    for cmd in cmds {
+        results.push_str(&format!("{}\n", crate::utils::run_command(cmd)));
+    }
+    "✅ Monitor turn off disabled (AC + DC)".to_string()
+}

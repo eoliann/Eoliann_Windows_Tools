@@ -1,6 +1,14 @@
-![Downloads total](https://img.shields.io/github/downloads/eoliann/Eoliann_Windows_Tools/total?style=flat-square)
-![Downloads latest](https://img.shields.io/github/downloads/eoliann/Eoliann_Windows_Tools/latest/total?style=flat-square)
-![Release date](https://img.shields.io/github/release-date/eoliann/Eoliann_Windows_Tools?style=flat-square)
+![Stars](https://img.shields.io/github/stars/eoliann/Eoliann_Windows_Tools?style=flat-square)
+![Last Commit](https://img.shields.io/github/last-commit/eoliann/Eoliann_Windows_Tools?style=flat-square)
+![License](https://img.shields.io/github/license/eoliann/Eoliann_Windows_Tools?style=flat-square)
+![Release Date](https://img.shields.io/github/release-date/eoliann/Eoliann_Windows_Tools?style=flat-square)
+
+
+<!-- ⬇️ Downloads -->
+![Total Downloads](https://img.shields.io/github/downloads/eoliann/Eoliann_Windows_Tools/total?style=flat-square)
+![Downloads Latest Release](https://img.shields.io/github/downloads/eoliann/Eoliann_Windows_Tools/latest/total?style=flat-square)
+![Downloads (EXE)](https://img.shields.io/github/downloads/eoliann/Eoliann_Windows_Tools/eoliann_windows_tools/eoliann_windows_tools_w11.exe?style=flat-square)
+
 
 
 # 🟢 Eoliann Windows Tools

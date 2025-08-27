@@ -1,6 +1,6 @@
 ![Stars](https://img.shields.io/github/stars/eoliann/Eoliann_Windows_Tools?style=flat-square)
 ![Last Commit](https://img.shields.io/github/last-commit/eoliann/Eoliann_Windows_Tools?style=flat-square)
-![License](https://img.shields.io/github/license/eoliann/Eoliann_Windows_Tools?style=flat-square)
+![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)
 ![Release Date](https://img.shields.io/github/release-date/eoliann/Eoliann_Windows_Tools?style=flat-square)
 
 

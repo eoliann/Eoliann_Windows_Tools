@@ -38,7 +38,7 @@ pub fn show_info(ui: &mut egui::Ui, log_output: &mut String) {
 
     ui.separator();
     ui.label("📖 About:");
-    ui.label("Eoliann Windows Tools v1.0.1");
+    ui.label("Eoliann Windows Tools");
     ui.label("Created by Eoliann");
     ui.label("Quick tools for Windows administration.");
     if ui.button("Open GitHub Repo").clicked() {

@@ -1,3 +1,8 @@
+![Downloads total](https://img.shields.io/github/downloads/eoliann/Eoliann_Windows_Tools/total?style=flat-square)
+![Downloads latest](https://img.shields.io/github/downloads/eoliann/Eoliann_Windows_Tools/latest/total?style=flat-square)
+![Release date](https://img.shields.io/github/release-date/eoliann/Eoliann_Windows_Tools?style=flat-square)
+
+
 # 🟢 Eoliann Windows Tools
 
 Un toolkit rapid pentru Windows 11, scris în Rust + egui, cu UI verde fluorescent retro hacker 🟩.  

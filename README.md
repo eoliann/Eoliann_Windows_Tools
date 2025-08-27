@@ -29,13 +29,14 @@ Include comenzi utile de administrare și tweak-uri pentru Windows 11.
 - `About` → versiune + link GitHub
 
 ### TOOLS
-<img width="1006" height="736" alt="Screenshot 2025-08-26 124337" src="https://github.com/user-attachments/assets/b70d68cc-1412-4283-b270-b13530bb1e55" />
+<img width="1006" height="736" alt="Screenshot 2025-08-27 124652" src="https://github.com/user-attachments/assets/7c25051f-e169-466d-994e-54719aa2c75b" />
 
 - `Toggle Context Menu` → schimbă instant între context menu **Win11 ↔ Classic** (cu restart Explorer)
 - `Disk Cleanup` → lansează curățarea de disc
 - `Quick Settings` → shortcut-uri pentru panouri din Settings
 - `Network Reset` → resetează complet rețeaua (Winsock + IP)
 - `Power Plan Switcher` → schimbă rapid între High Performance, Balanced, Power Saver
+- `Power Tweaks` → Disable Sleep (fără standby/sleep/hibernate), Disable HDD/SSD turn off, Disable Monitor turn off și funcționează atât pe baterie (DC) cât și la priză (AC).
 
 ### SETTINGS
 <img width="1006" height="736" alt="Screenshot 2025-08-26 124340" src="https://github.com/user-attachments/assets/146e63dc-2fb7-4150-91bf-96d9518d3aa9" />

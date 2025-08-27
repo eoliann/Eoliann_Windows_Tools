@@ -123,3 +123,129 @@ pub fn disable_monitor() -> String {
     }
     "✅ Monitor turn off disabled (AC + DC)".to_string()
 }
+
+use std::time::Instant;
+
+pub fn remove_app(package: &str) -> String {
+    // Remove for current user
+    let user_cmd = format!(
+        "powershell -ExecutionPolicy Unrestricted -Command \"Get-AppxPackage '{}' | Remove-AppxPackage\"",
+        package
+    );
+    let result_user = crate::utils::run_command(&user_cmd);
+
+    // Remove provisioned (system-wide)
+    let system_cmd = format!(
+        "powershell -ExecutionPolicy Unrestricted -Command \"Get-AppxProvisionedPackage -Online | Where-Object DisplayName -like '{}' | Remove-AppxProvisionedPackage -Online\"",
+        package
+    );
+    let result_system = crate::utils::run_command(&system_cmd);
+
+    if (result_user.trim().is_empty() || result_user.contains("completed"))
+        && (result_system.trim().is_empty() || result_system.contains("completed"))
+    {
+        format!("✅ {package} removed (User + Provisioned).")
+    } else {
+        format!(
+            "⚠ Attempted removal of {package}\nUser: {}\nSystem: {}",
+            result_user.trim(),
+            result_system.trim()
+        )
+    }
+}
+
+pub fn remove_app_force(package: &str) -> String {
+    // Step 1: User-level
+    let user_cmd = format!(
+        "powershell -ExecutionPolicy Unrestricted -Command \"Get-AppxPackage '{}' | Remove-AppxPackage\"",
+        package
+    );
+    let result_user = crate::utils::run_command(&user_cmd);
+
+    // Step 2: Provisioned
+    let system_cmd = format!(
+        "powershell -ExecutionPolicy Unrestricted -Command \"Get-AppxProvisionedPackage -Online | Where-Object DisplayName -like '{}' | Remove-AppxProvisionedPackage -Online\"",
+        package
+    );
+    let result_system = crate::utils::run_command(&system_cmd);
+
+    // Step 3: DISM Force Remove
+    let dism_cmd = format!(
+        "dism /Online /Remove-ProvisionedAppxPackage /PackageName:{}",
+        package
+    );
+    let result_dism = crate::utils::run_command(&dism_cmd);
+
+    if result_dism.contains("completed")
+        || (result_user.trim().is_empty() && result_system.trim().is_empty())
+    {
+        format!("✅ {package} removed (Force).")
+    } else {
+        format!(
+            "⚠ Attempted force removal of {package}\nUser: {}\nSystem: {}\nDISM: {}",
+            result_user.trim(),
+            result_system.trim(),
+            result_dism.trim()
+        )
+    }
+}
+
+pub fn remove_all_apps(force: bool) -> String {
+    let apps: Vec<(&str, &str)> = vec![
+        ("Microsoft Family Safety", "MicrosoftCorporationII.MicrosoftFamily"),
+        ("Outlook for Windows", "Microsoft.OutlookForWindows"),
+        ("Clipchamp", "Clipchamp.Clipchamp"),
+        ("3D Builder", "Microsoft.3DBuilder"),
+        ("3D Viewer", "Microsoft.Microsoft3DViewer"),
+        ("Bing Weather", "Microsoft.BingWeather"),
+        ("Bing Sports", "Microsoft.BingSports"),
+        ("Bing Finance", "Microsoft.BingFinance"),
+        ("Office Hub", "Microsoft.MicrosoftOfficeHub"),
+        ("Bing News", "Microsoft.BingNews"),
+        ("OneNote", "Microsoft.Office.OneNote"),
+        ("Sway", "Microsoft.Office.Sway"),
+        ("Windows Phone", "Microsoft.WindowsPhone"),
+        ("CommsPhone", "Microsoft.CommsPhone"),
+        ("Your Phone", "Microsoft.YourPhone"),
+        ("Get Started", "Microsoft.Getstarted"),
+        ("Xbox App Stub", "Microsoft.549981C3F5F10"),
+        ("Messaging", "Microsoft.Messaging"),
+        ("Voice Recorder", "Microsoft.WindowsSoundRecorder"),
+        ("Mixed Reality Portal", "Microsoft.MixedReality.Portal"),
+        ("Feedback Hub", "Microsoft.WindowsFeedbackHub"),
+        ("Alarms & Clock", "Microsoft.WindowsAlarms"),
+        ("Camera", "Microsoft.WindowsCamera"),
+        ("MS Paint", "Microsoft.MSPaint"),
+        ("Maps", "Microsoft.WindowsMaps"),
+        ("Minecraft for Windows", "Microsoft.MinecraftUWP"),
+        ("People", "Microsoft.People"),
+        ("Wallet", "Microsoft.Wallet"),
+        ("Print 3D", "Microsoft.Print3D"),
+        ("OneConnect", "Microsoft.OneConnect"),
+        ("Solitaire Collection", "Microsoft.MicrosoftSolitaireCollection"),
+        ("Sticky Notes", "Microsoft.MicrosoftStickyNotes"),
+        ("Mail & Calendar", "microsoft.windowscommunicationsapps"),
+        ("Skype", "Microsoft.SkypeApp"),
+        ("GroupMe", "Microsoft.GroupMe10"),
+        ("Teams", "MSTeams"),
+        ("To-Do", "Microsoft.Todos"),
+    ];
+
+    let start = Instant::now();
+    let mut results = String::from("📋 Bulk Removal Report:\n\n");
+
+    for (name, package) in apps {
+        let output = if force {
+            remove_app_force(package)
+        } else {
+            remove_app(package)
+        };
+        results.push_str(&format!("{name}: {output}\n"));
+    }
+
+
+    let elapsed = start.elapsed().as_secs_f32();
+    results.push_str(&format!("\n⏱ Completed in {:.1}s", elapsed));
+
+    results
+}

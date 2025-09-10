@@ -1,21 +1,35 @@
 [package]
 name = "eoliann_windows_tools_w11"
-version = "1.0.1"
+version = "1.0.3"
 edition = "2021"
+authors = ["Eoliann Dev"]
+description = "Quick tools for Windows administration"
+license = "MIT"
+
+# Ascunde consola CMD
+[package.metadata.winres]
+windows_subsystem = "windows"
 
 [dependencies]
-egui = "0.27"
-eframe = { version = "0.27", features = ["wgpu"] }
-winapi = { version = "0.3", features = ["winuser", "windef"] }
+# UI Framework
+eframe = "0.32"
+egui = "0.32"
 
-[package.metadata.winres]
-manifest = "app.manifest"
+# Pentru integrare cu Windows API (IsUserAnAdmin, ShellExecuteW, etc.)
+windows = { version = "0.61", features = [
+    "Win32_Foundation",
+    "Win32_UI_Shell",
+    "Win32_UI_WindowsAndMessaging",
+] }
+
+# Thread safety pentru log_output
+parking_lot = "0.12"
+
+# Pentru streaming și procesare I/O asincron
+tokio = { version = "1", features = ["full"] }
+
+# Optional: pentru encoding wide string (dacă vrei să folosești MessageBoxW, etc.)
+widestring = "1.0"
 
 [build-dependencies]
 winres = "0.1"
-
-[[bin]]
-name = "eoliann_windows_tools_w11"
-path = "src/main.rs"
-# 👇 această linie ascunde fereastra CMD la pornire
-windows_subsystem = "windows"

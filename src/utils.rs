@@ -1,33 +1,35 @@
-use std::process::{Command, Stdio};
-use std::os::windows::process::CommandExt; // necesar pentru creation_flags
+use std::process::Command;
 
+#[cfg(windows)]
+use std::os::windows::process::CommandExt;
+
+#[cfg(windows)]
 const CREATE_NO_WINDOW: u32 = 0x08000000;
 
-pub fn run_command(cmd: &str) -> String {
-    let mut parts = cmd.split_whitespace();
-    let program = parts.next().unwrap_or("");
-    let args: Vec<&str> = parts.collect();
+/// Rulează un cmd/sh ascuns și întoarce stdout + stderr concatenate.
+pub fn run_command(cmdline: &str) -> String {
+    let out = if cfg!(windows) {
+        Command::new("cmd")
+            .args(["/C", cmdline])
+            .creation_flags(CREATE_NO_WINDOW)
+            .output()
+    } else {
+        Command::new("sh")
+            .args(["-c", cmdline])
+            .output()
+    };
 
-    match Command::new(program)
-        .args(args)
-        .creation_flags(CREATE_NO_WINDOW) // 🔥 ascunde CMD
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .output()
-    {
-        Ok(output) => {
-            let stdout = String::from_utf8_lossy(&output.stdout).to_string();
-            let stderr = String::from_utf8_lossy(&output.stderr).to_string();
-            if stderr.trim().is_empty() {
-                if stdout.trim().is_empty() {
-                    "✅ Command executed successfully (no output)".to_string()
-                } else {
-                    stdout
-                }
-            } else {
-                format!("{}\n{}", stdout, stderr)
+    match out {
+        Ok(o) => {
+            let mut s = String::new();
+            s.push_str(&String::from_utf8_lossy(&o.stdout));
+            let err = String::from_utf8_lossy(&o.stderr);
+            if !err.trim().is_empty() {
+                if !s.ends_with('\n') { s.push('\n'); }
+                s.push_str(&err);
             }
+            s
         }
-        Err(e) => format!("❌ Failed to execute command: {}", e),
+        Err(e) => format!("Exec error: {e}"),
     }
 }

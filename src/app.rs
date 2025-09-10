@@ -1,274 +1,187 @@
-use crate::tabs::{
-    info::show_info,
-    tools::show_tools,
-    settings::show_settings,
-    winapp_removal::show_winapp_removal,
-};
+use std::sync::{Arc, Mutex};
 
-use egui::{FontDefinitions, FontData, FontFamily, FontId, TextStyle};
+use eframe::egui;
+use egui::{Color32, RichText, Vec2};
 
-pub struct App {
-    active_tab: Tab,
-    log_output: String,
-    show_popup: bool,
-    popup_message: String,
-    show_bulk_report: bool,
-    bulk_report: String,
+use crate::tabs::{info, tools, winapp_removal, settings};
+
+// ---------------- THEME (verde fluorescent) ----------------
+fn apply_neon_theme(ctx: &egui::Context) {
+    let mut style = (*ctx.style()).clone();
+
+    style.spacing.item_spacing = Vec2::new(6.0, 6.0);
+    style.spacing.button_padding = Vec2::new(10.0, 8.0);
+
+    let neon = Color32::from_rgb(0, 255, 140);
+    let neon_hover = Color32::from_rgb(20, 240, 160);
+    let neon_active = Color32::from_rgb(40, 220, 180);
+
+    let mut visuals = egui::Visuals::dark();
+
+    visuals.override_text_color = Some(Color32::WHITE);
+    visuals.widgets.noninteractive.bg_fill = Color32::from_rgb(20, 20, 24);
+    visuals.panel_fill = Color32::from_rgb(14, 14, 18);
+
+    visuals.widgets.inactive.bg_fill = Color32::from_rgb(30, 30, 36);
+    visuals.widgets.inactive.fg_stroke.color = neon;
+
+    visuals.widgets.hovered.bg_fill = neon_hover.linear_multiply(0.12);
+    visuals.widgets.hovered.fg_stroke.color = neon_hover;
+    visuals.widgets.hovered.bg_stroke.color = neon_hover;
+
+    visuals.widgets.active.bg_fill = neon_active.linear_multiply(0.18);
+    visuals.widgets.active.fg_stroke.color = neon_active;
+    visuals.widgets.active.bg_stroke.color = neon_active;
+
+    visuals.selection.bg_fill = neon.linear_multiply(0.25);
+    visuals.selection.stroke.color = neon;
+
+    style.visuals = visuals;
+    ctx.set_style(style);
 }
 
-
-#[derive(PartialEq)]
-enum Tab {
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Page {
     Info,
     Tools,
     WinAppRemoval,
     Settings,
 }
 
+pub struct App {
+    page: Page,
+    log: Arc<Mutex<String>>,
+    show_popup: bool,
+    popup_message: String,
+}
+
 impl Default for App {
     fn default() -> Self {
         Self {
-            active_tab: Tab::Info,
-            log_output: "📊 INFO Selected".to_string(),
+            page: Page::Info,
+            log: Arc::new(Mutex::new(String::new())),
             show_popup: false,
             popup_message: String::new(),
-            show_bulk_report: false,
-            bulk_report: String::new(),
         }
     }
 }
 
+impl App {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    fn clear_log(&self) {
+        if let Ok(mut lg) = self.log.lock() {
+            lg.clear();
+        }
+    }
+
+    // -------------- SIDEBAR --------------
+    fn sidebar(&mut self, ui: &mut egui::Ui) {
+        ui.add_space(6.0);
+        ui.heading(RichText::new("Eoliann Tools").color(Color32::from_rgb(0, 255, 140)));
+        ui.add_space(10.0);
+        ui.separator();
+        ui.add_space(6.0);
+
+        let btn = |ui: &mut egui::Ui, label: &str, selected: bool| {
+            let text = if selected {
+                RichText::new(label).strong().color(Color32::from_rgb(0, 255, 140))
+            } else {
+                RichText::new(label)
+            };
+            ui.selectable_label(selected, text)
+        };
+
+        if btn(ui, "Info", self.page == Page::Info).clicked() {
+            self.page = Page::Info;
+        }
+        if btn(ui, "Tools", self.page == Page::Tools).clicked() {
+            self.page = Page::Tools;
+        }
+        if btn(ui, "WinApp Removal", self.page == Page::WinAppRemoval).clicked() {
+            self.page = Page::WinAppRemoval;
+        }
+        if btn(ui, "Settings", self.page == Page::Settings).clicked() {
+            self.page = Page::Settings;
+        }
+
+        ui.with_layout(egui::Layout::bottom_up(egui::Align::LEFT), |ui| {
+            ui.separator();
+            if ui.button("Clear Log").clicked() {
+                self.clear_log();
+            }
+        });
+    }
+
+    // -------------- LOG VIEW (cu scroll & auto-scroll) --------------
+    fn log_view(&self, ui: &mut egui::Ui) {
+        let text = { self.log.lock().unwrap().clone() };
+
+        egui::ScrollArea::vertical()
+            .auto_shrink([false; 2])
+            .stick_to_bottom(true) // 🔥 stă lipit jos
+            .show(ui, |ui| {
+                ui.label(egui::RichText::new(text).monospace()); // nu rupe liniile; e mai bun pt log
+            });
+    }
+}
 
 impl eframe::App for App {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        // ===== Fonts =====
-        let mut fonts = FontDefinitions::default();
-        fonts.font_data.insert(
-            "JetBrainsMono".to_owned(),
-            FontData::from_owned(include_bytes!("../assets/JetBrainsMono-Regular.ttf").to_vec()),
-        );
-        fonts
-            .families
-            .entry(FontFamily::Monospace)
-            .or_default()
-            .insert(0, "JetBrainsMono".to_owned());
-        ctx.set_fonts(fonts);
+        apply_neon_theme(ctx);
 
-        // ===== Text Styles =====
-        let mut style = (*ctx.style()).clone();
-        style.text_styles = [
-            (TextStyle::Heading, FontId::new(20.0, FontFamily::Proportional)),
-            (TextStyle::Body, FontId::new(14.0, FontFamily::Proportional)),
-            (TextStyle::Monospace, FontId::new(13.0, FontFamily::Monospace)),
-            (TextStyle::Button, FontId::new(14.0, FontFamily::Proportional)),
-            (TextStyle::Small, FontId::new(12.0, FontFamily::Proportional)),
-        ]
-        .into();
-
-        // ===== Custom Retro Hacker Theme =====
-        style.visuals.override_text_color = Some(egui::Color32::from_rgb(57, 255, 20)); // verde neon
-        style.visuals.window_fill = egui::Color32::from_rgb(0, 0, 0); // fundal negru
-        style.visuals.panel_fill = egui::Color32::from_rgb(0, 0, 0);
-        style.visuals.widgets.inactive.fg_stroke.color = egui::Color32::from_rgb(57, 255, 20);
-        style.visuals.widgets.inactive.bg_fill = egui::Color32::from_rgb(0, 20, 0);
-        style.visuals.widgets.inactive.bg_stroke.width = 1.5;
-        style.visuals.widgets.hovered.fg_stroke.color = egui::Color32::from_rgb(0, 255, 127);
-        style.visuals.widgets.hovered.bg_fill = egui::Color32::from_rgb(0, 40, 0);
-        style.visuals.widgets.hovered.bg_stroke.width = 2.0;
-        style.visuals.widgets.active.fg_stroke.color = egui::Color32::BLACK;
-        style.visuals.widgets.active.bg_fill = egui::Color32::from_rgb(57, 255, 20);
-        style.visuals.widgets.active.bg_stroke.width = 2.5;
-
-        ctx.set_style(style);
-
-        // ===== Sidebar =====
-        egui::SidePanel::left("sidebar").show(ctx, |ui| {
-            ui.heading("📂 Menu");
-            if ui.button("📊 INFO").clicked() {
-                self.active_tab = Tab::Info;
-                self.log_output = "📊 INFO Selected".to_string();
-            }
-            if ui.button("🛠 TOOLS").clicked() {
-                self.active_tab = Tab::Tools;
-                self.log_output = "🛠 TOOLS Selected".to_string();
-            }
-            if ui.button("🗑 WinApp Removal").clicked() {
-                self.active_tab = Tab::WinAppRemoval;
-                self.log_output = "🗑 WinApp Removal Selected".to_string();
-            }
-            if ui.button("⚙ SETTINGS").clicked() {
-                self.active_tab = Tab::Settings;
-                self.log_output = "⚙ SETTINGS Selected".to_string();
-            }
+        egui::SidePanel::left("side_panel").show(ctx, |ui| {
+            self.sidebar(ui);
         });
 
-        // ===== Central Panel =====
         egui::CentralPanel::default().show(ctx, |ui| {
-            match self.active_tab {
-                Tab::Info => show_info(ui, &mut self.log_output),
-                Tab::Tools => show_tools(
-                    ui,
-                    &mut self.log_output,
-                    &mut self.show_popup,
-                    &mut self.popup_message,
-                ),
-                Tab::WinAppRemoval => show_winapp_removal(
-                    ui,
-                    &mut self.log_output,
-                    &mut self.show_popup,
-                    &mut self.popup_message,
-                ),
-                Tab::Settings => show_settings(ui, &mut self.log_output),
+            match self.page {
+                Page::Tools => {
+                    tools::show_tools(
+                        ui,
+                        &self.log,
+                        &mut self.show_popup,
+                        &mut self.popup_message,
+                    );
+                }
+                Page::WinAppRemoval => {
+                    winapp_removal::show_winapp_removal(
+                        ui,
+                        &self.log,
+                        &mut self.show_popup,
+                        &mut self.popup_message,
+                    );
+                }
+                Page::Info => {
+                    info::show_info(ui, &self.log);
+                }
+                Page::Settings => {
+                    settings::show_settings(ui, &self.log);
+                }
             }
 
             ui.separator();
-            ui.label("📝 Output:");
-            egui::ScrollArea::vertical()
-                .auto_shrink([false; 2])
-                .show(ui, |ui| {
-                    ui.add(
-                        egui::TextEdit::multiline(&mut self.log_output)
-                            .desired_rows(15)
-                            .lock_focus(true)
-                            .desired_width(f32::INFINITY),
-                    );
-                });
-        });
+            self.log_view(ui);
 
-        // ===== Popup Notification (Modal) =====
-        if self.show_popup {
-            let avail = ctx.available_rect(); // zona vizibilă
-            let max_size = egui::Vec2::new(avail.width() * 0.6, avail.height() * 0.4);
-
-            egui::Window::new("⚠ Notification")
-                .collapsible(false)
-                .resizable(false)
-                .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
-                .max_size(max_size) // 🔥 se încadrează
-                .default_size(max_size * 0.9)
-                .frame(egui::Frame {
-                    fill: egui::Color32::from_rgb(40, 40, 40),
-                    stroke: egui::Stroke::new(
-                        2.0,
-                        if self.popup_message.contains("FORCE") {
-                            egui::Color32::RED
-                        } else {
-                            egui::Color32::from_rgb(57, 255, 20)
-                        },
-                    ),
-                    inner_margin: egui::Margin::same(12.0),
-                    ..Default::default()
-                })
-                .show(ctx, |ui| {
-                    egui::ScrollArea::vertical()
-                        .stick_to_bottom(true)
-                        .show(ui, |ui| {
-                            ui.vertical_centered(|ui| {
-                                ui.heading(
-                                    egui::RichText::new(&self.popup_message)
-                                        .color(egui::Color32::WHITE)
-                                        .size(18.0)
-                                        .strong(),
-                                );
-
-                                ui.add_space(10.0);
-
-                                if self.popup_message.contains("FORCE") {
-                                    ui.horizontal(|ui| {
-                                        if ui.button("✅ YES (Force)").clicked() {
-                                            let result = crate::commands::remove_all_apps(true);
-                                            self.bulk_report = result;
-                                            self.show_bulk_report = true;
-                                            self.show_popup = false;
-                                        }
-                                        if ui.button("❌ NO").clicked() {
-                                            self.show_popup = false;
-                                        }
-                                    });
-                                } else if self.popup_message.contains("Confirm bulk removal") {
-                                    ui.horizontal(|ui| {
-                                        if ui.button("✅ YES").clicked() {
-                                            let result = crate::commands::remove_all_apps(false);
-                                            self.bulk_report = result;
-                                            self.show_bulk_report = true;
-                                            self.show_popup = false;
-                                        }
-                                        if ui.button("❌ NO").clicked() {
-                                            self.show_popup = false;
-                                        }
-                                    });
-                                } else {
-                                    if ui.button("OK").clicked() {
-                                        self.show_popup = false;
-                                    }
-                                }
-
-                                ui.add_space(8.0);
-                                if ui.button("❎ Close").clicked() {
-                                    self.show_popup = false;
-                                }
-                            });
+            // (opțional) popup generic; dacă nu-l folosești, îl poți elimina
+            if self.show_popup {
+                egui::Window::new("Confirm")
+                    .collapsible(false)
+                    .resizable(false)
+                    .show(ctx, |ui| {
+                        ui.label(&self.popup_message);
+                        ui.horizontal(|ui| {
+                            if ui.button("OK").clicked() {
+                                self.show_popup = false;
+                            }
+                            if ui.button("Cancel").clicked() {
+                                self.show_popup = false;
+                            }
                         });
-                });
-        }
-
-
-        // ===== Bulk Removal Report Popup =====
-        if self.show_bulk_report {
-            let avail = ctx.available_rect();
-            let max_size = egui::Vec2::new(avail.width() * 0.9, avail.height() * 0.8);
-
-            egui::Window::new("📋 Bulk Removal Report")
-                .collapsible(false)
-                .resizable(true)
-                .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
-                .max_size(max_size) // 🔥 încape în aplicație
-                .default_size(max_size * 0.9)
-                .frame(egui::Frame {
-                    fill: egui::Color32::from_rgb(25, 25, 60),
-                    stroke: egui::Stroke::new(2.0, egui::Color32::LIGHT_BLUE),
-                    inner_margin: egui::Margin::same(12.0),
-                    ..Default::default()
-                })
-                .show(ctx, |ui| {
-                    ui.vertical_centered(|ui| {
-                        ui.heading(
-                            egui::RichText::new("Results of bulk app removal")
-                                .color(egui::Color32::LIGHT_BLUE)
-                                .size(18.0)
-                                .strong(),
-                        );
-
-                        ui.add_space(8.0);
-
-                        egui::ScrollArea::vertical()
-                            .stick_to_bottom(true) // 🔥 mereu vezi ultima linie
-                            .show(ui, |ui| {
-                                for line in self.bulk_report.lines() {
-                                    if line.contains("✅") {
-                                        ui.colored_label(egui::Color32::from_rgb(57, 255, 20), line);
-                                    } else if line.contains("❌") {
-                                        ui.colored_label(egui::Color32::RED, line);
-                                    } else if line.contains("⚠") {
-                                        ui.colored_label(egui::Color32::YELLOW, line);
-                                    } else if line.contains("⏱") {
-                                        ui.colored_label(egui::Color32::LIGHT_BLUE, line);
-                                    } else {
-                                        ui.label(line);
-                                    }
-                                }
-                                // 🔥 scroll forțat la ultima linie
-                                ui.scroll_to_cursor(Some(egui::Align::BOTTOM));
-                            });
-
-                        ui.add_space(10.0);
-                        if ui.button("❎ Close").clicked() {
-                            self.show_bulk_report = false;
-                        }
                     });
-                });
-        }
-
-
+            }
+        });
     }
 }

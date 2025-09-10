@@ -1,20 +1,20 @@
 #pragma code_page(65001)
 1 VERSIONINFO
-FILETYPE 0x1
 FILESUBTYPE 0x0
-FILEFLAGS 0x0
-FILEVERSION 1, 0, 1, 0
-PRODUCTVERSION 1, 0, 1, 0
 FILEFLAGSMASK 0x3f
+PRODUCTVERSION 1, 0, 1, 0
+FILEVERSION 1, 0, 1, 0
+FILEFLAGS 0x0
+FILETYPE 0x1
 FILEOS 0x40004
 {
 BLOCK "StringFileInfo"
 {
 BLOCK "000004b0"
 {
-VALUE "FileDescription", "eoliann_windows_tools_w11"
 VALUE "ProductVersion", "1.0.1"
 VALUE "manifest", "app.manifest"
+VALUE "FileDescription", "eoliann_windows_tools_w11"
 VALUE "FileVersion", "1.0.1"
 VALUE "ProductName", "eoliann_windows_tools_w11"
 }

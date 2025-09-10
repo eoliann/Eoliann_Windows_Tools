@@ -28,24 +28,6 @@ pub fn show_winapp_removal(
 
     ui.separator();
 
-    // ===== Example Section =====
-    ui.group(|ui| {
-        ui.heading("📧 Communication");
-        ui.horizontal_wrapped(|ui| {
-            if ui.button("Outlook for Windows").clicked() {
-                *log_output = remove_app("Microsoft.OutlookForWindows");
-            }
-            if ui.button("Skype").clicked() {
-                *log_output = remove_app("Microsoft.SkypeApp");
-            }
-            if ui.button("Teams").clicked() {
-                *log_output = remove_app("MSTeams");
-            }
-        });
-    });
-
-    ui.separator();
-
     // ===== 📧 Communication =====
     ui.group(|ui| {
         ui.heading("📧 Communication");

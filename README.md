@@ -20,7 +20,7 @@ Include comenzi utile de administrare și tweak-uri pentru Windows 11.
 ## 🚀 Funcționalități
 
 ### INFO
-<img width="1006" height="736" alt="Screenshot 2025-08-26 124331" src="https://github.com/user-attachments/assets/703be1cc-5cbc-4890-8f23-f56bc6286b50" />
+<img width="1002" height="732" alt="Screenshot 2025-08-27 175721" src="https://github.com/user-attachments/assets/a8517a1d-d6cc-44fb-a9a8-1ca73c39bb2e" />
 
 - `whoami` → afișează utilizatorul curent
 - `ipconfig` → afișează setările de rețea
@@ -37,6 +37,16 @@ Include comenzi utile de administrare și tweak-uri pentru Windows 11.
 - `Network Reset` → resetează complet rețeaua (Winsock + IP)
 - `Power Plan Switcher` → schimbă rapid între High Performance, Balanced, Power Saver
 - `Power Tweaks` → Disable Sleep (fără standby/sleep/hibernate), Disable HDD/SSD turn off, Disable Monitor turn off și funcționează atât pe baterie (DC) cât și la priză (AC).
+
+### WINDOWS APP REMOVAL
+<img width="1002" height="949" alt="Screenshot 2025-08-27 175736" src="https://github.com/user-attachments/assets/e61609e5-1668-4f43-9010-64d144e28b31" />
+
+- `Communication` → elimină aplicațiile implicite care vin cu instalarea Windows, precum: Outlook for Windows, Skype, Teams, GroupMe, To-Do, Your Phone, CommsPhone, Messaging, Mail & Calendar
+- `Media & Creativity` → elimină aplicațiile implicite care vin cu instalarea Windows, precum: Climpchamp, Camera, MS Paint, 3D Builder, 3D Viewer, Print 3D, Mixed Reality Portal
+- `Microsoft Apps` → elimină aplicațiile implicite care vin cu instalarea Windows, precum: Office Hub, OneNote, Sway, Sticky Notes, Family Safety
+- `Bing Apps` → elimină aplicațiile implicite care vin cu instalarea Windows, precum: Bing Weather, Bing Sports, Bing Finance, Bing News
+- `Games` → elimină aplicațiile implicite care vin cu instalarea Windows, precum: Solitaire Collection, Minecraft for Windows
+- `System & Misc` → elimină aplicațiile implicite care vin cu instalarea Windows, precum: People, Maps, Wallet, Get Started, Feedback Hub, Alarms & Clock, OneConnect, Windows Phone, Voice Recorder
 
 ### SETTINGS
 <img width="1006" height="736" alt="Screenshot 2025-08-26 124340" src="https://github.com/user-attachments/assets/146e63dc-2fb7-4150-91bf-96d9518d3aa9" />

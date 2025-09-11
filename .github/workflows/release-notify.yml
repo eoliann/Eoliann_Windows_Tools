@@ -18,8 +18,7 @@ jobs:
     steps:
       - name: Send Telegram notifications
         run: |
-          TEXT="📢 Nou release pe GitHub! <b>${RELEASE_NAME} (tag: ${RELEASE_TAG})</b>
-          👉 ${RELEASE_URL}"
+          TEXT="📢 <b>Nou release pe GitHub!</b><br><br><b>${RELEASE_NAME}</b> (tag: <code>${RELEASE_TAG}</code>)<br>👉 <a href='${RELEASE_URL}'>Deschide release</a>"
 
           IFS=',' read -r -a CHATS <<< "${TG_CHATS}"
           for ITEM in "${CHATS[@]}"; do
@@ -29,7 +28,7 @@ jobs:
             if [[ "$ITEM_TRIM" == *":"* ]]; then
               CHAT_ID="${ITEM_TRIM%%:*}"
               THREAD_ID="${ITEM_TRIM##*:}"
-              echo ">>> Trimit catre grup $CHAT_ID in topic $THREAD_ID"
+              echo ">>> Trimit catre $CHAT_ID in topic $THREAD_ID"
               curl -s "https://api.telegram.org/bot${TG_BOT_TOKEN}/sendMessage" \
                 -d chat_id="${CHAT_ID}" \
                 -d message_thread_id="${THREAD_ID}" \

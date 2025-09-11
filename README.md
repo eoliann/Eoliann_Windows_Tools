@@ -34,7 +34,7 @@ Includes useful administration commands and tweaks for Windows 11.
 - `tasklist` → procese active / active processes
 
 ### TOOLS
-<img width="1002" height="762" alt="EWT_tools" src="https://github.com/user-attachments/assets/d24aa030-8bc7-4aed-ae79-f59a00eae509" />
+<img width="1252" height="914" alt="Screenshot 2025-09-11 170250" src="https://github.com/user-attachments/assets/4825115b-dc2d-4365-b574-f17b97953275" />
 
 - `Toggle Context Menu` → schimbă instant între context menu **Win11 ↔ Classic** (cu restart Explorer) / Instantly switch between the **Win11 ↔ Classic** context menu (with Explorer restart)
 - `Disk Cleanup` → lansează curățarea de disc / start disk cleanup
@@ -42,6 +42,19 @@ Includes useful administration commands and tweaks for Windows 11.
 - `Clean Temporary Files` → lansează curățarea fișierelor temporare / launches temporary file cleanup
 - `Network Reset` → resetează complet rețeaua (Winsock + IP) / completely reset the network (Winsock + IP)
 - `Verify System Integrity (SFC + DSIM)` → verifică dacă integritatea sistemului este corectă și, dacă nu, repară fișierele corupte / checks whether the system integrity is correct and, if not, repairs corrupted files
+- `Disable Telemetry` → dezactivează diverse opțiuni de telemetrie, ferestre pop-up și alte elemente deranjante din Edge / disables various telemetry options, popups, and other annoyances in Edge
+- `Disable Location Tracking` → dezactivează urmărirea locației / disables Location Tracking
+- `Disable Wifi-Sense` → Wifi Sense este un serviciu de spionaj care transmite către producător toate rețelele wifi scanate din apropiere și locația dvs. geografică actuală / Wifi Sense is a spying service that phones home all nearby scanned wifi networks and your current geo location
+- `Enable End Task With Right Click` → activează opțiunea de a închide sarcina atunci când faceți clic dreapta pe un program din bara de sarcini / enables option to end task when right clicking a program in the taskbar
+- `Undo End Task With Right Click` → dezactivează opțiunea de a închide sarcina atunci când faceți clic dreapta pe un program din bara de sarcini / disables option to end task when right clicking a program in the taskbar
+- `Disable Recall` → dezactivează MS Recall integrat în Windows începând cu versiunea 24H2 / disables MS Recall built into Windows since 24H2
+- `Enable Recall` → activează MS Recall integrat în Windows începând cu versiunea 24H2 / enables MS Recall built into Windows since 24H2
+- `Debloat Edge` → dezactivează diverse opțiuni de telemetrie, ferestre pop-up și alte elemente deranjante din Edge / disables various telemetry options, popups, and other annoyances in Edge
+- `Adobe Network Block` → reduceți întreruperile utilizatorilor prin blocarea selectivă a conexiunilor la serverele de activare și telemetrie Adobe. Credit: Ruddernation-Designs
+/ reduce user interruptions by selectively blocking connections to Adobe’s activation and telemetry servers. Credit: Ruddernation-Designs
+- `Adobe Debloat` → gestionează serviciile Adobe, serviciul Adobe Desktop și actualizările Acrobat / manages Adobe Services, Adobe Desktop Service, and Acrobat Updates
+- `Disable Microsoft Copilot` → dezactivează MS Copilot AI integrat în Windows începând cu versiunea 23H2 / disables MS Copilot AI built into Windows since 23H2
+- `Set Display for Performance` → setează preferințele sistemului pentru performanță. Puteți face acest lucru manual și cu sysdm.cpl / sets the system preferences to performance. You can do this manually with sysdm.cpl as well
 - `Power Plan Switcher` → schimbă rapid între High Performance, Balanced, Power Saver / quickly switch between High Performance, Balanced, and Power Saver modes
 - `Power Tweaks` → Disable Sleep (fără standby/sleep/hibernate), Disable HDD/SSD turn off, Disable Monitor turn off și funcționează atât pe baterie (DC) cât și la priză (AC) / Disable Sleep (no standby/sleep/hibernate), Disable HDD/SSD turn off, Disable Monitor turn off, and works on both battery (DC) and mains power (AC)
 

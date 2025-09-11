@@ -1,71 +1,47 @@
 name: Notify Telegram on Release
 
 on:
-  workflow_dispatch:        # rulează manual
+  workflow_dispatch:
   release:
-    types: [published]      # rulează la publicarea unui release
+    types: [published]
 
 jobs:
   notify:
     runs-on: ubuntu-latest
     env:
       TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
-      TG_CHAT_IDS: ${{ secrets.TG_CHAT_IDS }}            # ex: -1001739090365,-1001122334455
-      TG_CHAT_THREAD: ${{ secrets.TG_CHAT_THREAD }}      # ex: -1002414179316:11538,-1009988776655:5678
+      TG_CHAT_IDS: ${{ secrets.TG_CHAT_IDS }}
+      TG_CHAT_THREAD: ${{ secrets.TG_CHAT_THREAD }}
       RELEASE_NAME: ${{ github.event.release.name || github.repository }}
       RELEASE_TAG:  ${{ github.event.release.tag_name || 'manual' }}
       RELEASE_URL:  ${{ github.event.release.html_url || format('{0}/{1}/releases', github.server_url, github.repository) }}
 
     steps:
       - name: Send Telegram notifications
-        shell: bash
         run: |
-          set -euo pipefail
+          TEXT="📢 <b>Nou release pe GitHub!</b>%0A%0A<b>${RELEASE_NAME}</b> (tag: <code>${RELEASE_TAG}</code>)%0A👉 <a href='${RELEASE_URL}'>Deschide release</a>"
 
-          esc() { sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g'; }
-          SAFE_NAME=$(printf '%s' "${RELEASE_NAME}" | esc)
-          SAFE_TAG=$(printf '%s' "${RELEASE_TAG}"  | esc)
-
-          TEXT=$(printf '%b' "📢 <b>Nou release pe GitHub!</b>\n\n<b>${SAFE_NAME}</b> (tag: <code>${SAFE_TAG}</code>)\n👉 <a href='${RELEASE_URL}'>Deschide release</a>")
-
-          api_send() {
-            local chat_id="$1"
-            local thread_id="${2:-}"
-            echo ">>> trimit către ${chat_id}${thread_id:+ (topic ${thread_id})}"
-            if [[ -n "${thread_id}" ]]; then
-              curl -sS "https://api.telegram.org/bot${TG_BOT_TOKEN}/sendMessage" \
-                -d chat_id="${chat_id}" \
-                -d message_thread_id="${thread_id}" \
-                -d parse_mode="HTML" \
-                -d disable_web_page_preview="true" \
-                --data-urlencode "text=${TEXT}"
-            else
-              curl -sS "https://api.telegram.org/bot${TG_BOT_TOKEN}/sendMessage" \
-                -d chat_id="${chat_id}" \
-                -d parse_mode="HTML" \
-                -d disable_web_page_preview="true" \
-                --data-urlencode "text=${TEXT}"
-            fi
-          }
-
-          # Grupuri fără topic
-          if [[ -n "${TG_CHAT_IDS:-}" ]]; then
+          # Grupuri simple
+          if [[ -n "${TG_CHAT_IDS}" ]]; then
             IFS=',' read -r -a CHATS <<< "${TG_CHAT_IDS}"
             for CHAT in "${CHATS[@]}"; do
-              CHAT_TRIM=$(echo "$CHAT" | xargs)
-              [[ -z "$CHAT_TRIM" ]] && continue
-              api_send "$CHAT_TRIM"
+              curl -s "https://api.telegram.org/bot${TG_BOT_TOKEN}/sendMessage" \
+                -d chat_id="${CHAT}" \
+                -d parse_mode="HTML" \
+                --data-urlencode "text=${TEXT}"
             done
           fi
 
-          # Grupuri cu topic: chat_id:thread_id
-          if [[ -n "${TG_CHAT_THREAD:-}" ]]; then
+          # Grupuri cu topic
+          if [[ -n "${TG_CHAT_THREAD}" ]]; then
             IFS=',' read -r -a ITEMS <<< "${TG_CHAT_THREAD}"
             for ITEM in "${ITEMS[@]}"; do
-              ITEM_TRIM=$(echo "$ITEM" | xargs)
-              [[ -z "$ITEM_TRIM" ]] && continue
-              CHAT_ID="${ITEM_TRIM%%:*}"
-              THREAD_ID="${ITEM_TRIM##*:}"
-              api_send "$CHAT_ID" "$THREAD_ID"
+              CHAT_ID="${ITEM%%:*}"
+              THREAD_ID="${ITEM##*:}"
+              curl -s "https://api.telegram.org/bot${TG_BOT_TOKEN}/sendMessage" \
+                -d chat_id="${CHAT_ID}" \
+                -d message_thread_id="${THREAD_ID}" \
+                -d parse_mode="HTML" \
+                --data-urlencode "text=${TEXT}"
             done
           fi

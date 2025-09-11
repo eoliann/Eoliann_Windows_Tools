@@ -18,7 +18,8 @@ jobs:
     steps:
       - name: Send Telegram notifications
         run: |
-          TEXT="📢 Nou release pe GitHub!\n\n${RELEASE_NAME} (tag: ${RELEASE_TAG})\n👉 ${RELEASE_URL}"
+          TEXT="📢 Nou release pe GitHub! <b>${RELEASE_NAME} (tag: ${RELEASE_TAG})</b>
+          👉 ${RELEASE_URL}"
 
           IFS=',' read -r -a CHATS <<< "${TG_CHATS}"
           for ITEM in "${CHATS[@]}"; do

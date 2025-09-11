@@ -14,18 +14,34 @@ jobs:
       RELEASE_NAME: ${{ github.event.release.name || github.repository }}
       RELEASE_TAG:  ${{ github.event.release.tag_name || github.ref_name }}
       RELEASE_URL:  ${{ github.event.release.html_url || format('{0}/{1}/releases', github.server_url, github.repository) }}
-      ASSET_URL:   ${{ github.event.release.assets[0].browser_download_url || '' }}
 
     steps:
-      - name: Send Telegram notifications
+      - name: Build release message
+        id: build
         run: |
           TEXT="📢 <b>Nou release pe GitHub!</b>
           <b>${RELEASE_NAME}</b> (tag: <code>${RELEASE_TAG}</code>)
           👉 <a href='${RELEASE_URL}'>Pagina release</a>"
 
-          if [[ -n "${ASSET_URL}" ]]; then
-            TEXT="$TEXT⬇️ <a href='${ASSET_URL}'>Descarcă .exe</a>"
+          # extragem assetele direct din payloadul evenimentului
+          echo '${{ toJson(github.event.release.assets) }}' > assets.json
+
+          if [[ -s assets.json && $(jq length assets.json) -gt 0 ]]; then
+            echo "Assete gasite:"
+            jq -r '.[].browser_download_url' assets.json
+
+            LINKS=$(jq -r '.[].browser_download_url' assets.json)
+            while read -r URL; do
+              NAME=$(basename "$URL")
+              TEXT="$TEXT\n⬇️ <a href='$URL'>$NAME</a>"
+            done <<< "$LINKS"
           fi
+
+          echo "msg=$TEXT" >> $GITHUB_OUTPUT
+
+      - name: Send Telegram notifications
+        run: |
+          TEXT="${{ steps.build.outputs.msg }}"
 
           IFS=',' read -r -a CHATS <<< "${TG_CHATS}"
           for ITEM in "${CHATS[@]}"; do

@@ -32,7 +32,6 @@ Includes useful administration commands and tweaks for Windows 11.
 - `ipconfig` → afișează setările de rețea / display network settings
 - `systeminfo` → detalii despre sistem / system details
 - `tasklist` → procese active / active processes
-- `About` → informații despre versiune + link GitHub / version information + GitHub link
 
 ### TOOLS
 <img width="1002" height="762" alt="EWT_tools" src="https://github.com/user-attachments/assets/d24aa030-8bc7-4aed-ae79-f59a00eae509" />

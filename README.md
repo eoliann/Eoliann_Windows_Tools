@@ -11,61 +11,71 @@
 
 # 🟢 Eoliann Windows Tools
 
+[RO]
 Un toolkit rapid pentru Windows 11, scris în Rust + egui, cu UI verde fluorescent retro hacker 🟩.  
 Include comenzi utile de administrare și tweak-uri pentru Windows 11.
 
----
-<img width="460" height="495" alt="Screenshot 2025-08-26 124326" src="https://github.com/user-attachments/assets/9b195b58-4f9f-44a2-a7f9-85168b0a3634" />
+[EN]
+A quick toolkit for Windows 11, written in Rust + egui, with a retro hacker fluorescent green UI 🟩.  
+Includes useful administration commands and tweaks for Windows 11.
 
-## 🚀 Funcționalități
+---
+
+<img width="456" height="403" alt="EWT_1" src="https://github.com/user-attachments/assets/2b430312-846a-433f-9559-e73c44bb264f" />
+
+## 🚀 Funcționalități / Features
 
 ### INFO
-<img width="1002" height="732" alt="Screenshot 2025-08-27 175721" src="https://github.com/user-attachments/assets/a8517a1d-d6cc-44fb-a9a8-1ca73c39bb2e" />
+<img width="1002" height="762" alt="EWT_info" src="https://github.com/user-attachments/assets/71554f5f-52b4-463b-8ea3-99521827af6c" />
 
-- `whoami` → afișează utilizatorul curent
-- `ipconfig` → afișează setările de rețea
-- `systeminfo` → detalii despre sistem
-- `tasklist` → procese active
-- `About` → versiune + link GitHub
+- `whoami` → afișează utilizatorul curent / displays the current user
+- `ipconfig` → afișează setările de rețea / display network settings
+- `systeminfo` → detalii despre sistem / system details
+- `tasklist` → procese active / active processes
+- `About` → informații despre versiune + link GitHub / version information + GitHub link
 
 ### TOOLS
-<img width="1006" height="736" alt="Screenshot 2025-08-27 124652" src="https://github.com/user-attachments/assets/7c25051f-e169-466d-994e-54719aa2c75b" />
+<img width="1002" height="762" alt="EWT_tools" src="https://github.com/user-attachments/assets/d24aa030-8bc7-4aed-ae79-f59a00eae509" />
 
-- `Toggle Context Menu` → schimbă instant între context menu **Win11 ↔ Classic** (cu restart Explorer)
-- `Disk Cleanup` → lansează curățarea de disc
-- `Quick Settings` → shortcut-uri pentru panouri din Settings
-- `Network Reset` → resetează complet rețeaua (Winsock + IP)
-- `Power Plan Switcher` → schimbă rapid între High Performance, Balanced, Power Saver
-- `Power Tweaks` → Disable Sleep (fără standby/sleep/hibernate), Disable HDD/SSD turn off, Disable Monitor turn off și funcționează atât pe baterie (DC) cât și la priză (AC).
+- `Toggle Context Menu` → schimbă instant între context menu **Win11 ↔ Classic** (cu restart Explorer) / Instantly switch between the **Win11 ↔ Classic** context menu (with Explorer restart)
+- `Disk Cleanup` → lansează curățarea de disc / start disk cleanup
+- `Empty Recycle Bin` → lansează golirea coșului de gunoi / initiates emptying of the trash bin
+- `Clean Temporary Files` → lansează curățarea fișierelor temporare / launches temporary file cleanup
+- `Network Reset` → resetează complet rețeaua (Winsock + IP) / completely reset the network (Winsock + IP)
+- `Verify System Integrity (SFC + DSIM)` → verifică dacă integritatea sistemului este corectă și, dacă nu, repară fișierele corupte / checks whether the system integrity is correct and, if not, repairs corrupted files
+- `Power Plan Switcher` → schimbă rapid între High Performance, Balanced, Power Saver / quickly switch between High Performance, Balanced, and Power Saver modes
+- `Power Tweaks` → Disable Sleep (fără standby/sleep/hibernate), Disable HDD/SSD turn off, Disable Monitor turn off și funcționează atât pe baterie (DC) cât și la priză (AC) / Disable Sleep (no standby/sleep/hibernate), Disable HDD/SSD turn off, Disable Monitor turn off, and works on both battery (DC) and mains power (AC)
 
 ### WINDOWS APP REMOVAL
-<img width="1002" height="949" alt="Screenshot 2025-08-27 175736" src="https://github.com/user-attachments/assets/e61609e5-1668-4f43-9010-64d144e28b31" />
+<img width="1006" height="766" alt="EWT_winapp_removal" src="https://github.com/user-attachments/assets/a1026b80-a125-4f77-9650-8558d88ffb35" />
 
-- `Communication` → elimină aplicațiile implicite care vin cu instalarea Windows, precum: Outlook for Windows, Skype, Teams, GroupMe, To-Do, Your Phone, CommsPhone, Messaging, Mail & Calendar
-- `Media & Creativity` → elimină aplicațiile implicite care vin cu instalarea Windows, precum: Climpchamp, Camera, MS Paint, 3D Builder, 3D Viewer, Print 3D, Mixed Reality Portal
-- `Microsoft Apps` → elimină aplicațiile implicite care vin cu instalarea Windows, precum: Office Hub, OneNote, Sway, Sticky Notes, Family Safety
-- `Bing Apps` → elimină aplicațiile implicite care vin cu instalarea Windows, precum: Bing Weather, Bing Sports, Bing Finance, Bing News
-- `Games` → elimină aplicațiile implicite care vin cu instalarea Windows, precum: Solitaire Collection, Minecraft for Windows
-- `System & Misc` → elimină aplicațiile implicite care vin cu instalarea Windows, precum: People, Maps, Wallet, Get Started, Feedback Hub, Alarms & Clock, OneConnect, Windows Phone, Voice Recorder
+- `Communication` → elimină aplicațiile implicite care vin cu instalarea Windows, precum: Outlook for Windows, Skype, Teams, GroupMe, To-Do, Your Phone, CommsPhone, Messaging, Mail & Calendar și altele / remove default applications that come with Windows installation, such as: Outlook for Windows, Skype, Teams, GroupMe, To-Do, Your Phone, CommsPhone, Messaging, Mail & Calendar, and others.
+- `Media & Creativity` → elimină aplicațiile implicite care vin cu instalarea Windows, precum: Climpchamp, Camera, MS Paint, 3D Builder, 3D Viewer, Print 3D, Mixed Reality Portal / removes default applications that come with Windows installation, such as: Climpchamp, Camera, MS Paint, 3D Builder, 3D Viewer, Print 3D, Mixed Reality Portal
+- `Microsoft Apps` → elimină aplicațiile implicite care vin cu instalarea Windows, precum: Office Hub, OneNote, Sway, Sticky Notes, Family Safety / removes default applications that come with Windows installation, such as: Office Hub, OneNote, Sway, Sticky Notes, Family Safety
+- `Bing Apps` → elimină aplicațiile implicite care vin cu instalarea Windows, precum: Bing Weather, Bing Sports, Bing Finance, Bing News / removes default applications that come with Windows installation, such as: Bing Weather, Bing Sports, Bing Finance, Bing News
+- `Games` → elimină aplicațiile implicite care vin cu instalarea Windows, precum: Solitaire Collection, Minecraft for Windows / removes default applications that come with Windows installation, such as: Solitaire Collection, Minecraft for Windows
+- `System & Misc` → elimină aplicațiile implicite care vin cu instalarea Windows, precum: People, Maps, Wallet, Get Started, Feedback Hub, Alarms & Clock, OneConnect, Windows Phone, Voice Recorder / remove default applications that come with Windows installation, such as: People, Maps, Wallet, Get Started, Feedback Hub, Alarms & Clock, OneConnect, Windows Phone, Voice Recorder
 
 ### SETTINGS
-<img width="1006" height="736" alt="Screenshot 2025-08-26 124340" src="https://github.com/user-attachments/assets/146e63dc-2fb7-4150-91bf-96d9518d3aa9" />
+<img width="1002" height="732" alt="EWT_settings" src="https://github.com/user-attachments/assets/30f1f322-7210-4b76-bfe3-5a7c68e70fcf" />
 
-- `Dark / Light Theme` → schimbă între tema Windows
+- `Dark / Light Theme` → schimbă între temele Light și Dark ale Windows / switch between Windows Light and Dark themes
+- `Open Display Settings` → deschide fereastra cu opțiunile de afișare ale sistemului / opens the window with the system display options
+- `About` → informații despre versiune + link GitHub / version information + GitHub link
 
 ---
 
 ## 🎨 Design
-- UI vizual cu tab-uri **INFO, TOOLS, SETTINGS**
-- Fundal **negru**
-- Text și butoane **verde fluorescent (#39FF14)**
-- ASCII Logo retro hacker 🟩 la pornire (JetBrains Mono font)
+- UI vizual cu tab-uri **INFO, TOOLS, WINAPP REMOVAL SETTINGS** / Visual UI with tabs **INFO, TOOLS, WINAPP REMOVAL SETTINGS**
+- Fundal **negru** / **Black** background
+- Text și butoane **verde fluorescent (#39FF14)** / Text and buttons **fluorescent green (#39FF14)**
+- ASCII Logo retro hacker 🟩 la pornire (JetBrains Mono font) / ASCII Retro Hacker Logo 🟩 la pornire (JetBrains Mono font)
 
 ---
 
-## 🛠️ Build și rulare
+## 🛠️ Build și rulare / Build and run
 
-### 1. Clonează repo
+### Clonează repo / Clone repo
 ```powershell
 git clone https://github.com/eoliann/Eoliann_Windows_Tools
 cd Eoliann_Windows_Tools

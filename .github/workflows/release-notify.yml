@@ -20,6 +20,8 @@ jobs:
         run: |
           TEXT="📢 <b>Nou release pe GitHub!</b><br><br><b>${RELEASE_NAME}</b> (tag: <code>${RELEASE_TAG}</code>)<br>👉 <a href='${RELEASE_URL}'>Deschide release</a>"
 
+          echo "TG_CHATS=${TG_CHATS}"
+
           IFS=',' read -r -a CHATS <<< "${TG_CHATS}"
           for ITEM in "${CHATS[@]}"; do
             ITEM_TRIM=$(echo "$ITEM" | xargs)

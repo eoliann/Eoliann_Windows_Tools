@@ -18,7 +18,9 @@ jobs:
     steps:
       - name: Send Telegram notifications
         run: |
-          TEXT="📢 <b>Nou release pe GitHub!</b>\n\n<b>${RELEASE_NAME}</b> (tag: <code>${RELEASE_TAG}</code>)\n👉 <a href='${RELEASE_URL}'>Deschide release</a>"
+          TEXT="📢 <b>Nou release pe GitHub!</b>
+          <b>${RELEASE_NAME}</b> (tag: <code>${RELEASE_TAG}</code>)
+          👉 <a href='${RELEASE_URL}'>Deschide release</a>"
 
           echo "TG_CHATS=${TG_CHATS}"
 

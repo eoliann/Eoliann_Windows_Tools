@@ -19,25 +19,28 @@ jobs:
       - name: Build release message
         id: build
         run: |
-          TEXT="📢 <b>Nou release pe GitHub!</b>
-          <b>${RELEASE_NAME}</b> (tag: <code>${RELEASE_TAG}</code>)
-          👉 <a href='${RELEASE_URL}'>Pagina release</a>"
+          esc() { sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g'; }
 
-          # extragem assetele direct din payloadul evenimentului
+          SAFE_NAME=$(printf '%s' "${RELEASE_NAME}" | esc)
+          SAFE_TAG=$(printf '%s' "${RELEASE_TAG}" | esc)
+
+          TEXT="📢 <b>Nou release pe GitHub!</b>\n\n<b>${SAFE_NAME}</b> (tag: <code>${SAFE_TAG}</code>)\n👉 <a href='${RELEASE_URL}'>Pagina release</a>"
+
+          # adaugă assete dacă există
           echo '${{ toJson(github.event.release.assets) }}' > assets.json
-
           if [[ -s assets.json && $(jq length assets.json) -gt 0 ]]; then
-            echo "Assete gasite:"
-            jq -r '.[].browser_download_url' assets.json
-
-            LINKS=$(jq -r '.[].browser_download_url' assets.json)
-            while read -r URL; do
-              NAME=$(basename "$URL")
+            jq -r '.[].browser_download_url' assets.json | while read -r URL; do
+              NAME=$(basename "$URL" | esc)
               TEXT="$TEXT\n⬇️ <a href='$URL'>$NAME</a>"
-            done <<< "$LINKS"
+            done
           fi
 
-          echo "msg=$TEXT" >> $GITHUB_OUTPUT
+          # scriem safe pentru GitHub Outputs
+          TEXT_ESCAPED="${TEXT//'%'/'%25'}"
+          TEXT_ESCAPED="${TEXT_ESCAPED//$'\n'/'%0A'}"
+          TEXT_ESCAPED="${TEXT_ESCAPED//$'\r'/'%0D'}"
+
+          echo "msg=$TEXT_ESCAPED" >> $GITHUB_OUTPUT
 
       - name: Send Telegram notifications
         run: |

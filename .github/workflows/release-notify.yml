@@ -19,7 +19,8 @@ jobs:
     steps:
       - name: Send Telegram notifications
         run: |
-          TEXT="📢 <b>Nou release pe GitHub!</b>%0A%0A<b>${RELEASE_NAME}</b> (tag: <code>${RELEASE_TAG}</code>)%0A👉 <a href='${RELEASE_URL}'>Deschide release</a>"
+          TEXT="📢 <b>Nou release pe GitHub!</b> <b>${RELEASE_NAME}</b> (tag: <code>${RELEASE_TAG}</code>)
+          👉 <a href='${RELEASE_URL}'>Deschide release</a>"
 
           # Grupuri fără topic
           if [[ -n "${TG_CHAT_IDS}" ]]; then

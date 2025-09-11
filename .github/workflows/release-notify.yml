@@ -11,38 +11,20 @@ jobs:
     env:
       TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
       TG_CHATS: ${{ secrets.TG_CHATS }}
+      RELEASE_NAME: ${{ github.event.release.name || github.repository }}
+      RELEASE_TAG:  ${{ github.event.release.tag_name || github.ref_name }}
+      RELEASE_URL:  ${{ github.event.release.html_url || format('{0}/{1}/releases', github.server_url, github.repository) }}
+      ASSET_URL:   ${{ github.event.release.assets[0].browser_download_url || '' }}
 
     steps:
-      - name: Get release info
-        id: release
-        run: |
-          API_URL="https://api.github.com/repos/${GITHUB_REPOSITORY}/releases/${GITHUB_REF_NAME}"
-          curl -s -H "Authorization: Bearer $GITHUB_TOKEN" "$API_URL" > release.json
-          cat release.json
-          NAME=$(jq -r '.name // .tag_name' release.json)
-          TAG=$(jq -r '.tag_name' release.json)
-          URL=$(jq -r '.html_url' release.json)
-          ASSET_URL=$(jq -r '.assets[0].browser_download_url // empty' release.json)
-
-          echo "name=$NAME" >> $GITHUB_OUTPUT
-          echo "tag=$TAG" >> $GITHUB_OUTPUT
-          echo "url=$URL" >> $GITHUB_OUTPUT
-          echo "asset_url=$ASSET_URL" >> $GITHUB_OUTPUT
-
       - name: Send Telegram notifications
         run: |
-          RELEASE_NAME="${{ steps.release.outputs.name }}"
-          RELEASE_TAG="${{ steps.release.outputs.tag }}"
-          RELEASE_URL="${{ steps.release.outputs.url }}"
-          ASSET_URL="${{ steps.release.outputs.asset_url }}"
-
           TEXT="📢 <b>Nou release pe GitHub!</b>
           <b>${RELEASE_NAME}</b> (tag: <code>${RELEASE_TAG}</code>)
           👉 <a href='${RELEASE_URL}'>Pagina release</a>"
 
-          if [[ -n "$ASSET_URL" ]]; then
-            TEXT="$TEXT
-            ⬇️ <a href='${ASSET_URL}'>Descarcă .exe</a>"
+          if [[ -n "${ASSET_URL}" ]]; then
+            TEXT="$TEXT\n⬇️ <a href='${ASSET_URL}'>Descarcă .exe</a>"
           fi
 
           IFS=',' read -r -a CHATS <<< "${TG_CHATS}"

@@ -1,24 +1,37 @@
 name: Notify Telegram on Release
 
 on:
-  workflow_dispatch:   # rulează manual pentru test
+  workflow_dispatch:
   release:
-    types: [published] # rulează automat la publicarea unui release
+    types: [published]
 
 jobs:
   notify:
     runs-on: ubuntu-latest
     steps:
-      - name: Send Telegram messages to all groups
+      - name: Send Telegram messages to normal groups
+        if: secrets.TG_CHAT_IDS != ''
         run: |
-          echo "Token: ***"
-          echo "Chats: ${{ secrets.TG_CHAT_IDS }}"
-
           IFS=',' read -ra CHATS <<< "${{ secrets.TG_CHAT_IDS }}"
           for CHAT in "${CHATS[@]}"; do
-            echo ">>> Trimit catre $CHAT"
+            echo ">>> Trimit catre grup $CHAT"
             curl -s -X POST "https://api.telegram.org/bot${{ secrets.TG_BOT_TOKEN }}/sendMessage" \
               -d chat_id="$CHAT" \
+              -d parse_mode="HTML" \
+              -d text="📢 <b>Nou release pe GitHub!</b>%0A%0A<b>${{ github.event.release.name }}</b> (tag: <code>${{ github.event.release.tag_name }}</code>)%0A👉 <a href='${{ github.event.release.html_url }}'>Deschide release</a>"
+          done
+
+      - name: Send Telegram messages to groups with topics
+        if: secrets.TG_CHAT_THREAD != ''
+        run: |
+          IFS=',' read -ra CHATS <<< "${{ secrets.TG_CHAT_THREAD }}"
+          for ITEM in "${CHATS[@]}"; do
+            CHAT_ID=$(echo $ITEM | cut -d':' -f1)
+            THREAD_ID=$(echo $ITEM | cut -d':' -f2)
+            echo ">>> Trimit catre grup $CHAT_ID in topic $THREAD_ID"
+            curl -s -X POST "https://api.telegram.org/bot${{ secrets.TG_BOT_TOKEN }}/sendMessage" \
+              -d chat_id="$CHAT_ID" \
+              -d message_thread_id="$THREAD_ID" \
               -d parse_mode="HTML" \
               -d text="📢 <b>Nou release pe GitHub!</b>%0A%0A<b>${{ github.event.release.name }}</b> (tag: <code>${{ github.event.release.tag_name }}</code>)%0A👉 <a href='${{ github.event.release.html_url }}'>Deschide release</a>"
           done

@@ -11,40 +11,39 @@ jobs:
     env:
       TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
       TG_CHATS: ${{ secrets.TG_CHATS }}
-      RELEASE_NAME: ${{ github.event.release.name || github.repository }}
-      RELEASE_TAG:  ${{ github.event.release.tag_name || github.ref_name }}
-      RELEASE_URL:  ${{ github.event.release.html_url || format('{0}/{1}/releases', github.server_url, github.repository) }}
 
     steps:
-      - name: Build release message
-        id: build
+      - name: Get release info
+        id: release
         run: |
-          esc() { sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g'; }
+          API_URL="https://api.github.com/repos/${GITHUB_REPOSITORY}/releases/${GITHUB_REF_NAME}"
+          curl -s -H "Authorization: Bearer $GITHUB_TOKEN" "$API_URL" > release.json
+          cat release.json
+          NAME=$(jq -r '.name // .tag_name' release.json)
+          TAG=$(jq -r '.tag_name' release.json)
+          URL=$(jq -r '.html_url' release.json)
+          ASSET_URL=$(jq -r '.assets[0].browser_download_url // empty' release.json)
 
-          SAFE_NAME=$(printf '%s' "${RELEASE_NAME}" | esc)
-          SAFE_TAG=$(printf '%s' "${RELEASE_TAG}" | esc)
-
-          TEXT="📢 <b>Nou release pe GitHub!</b>\n\n<b>${SAFE_NAME}</b> (tag: <code>${SAFE_TAG}</code>)\n👉 <a href='${RELEASE_URL}'>Pagina release</a>"
-
-          # adaugă assete dacă există
-          echo '${{ toJson(github.event.release.assets) }}' > assets.json
-          if [[ -s assets.json && $(jq length assets.json) -gt 0 ]]; then
-            jq -r '.[].browser_download_url' assets.json | while read -r URL; do
-              NAME=$(basename "$URL" | esc)
-              TEXT="$TEXT\n⬇️ <a href='$URL'>$NAME</a>"
-            done
-          fi
-
-          # scriem safe pentru GitHub Outputs
-          TEXT_ESCAPED="${TEXT//'%'/'%25'}"
-          TEXT_ESCAPED="${TEXT_ESCAPED//$'\n'/'%0A'}"
-          TEXT_ESCAPED="${TEXT_ESCAPED//$'\r'/'%0D'}"
-
-          echo "msg=$TEXT_ESCAPED" >> $GITHUB_OUTPUT
+          echo "name=$NAME" >> $GITHUB_OUTPUT
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "url=$URL" >> $GITHUB_OUTPUT
+          echo "asset_url=$ASSET_URL" >> $GITHUB_OUTPUT
 
       - name: Send Telegram notifications
         run: |
-          TEXT="${{ steps.build.outputs.msg }}"
+          RELEASE_NAME="${{ steps.release.outputs.name }}"
+          RELEASE_TAG="${{ steps.release.outputs.tag }}"
+          RELEASE_URL="${{ steps.release.outputs.url }}"
+          ASSET_URL="${{ steps.release.outputs.asset_url }}"
+
+          TEXT="📢 <b>Nou release pe GitHub!</b>
+          <b>${RELEASE_NAME}</b> (tag: <code>${RELEASE_TAG}</code>)
+          👉 <a href='${RELEASE_URL}'>Pagina release</a>"
+
+          if [[ -n "$ASSET_URL" ]]; then
+            TEXT="$TEXT
+            ⬇️ <a href='${ASSET_URL}'>Descarcă .exe</a>"
+          fi
 
           IFS=',' read -r -a CHATS <<< "${TG_CHATS}"
           for ITEM in "${CHATS[@]}"; do

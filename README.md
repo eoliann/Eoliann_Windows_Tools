@@ -26,7 +26,7 @@ Includes useful administration commands and tweaks for Windows 11.
 ## 🚀 Funcționalități / Features
 
 ### INFO
-<img width="1002" height="762" alt="EWT_info" src="https://github.com/user-attachments/assets/71554f5f-52b4-463b-8ea3-99521827af6c" />
+<img width="1002" height="732" alt="Screenshot 2025-09-11 151923" src="https://github.com/user-attachments/assets/e6bb58d8-ea70-4a0a-92b2-3be2ef034b88" />
 
 - `whoami` → afișează utilizatorul curent / displays the current user
 - `ipconfig` → afișează setările de rețea / display network settings
@@ -46,6 +46,20 @@ Includes useful administration commands and tweaks for Windows 11.
 - `Power Plan Switcher` → schimbă rapid între High Performance, Balanced, Power Saver / quickly switch between High Performance, Balanced, and Power Saver modes
 - `Power Tweaks` → Disable Sleep (fără standby/sleep/hibernate), Disable HDD/SSD turn off, Disable Monitor turn off și funcționează atât pe baterie (DC) cât și la priză (AC) / Disable Sleep (no standby/sleep/hibernate), Disable HDD/SSD turn off, Disable Monitor turn off, and works on both battery (DC) and mains power (AC)
 
+### INSTALL
+<img width="1002" height="732" alt="Screenshot 2025-09-11 151930" src="https://github.com/user-attachments/assets/da61c73e-9d1c-4790-86b7-1e9f1f7592df" />
+
+- `Browsers`
+- `Communications`
+- `Development`
+- `Document`
+- `Games`
+- `Microsoft Tools`
+- `Multimedia Tools`
+- `Pro Tools`
+- `Security`
+- `Utilities`
+  
 ### WINDOWS APP REMOVAL
 <img width="1006" height="766" alt="EWT_winapp_removal" src="https://github.com/user-attachments/assets/a1026b80-a125-4f77-9650-8558d88ffb35" />
 

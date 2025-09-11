@@ -1,0 +1,51 @@
+# === Sistem de operare Windows ===
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# === Rust specific ===
+/target/
+/Cargo.lock
+Makefile
+
+# === IDE / Editoare ===
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# === Build / compilare ===
+bin/
+obj/
+build/
+dist/
+*.exe
+*.dll
+*.pdb
+
+# === Fișiere log / cache ===
+*.log
+*.cache
+*.tmp
+*.bak
+
+# === Python (dacă folosești scripturi auxiliare) ===
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.env
+.venv
+
+# === Node.js (dacă folosești interfață web) ===
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# === Personalizat: foldere de ignorat manual ===
+# (adaugă aici dacă mai ai ceva ce nu vrei pe GitHub)

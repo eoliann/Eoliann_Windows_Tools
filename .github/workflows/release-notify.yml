@@ -9,12 +9,16 @@ jobs:
   notify:
     runs-on: ubuntu-latest
     steps:
-      - name: Send Telegram message
+      - name: Send Telegram messages to all groups
         run: |
-          echo "Token: ${{ secrets.TG_BOT_TOKEN }}"
-          echo "Chat:  ${{ secrets.TG_CHAT_ID }}"
+          echo "Token: ***"
+          echo "Chats: ${{ secrets.TG_CHAT_IDS }}"
 
-          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TG_BOT_TOKEN }}/sendMessage" \
-            -d chat_id="${{ secrets.TG_CHAT_ID }}" \
-            -d parse_mode="HTML" \
-            -d text="📢 <b>Nou release pe GitHub!</b>%0A%0A<b>${{ github.event.release.name }}</b> (tag: <code>${{ github.event.release.tag_name }}</code>)%0A👉 <a href='${{ github.event.release.html_url }}'>Deschide release</a>"
+          IFS=',' read -ra CHATS <<< "${{ secrets.TG_CHAT_IDS }}"
+          for CHAT in "${CHATS[@]}"; do
+            echo ">>> Trimit catre $CHAT"
+            curl -s -X POST "https://api.telegram.org/bot${{ secrets.TG_BOT_TOKEN }}/sendMessage" \
+              -d chat_id="$CHAT" \
+              -d parse_mode="HTML" \
+              -d text="📢 <b>Nou release pe GitHub!</b>%0A%0A<b>${{ github.event.release.name }}</b> (tag: <code>${{ github.event.release.tag_name }}</code>)%0A👉 <a href='${{ github.event.release.html_url }}'>Deschide release</a>"
+          done

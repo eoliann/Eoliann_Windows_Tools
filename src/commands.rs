@@ -765,3 +765,87 @@ pub fn set_display_for_performance() -> String {
         Write-Output '➡️ Please log off or restart for changes to take effect.'
     "##)
 }
+
+
+use std::process::Output;
+
+// Rulează un proces ascuns și capturează output.
+fn run_hidden(cmd: &str, args: &[&str]) -> std::io::Result<Output> {
+    let mut c = std::process::Command::new(cmd);
+    c.args(args)
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped());
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        c.creation_flags(CREATE_NO_WINDOW);
+    }
+    c.output()
+}
+
+/// Încearcă să verifice/actualizeze winget. Întoarce true dacă e gata de folosire.
+pub fn ensure_winget_ready(log: Arc<Mutex<String>>) -> bool {
+    match run_hidden("winget", &["--version"]) {
+        Ok(o) if o.status.success() => {
+            push_line(&log, "✅ winget available.");
+            // încercăm și un source update (nu strică)
+            let _ = run_hidden("winget", &["source", "update"]);
+            true
+        }
+        _ => {
+            push_line(&log, "⚠ winget not found. Attempting to help you install 'App Installer' (Microsoft Store)...");
+            // Deschide pagina App Installer în Store; utilizatorul trebuie să confirme instalarea.
+            let _ = std::process::Command::new("powershell")
+                .args(&[
+                    "-ExecutionPolicy", "Bypass",
+                    "-Command",
+                    "Start-Process 'ms-windows-store://pdp/?productid=9NBLGGH4NNS1'"
+                ])
+                .stdout(std::process::Stdio::null())
+                .stderr(std::process::Stdio::null())
+                .spawn();
+            push_line(&log, "Please install/update 'App Installer' from the Store, then retry.");
+            false
+        }
+    }
+}
+
+/// Verifică dacă un id winget este instalat (winget list --id).
+pub fn winget_is_installed(id: &str) -> bool {
+    match run_hidden("winget", &["list", "--id", id, "-e"]) {
+        Ok(o) => {
+            let out = String::from_utf8_lossy(&o.stdout);
+            // winget scrie „No installed package found…” când nu găsește nimic
+            o.status.success() && !out.to_lowercase().contains("no installed package")
+        }
+        Err(_) => false,
+    }
+}
+
+/// Instalează pachetul (silent) și streamează în log.
+pub fn winget_install(id: &str, log: Arc<Mutex<String>>) -> i32 {
+    let args = ["install", "--id", id, "-e", "--silent", "--accept-package-agreements", "--accept-source-agreements"];
+    match run_command_stream_and_wait(log, "winget", &args) {
+        Ok(code) => code,
+        Err(_) => -1,
+    }
+}
+
+/// Dezinstalează pachetul (unde se poate) și streamează în log.
+pub fn winget_uninstall(id: &str, log: Arc<Mutex<String>>) -> i32 {
+    let args = ["uninstall", "--id", id, "-e", "--silent"];
+    match run_command_stream_and_wait(log, "winget", &args) {
+        Ok(code) => code,
+        Err(_) => -1,
+    }
+}
+
+/// Upgrade pentru pachet (silent) și streamează în log.
+pub fn winget_upgrade(id: &str, log: Arc<Mutex<String>>) -> i32 {
+    let args = ["upgrade", "--id", id, "-e", "--silent", "--accept-package-agreements", "--accept-source-agreements"];
+    match run_command_stream_and_wait(log, "winget", &args) {
+        Ok(code) => code,
+        Err(_) => -1,
+    }
+}

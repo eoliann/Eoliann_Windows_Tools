@@ -3,7 +3,7 @@ use std::sync::{Arc, Mutex};
 use eframe::egui;
 use egui::{Color32, RichText, Vec2};
 
-use crate::tabs::{info, tools, winapp_removal, settings};
+use crate::tabs::{info, tools, install, winapp_removal, settings};
 
 // ---------------- THEME (verde fluorescent) ----------------
 fn apply_neon_theme(ctx: &egui::Context) {
@@ -44,6 +44,7 @@ fn apply_neon_theme(ctx: &egui::Context) {
 enum Page {
     Info,
     Tools,
+    Install,
     WinAppRemoval,
     Settings,
 }
@@ -80,7 +81,7 @@ impl App {
     // -------------- SIDEBAR --------------
     fn sidebar(&mut self, ui: &mut egui::Ui) {
         ui.add_space(6.0);
-        ui.heading(RichText::new("Eoliann Tools").color(Color32::from_rgb(0, 255, 140)));
+        ui.heading(RichText::new("Eoliann Win Tools").color(Color32::from_rgb(0, 255, 140)));
         ui.add_space(10.0);
         ui.separator();
         ui.add_space(6.0);
@@ -99,6 +100,9 @@ impl App {
         }
         if btn(ui, "Tools", self.page == Page::Tools).clicked() {
             self.page = Page::Tools;
+        }
+        if btn(ui, "Install", self.page == Page::Install).clicked() {
+            self.page = Page::Install;
         }
         if btn(ui, "WinApp Removal", self.page == Page::WinAppRemoval).clicked() {
             self.page = Page::WinAppRemoval;
@@ -144,6 +148,12 @@ impl eframe::App for App {
                         &self.log,
                         &mut self.show_popup,
                         &mut self.popup_message,
+                    );
+                }
+                Page::Install => {
+                    install::show_install(
+                        ui, 
+                        &self.log
                     );
                 }
                 Page::WinAppRemoval => {

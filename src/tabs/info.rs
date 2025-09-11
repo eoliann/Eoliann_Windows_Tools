@@ -54,7 +54,7 @@ pub fn show_info(ui: &mut egui::Ui, log_output: &Arc<Mutex<String>>) {
             *log_output.lock().unwrap() = format!("> ipconfig /all\n{}", out);
         }
 
-        if ui.button("🖥️ systeminfo")
+        if ui.button("💻 systeminfo")
             .on_hover_ui(|ui| {
                 ui.vertical(|ui| {
                     ui.colored_label(egui::Color32::from_rgb(57, 255, 20), "systeminfo");

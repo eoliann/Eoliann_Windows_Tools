@@ -1,4 +1,4 @@
-use std::process::Command;
+use std::process::{Command, Stdio};
 
 #[cfg(windows)]
 use std::os::windows::process::CommandExt;
@@ -31,5 +31,33 @@ pub fn run_command(cmdline: &str) -> String {
             s
         }
         Err(e) => format!("Exec error: {e}"),
+    }
+}
+
+pub fn run_powershell(script: &str) -> String {
+    let output = Command::new("powershell")
+        .args(["-ExecutionPolicy", "Bypass", "-NoProfile", "-Command", script])
+        .creation_flags(0x08000000) // ascunde CMD
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .output();
+
+    match output {
+        Ok(o) => {
+            let mut result = String::new();
+            if !o.stdout.is_empty() {
+                result.push_str(&String::from_utf8_lossy(&o.stdout));
+            }
+            if !o.stderr.is_empty() {
+                result.push_str("\n⚠ ERROR: ");
+                result.push_str(&String::from_utf8_lossy(&o.stderr));
+            }
+            if result.trim().is_empty() {
+                "⚠ No output returned.".to_string()
+            } else {
+                result
+            }
+        }
+        Err(e) => format!("❌ Execution error: {}", e),
     }
 }

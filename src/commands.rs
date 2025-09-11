@@ -414,3 +414,354 @@ pub fn remove_all_apps(force: bool) -> String {
 
     results
 }
+
+#[allow(dead_code)]
+pub fn disable_telemetry() -> String {
+    let ps_script = r#"
+    # Dezactivează task-urile de telemetrie
+    $tasks = @(
+        "Microsoft\Windows\Application Experience\Microsoft Compatibility Appraiser",
+        "Microsoft\Windows\Application Experience\ProgramDataUpdater",
+        "Microsoft\Windows\Autochk\Proxy",
+        "Microsoft\Windows\Customer Experience Improvement Program\Consolidator",
+        "Microsoft\Windows\Customer Experience Improvement Program\UsbCeip",
+        "Microsoft\Windows\DiskDiagnostic\Microsoft-Windows-DiskDiagnosticDataCollector",
+        "Microsoft\Windows\Feedback\Siuf\DmClient",
+        "Microsoft\Windows\Feedback\Siuf\DmClientOnScenarioDownload",
+        "Microsoft\Windows\Windows Error Reporting\QueueReporting",
+        "Microsoft\Windows\Application Experience\MareBackup",
+        "Microsoft\Windows\Application Experience\StartupAppTask",
+        "Microsoft\Windows\Application Experience\PcaPatchDbTask",
+        "Microsoft\Windows\Maps\MapsUpdateTask"
+    )
+        foreach ($task in $tasks) {
+            schtasks /Change /TN $task /Disable 2>&1
+        }
+
+        # Setări registry pentru a dezactiva telemetria
+        Set-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\DataCollection" -Name "AllowTelemetry" -Type DWord -Value 0 -Force -ErrorAction SilentlyContinue
+        Set-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\DataCollection" -Name "AllowTelemetry" -Type DWord -Value 0 -Force -ErrorAction SilentlyContinue
+        Set-ItemProperty -Path "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\ContentDeliveryManager" -Name "ContentDeliveryAllowed" -Type DWord -Value 0 -Force -ErrorAction SilentlyContinue
+        Set-ItemProperty -Path "HKCU:\SOFTWARE\Microsoft\Siuf\Rules" -Name "NumberOfSIUFInPeriod" -Type DWord -Value 0 -Force -ErrorAction SilentlyContinue
+        Set-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\DataCollection" -Name "DoNotShowFeedbackNotifications" -Type DWord -Value 1 -Force -ErrorAction SilentlyContinue
+        Set-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\AdvertisingInfo" -Name "DisabledByGroupPolicy" -Type DWord -Value 1 -Force -ErrorAction SilentlyContinue
+        Set-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows\Windows Error Reporting" -Name "Disabled" -Type DWord -Value 1 -Force -ErrorAction SilentlyContinue
+
+        Write-Output '✅ Telemetry disabled successfully'
+        "#;
+
+        crate::utils::run_powershell(ps_script)
+    }
+
+#[allow(dead_code)]
+pub fn disable_location_tracking() -> String {
+    let ps_script = r#"
+    # Dezactivează Location Tracking prin registry
+    Set-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\location" -Name "Value" -Value "Deny" -Force -ErrorAction SilentlyContinue
+    Set-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Sensor\Overrides\{BFA794E4-F964-4FDB-90F6-51056BFE4B44}" -Name "SensorPermissionState" -Type DWord -Value 0 -Force -ErrorAction SilentlyContinue
+    Set-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Services\lfsvc\Service\Configuration" -Name "Status" -Type DWord -Value 0 -Force -ErrorAction SilentlyContinue
+    Set-ItemProperty -Path "HKLM:\SYSTEM\Maps" -Name "AutoUpdateEnabled" -Type DWord -Value 0 -Force -ErrorAction SilentlyContinue
+
+    Write-Output '✅ Location Tracking disabled successfully'
+    "#;
+
+        crate::utils::run_powershell(ps_script)
+}
+
+#[allow(dead_code)]
+pub fn disable_wifi_sense() -> String {
+    let ps_script = r#"
+    # Dezactivează Wifi-Sense prin registry
+    Set-ItemProperty -Path "HKLM:\Software\Microsoft\PolicyManager\default\WiFi\AllowWiFiHotSpotReporting" -Name "Value" -Type DWord -Value 0 -Force -ErrorAction SilentlyContinue
+    Set-ItemProperty -Path "HKLM:\Software\Microsoft\PolicyManager\default\WiFi\AllowAutoConnectToWiFiSenseHotspots" -Name "Value" -Type DWord -Value 0 -Force -ErrorAction SilentlyContinue
+
+    Write-Output '✅ Wifi-Sense disabled successfully'
+    "#;
+
+    crate::utils::run_powershell(ps_script)
+}
+
+#[allow(dead_code)]
+/// ✅ Enable End Task With Right Click
+pub fn enable_end_task_right_click() -> String {
+    let ps_script = r#"
+        $path = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced\TaskbarDeveloperSettings'
+        $name = 'TaskbarEndTask'
+        $value = 1
+
+        if (-not (Test-Path $path)) {
+            New-Item -Path $path -Force | Out-Null
+        }
+
+        New-ItemProperty -Path $path -Name $name -PropertyType DWord -Value $value -Force | Out-Null
+        Write-Output '✅ End Task with Right-Click enabled successfully.'
+    "#;
+
+    crate::utils::run_powershell(ps_script)
+}
+
+/// ❌ Disable End Task With Right Click (Undo)
+#[allow(dead_code)]
+pub fn disable_end_task_right_click() -> String {
+    let ps_script = r#"
+        $path = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced\TaskbarDeveloperSettings'
+        $name = 'TaskbarEndTask'
+        $value = 0
+
+        if (-not (Test-Path $path)) {
+            New-Item -Path $path -Force | Out-Null
+        }
+
+        New-ItemProperty -Path $path -Name $name -PropertyType DWord -Value $value -Force | Out-Null
+        Write-Output '↩ End Task with Right-Click reverted (disabled).'
+    "#;
+
+    crate::utils::run_powershell(ps_script)
+}
+
+#[allow(dead_code)]
+/// 🔹 Disable Recall
+pub fn disable_recall() -> String {
+    let ps_script = r#"
+        Write-Host 'Disable Recall'
+        New-Item -Path 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsAI' -Force | Out-Null
+        Set-ItemProperty -Path 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsAI' -Name 'DisableAIDataAnalysis' -Value 1 -Type DWord
+        Set-ItemProperty -Path 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsAI' -Name 'AllowRecallEnablement' -Value 0 -Type DWord
+
+        New-Item -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\CI\Policy' -Force | Out-Null
+        Set-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\CI\Policy' -Name 'VerifiedAndReputablePolicyState' -Value 0 -Type DWord
+
+        DISM /Online /Disable-Feature /FeatureName:Recall /Quiet /NoRestart
+        Write-Host 'Please restart your computer in order for the changes to be fully applied.'
+    "#;
+
+    crate::utils::run_powershell(ps_script)
+}
+
+#[allow(dead_code)]
+pub fn enable_recall() -> String {
+    let ps_script = r#"
+        Write-Host 'Enable Recall'
+        DISM /Online /Enable-Feature /FeatureName:Recall /Quiet /NoRestart
+        Write-Host 'Please restart your computer in order for the changes to be fully applied.'
+    "#;
+
+    crate::utils::run_powershell(ps_script)
+}
+
+#[allow(dead_code)]
+/// 🔹 Debloat Microsoft Edge
+pub fn debloat_edge() -> String {
+    let ps_script = r#"
+        Write-Host 'Applying Debloat Edge Tweaks...'
+
+        # Edge Update - disable desktop shortcut
+        New-Item -Path 'HKLM:\SOFTWARE\Policies\Microsoft\EdgeUpdate' -Force | Out-Null
+        Set-ItemProperty -Path 'HKLM:\SOFTWARE\Policies\Microsoft\EdgeUpdate' -Name 'CreateDesktopShortcutDefault' -Value 0 -Type DWord
+
+        # Edge policies
+        New-Item -Path 'HKLM:\SOFTWARE\Policies\Microsoft\Edge' -Force | Out-Null
+
+        $settings = @{
+            EdgeEnhanceImagesEnabled = 0
+            PersonalizationReportingEnabled = 0
+            ShowRecommendationsEnabled = 0
+            HideFirstRunExperience = 1
+            UserFeedbackAllowed = 0
+            ConfigureDoNotTrack = 1
+            AlternateErrorPagesEnabled = 0
+            EdgeCollectionsEnabled = 0
+            EdgeFollowEnabled = 0
+            EdgeShoppingAssistantEnabled = 0
+            MicrosoftEdgeInsiderPromotionEnabled = 0
+            ShowMicrosoftRewards = 0
+            WebWidgetAllowed = 0
+            DiagnosticData = 0
+            EdgeAssetDeliveryServiceEnabled = 0
+            CryptoWalletEnabled = 0
+            WalletDonationEnabled = 0
+        }
+
+        foreach ($key in $settings.Keys) {
+            Set-ItemProperty -Path 'HKLM:\SOFTWARE\Policies\Microsoft\Edge' -Name $key -Value $settings[$key] -Type DWord
+        }
+
+        Write-Host '✅ Edge Debloat applied successfully.'
+    "#;
+
+    crate::utils::run_powershell(ps_script)
+}
+
+#[allow(dead_code)]
+// === Adobe Network Block ===
+pub fn adobe_network_block() -> String {
+    run_command(r#"powershell -Command "
+        $remoteHostsUrl = 'https://raw.githubusercontent.com/Ruddernation-Designs/Adobe-URL-Block-List/master/hosts'
+        $localHostsPath = 'C:\Windows\System32\drivers\etc\hosts'
+        $tempHostsPath = 'C:\Windows\System32\drivers\etc\temp_hosts'
+
+        try {
+            Invoke-WebRequest -Uri $remoteHostsUrl -OutFile $tempHostsPath
+            Write-Output 'Downloaded the remote HOSTS file to a temporary location.'
+        } catch {
+            Write-Output 'Failed to download the HOSTS file.'
+        }
+
+        try {
+            $localHostsContent = Get-Content $localHostsPath -ErrorAction Stop
+            $blockStartExists = $localHostsContent -like '*#AdobeNetBlock-start*'
+            if ($blockStartExists) {
+                Write-Output 'AdobeNetBlock-start already exists. Skipping addition.'
+            } else {
+                $newBlockContent = Get-Content $tempHostsPath -ErrorAction Stop |
+                    Where-Object { $_ -notmatch '^\s*#' -and $_ -ne '' }
+                $newBlockHeader = '#AdobeNetBlock-start'
+                $newBlockFooter = '#AdobeNetBlock-end'
+                $combinedContent = $localHostsContent + $newBlockHeader, $newBlockContent, $newBlockFooter
+                $combinedContent | Set-Content $localHostsPath -Encoding ASCII
+                Write-Output 'Successfully added the AdobeNetBlock.'
+            }
+        } catch {
+            Write-Output 'Error during processing.'
+        }
+
+        Remove-Item $tempHostsPath -ErrorAction Ignore
+
+        try {
+            ipconfig /flushdns | Out-Null
+            Write-Output 'DNS cache flushed successfully.'
+        } catch {
+            Write-Output 'Failed to flush DNS cache.'
+        }
+    ""#)
+}
+
+#[allow(dead_code)]
+// === Adobe Debloat ===
+pub fn adobe_debloat() -> String {
+    run_command(r#"powershell -NoProfile -ExecutionPolicy Bypass -Command "
+        function CCStopper {
+            $path = 'C:\Program Files (x86)\Common Files\Adobe\Adobe Desktop Common\ADS\Adobe Desktop Service.exe'
+            if (Test-Path $path) {
+                Takeown /f $path
+                $acl = Get-Acl $path
+                $acl.SetOwner([System.Security.Principal.NTAccount]'Administrators')
+                $acl | Set-Acl $path
+                Rename-Item -Path $path -NewName 'Adobe Desktop Service.exe.old' -Force
+                Write-Output '✅ Adobe Desktop Service disabled.'
+            } else {
+                Write-Output 'ℹ️ Adobe Desktop Service not found in default location.'
+            }
+        }
+
+        function AcrobatUpdates {
+            $rootPath = 'HKLM:\SOFTWARE\WOW6432Node\Adobe\Adobe ARM\Legacy\Acrobat'
+            $subKeys = Get-ChildItem -Path $rootPath | Where-Object { $_.PSChildName -like '{*}' }
+            foreach ($subKey in $subKeys) {
+                $fullPath = Join-Path -Path $rootPath -ChildPath $subKey.PSChildName
+                try {
+                    Set-ItemProperty -Path $fullPath -Name Mode -Value 0
+                    Write-Output '✅ Acrobat Updates disabled.'
+                } catch {
+                    Write-Output \"⚠️ Registry Key for Acrobat Updates not found: $fullPath\"
+                }
+            }
+        }
+
+        CCStopper
+        AcrobatUpdates
+
+        $services = @('AGSService','AGMService','AdobeUpdateService','Adobe Acrobat Update',
+                      'Adobe Genuine Monitor Service','AdobeARMservice','Adobe Licensing Console',
+                      'CCXProcess','AdobeIPCBroker','CoreSync')
+        foreach ($svc in $services) {
+            try {
+                Set-Service -Name $svc -StartupType Disabled -ErrorAction SilentlyContinue
+                Stop-Service -Name $svc -Force -ErrorAction SilentlyContinue
+                Write-Output \"✅ Disabled service: $svc\"
+            } catch {
+                Write-Output \"⚠️ Failed to disable service: $svc\"
+            }
+        }
+    ""#)
+}
+
+#[allow(dead_code)]
+// === Disable Microsoft Copilot ===
+pub fn disable_copilot() -> String {
+    run_command(r##"powershell -NoProfile -ExecutionPolicy Bypass -Command "
+        Write-Output '🛑 Removing Microsoft Copilot...'
+
+        # Registry tweaks
+        try {
+            New-Item -Path 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsCopilot' -Force | Out-Null
+            Set-ItemProperty -Path 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsCopilot' -Name 'TurnOffWindowsCopilot' -Value 1 -Type DWord
+            Write-Output '✅ Copilot disabled via HKLM policy.'
+        } catch {
+            Write-Output '⚠️ Failed to apply HKLM Copilot policy.'
+        }
+
+        try {
+            New-Item -Path 'HKCU:\Software\Policies\Microsoft\Windows\WindowsCopilot' -Force | Out-Null
+            Set-ItemProperty -Path 'HKCU:\Software\Policies\Microsoft\Windows\WindowsCopilot' -Name 'TurnOffWindowsCopilot' -Value 1 -Type DWord
+            Write-Output '✅ Copilot disabled via HKCU policy.'
+        } catch {
+            Write-Output '⚠️ Failed to apply HKCU Copilot policy.'
+        }
+
+        try {
+            Set-ItemProperty -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced' -Name 'ShowCopilotButton' -Value 0 -Type DWord
+            Write-Output '✅ Copilot button removed from taskbar.'
+        } catch {
+            Write-Output '⚠️ Failed to remove Copilot button.'
+        }
+
+        # Optional: remove package
+        try {
+            dism /online /remove-package /package-name:Microsoft.Windows.Copilot | Out-Null
+            Write-Output '✅ Copilot package removal attempted.'
+        } catch {
+            Write-Output '⚠️ Failed to remove Copilot package.'
+        }
+
+        Write-Output '➡️ Please restart Windows to complete changes.'
+    "##)
+}
+
+#[allow(dead_code)]
+// === Set Display for Performance ===
+pub fn set_display_for_performance() -> String {
+    run_command(r##"powershell -NoProfile -ExecutionPolicy Bypass -Command "
+        Write-Output '🎛️ Applying Display Performance Tweaks...'
+
+        # Registry changes
+        try {
+            Set-ItemProperty -Path 'HKCU:\Control Panel\Desktop' -Name 'DragFullWindows' -Value '0' -Type String
+            Set-ItemProperty -Path 'HKCU:\Control Panel\Desktop' -Name 'MenuShowDelay' -Value '200' -Type String
+            Set-ItemProperty -Path 'HKCU:\Control Panel\Desktop\WindowMetrics' -Name 'MinAnimate' -Value '0' -Type String
+            Set-ItemProperty -Path 'HKCU:\Control Panel\Keyboard' -Name 'KeyboardDelay' -Value 0 -Type DWord
+            Set-ItemProperty -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced' -Name 'ListviewAlphaSelect' -Value 0 -Type DWord
+            Set-ItemProperty -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced' -Name 'ListviewShadow' -Value 0 -Type DWord
+            Set-ItemProperty -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced' -Name 'TaskbarAnimations' -Value 0 -Type DWord
+            Set-ItemProperty -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\VisualEffects' -Name 'VisualFXSetting' -Value 3 -Type DWord
+            Set-ItemProperty -Path 'HKCU:\Software\Microsoft\Windows\DWM' -Name 'EnableAeroPeek' -Value 0 -Type DWord
+            Set-ItemProperty -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced' -Name 'TaskbarMn' -Value 0 -Type DWord
+            Set-ItemProperty -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced' -Name 'TaskbarDa' -Value 0 -Type DWord
+            Set-ItemProperty -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced' -Name 'ShowTaskViewButton' -Value 0 -Type DWord
+            Set-ItemProperty -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Search' -Name 'SearchboxTaskbarMode' -Value 0 -Type DWord
+            Write-Output '✅ Registry tweaks applied.'
+        } catch {
+            Write-Output '⚠️ Failed to apply some registry tweaks.'
+        }
+
+        # Apply UserPreferencesMask for Performance
+        try {
+            Set-ItemProperty -Path 'HKCU:\Control Panel\Desktop' -Name 'UserPreferencesMask' -Type Binary -Value ([byte[]](144,18,3,128,16,0,0,0))
+            Write-Output '✅ UserPreferencesMask set for performance.'
+        } catch {
+            Write-Output '⚠️ Failed to update UserPreferencesMask.'
+        }
+
+        Write-Output '➡️ Please log off or restart for changes to take effect.'
+    "##)
+}

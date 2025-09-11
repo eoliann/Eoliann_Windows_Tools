@@ -2,7 +2,7 @@ name: Notify Telegram on Release
 
 on:
   release:
-    types: [published]   # rulează doar când apare un release nou
+    types: [published]
 
 jobs:
   notify:
@@ -10,7 +10,7 @@ jobs:
     steps:
       - name: Send Telegram message
         run: |
-          curl -s -X POST https://api.telegram.org/bot${{ secrets.TG_BOT_TOKEN }}/sendMessage \
+          curl -v -X POST https://api.telegram.org/bot${{ secrets.TG_BOT_TOKEN }}/sendMessage \
             -d chat_id=${{ secrets.TG_CHAT_ID }} \
-            -d parse_mode=Markdown \
-            -d text="📢 *Nou release pe GitHub!*%0A%0A*${{ github.event.release.name }}* (tag: ${{ github.event.release.tag_name }})%0A👉 [Deschide release](${{ github.event.release.html_url }})"
+            -d parse_mode=HTML \
+            -d text="📢 <b>Nou release pe GitHub!</b>%0A%0A<b>${{ github.event.release.name }}</b> (tag: ${{ github.event.release.tag_name }})%0A👉 <a href='${{ github.event.release.html_url }}'>Deschide release</a>"

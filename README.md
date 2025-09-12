@@ -26,7 +26,7 @@ Includes useful administration commands and tweaks for Windows 11.
 ## 🚀 Funcționalități / Features
 
 ### INFO
-<img width="1002" height="732" alt="Screenshot 2025-09-11 151923" src="https://github.com/user-attachments/assets/e6bb58d8-ea70-4a0a-92b2-3be2ef034b88" />
+<img width="1002" height="732" alt="1" src="https://github.com/user-attachments/assets/eafdb955-e54c-4016-9e83-a2c995b2baaa" />
 
 - `whoami` → afișează utilizatorul curent / displays the current user
 - `ipconfig` → afișează setările de rețea / display network settings
@@ -59,7 +59,7 @@ Includes useful administration commands and tweaks for Windows 11.
 - `Power Tweaks` → Disable Sleep (fără standby/sleep/hibernate), Disable HDD/SSD turn off, Disable Monitor turn off și funcționează atât pe baterie (DC) cât și la priză (AC) / Disable Sleep (no standby/sleep/hibernate), Disable HDD/SSD turn off, Disable Monitor turn off, and works on both battery (DC) and mains power (AC)
 
 ### INSTALL
-<img width="1002" height="732" alt="Screenshot 2025-09-11 151930" src="https://github.com/user-attachments/assets/da61c73e-9d1c-4790-86b7-1e9f1f7592df" />
+<img width="1002" height="732" alt="2" src="https://github.com/user-attachments/assets/d26ed7ea-be21-41f6-93a2-b6ce629a9012" />
 
 - `Browsers`
 - `Communications`
@@ -69,7 +69,6 @@ Includes useful administration commands and tweaks for Windows 11.
 - `Microsoft Tools`
 - `Multimedia Tools`
 - `Pro Tools`
-- `Security`
 - `Utilities`
   
 ### WINDOWS APP REMOVAL
@@ -83,7 +82,7 @@ Includes useful administration commands and tweaks for Windows 11.
 - `System & Misc` → elimină aplicațiile implicite care vin cu instalarea Windows, precum: People, Maps, Wallet, Get Started, Feedback Hub, Alarms & Clock, OneConnect, Windows Phone, Voice Recorder / remove default applications that come with Windows installation, such as: People, Maps, Wallet, Get Started, Feedback Hub, Alarms & Clock, OneConnect, Windows Phone, Voice Recorder
 
 ### SETTINGS
-<img width="1002" height="732" alt="EWT_settings" src="https://github.com/user-attachments/assets/30f1f322-7210-4b76-bfe3-5a7c68e70fcf" />
+<img width="1252" height="914" alt="3" src="https://github.com/user-attachments/assets/ee3963ac-f848-4741-8b7a-24e3b85b824c" />
 
 - `Dark / Light Theme` → schimbă între temele Light și Dark ale Windows / switch between Windows Light and Dark themes
 - `Open Display Settings` → deschide fereastra cu opțiunile de afișare ale sistemului / opens the window with the system display options

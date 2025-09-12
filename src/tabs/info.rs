@@ -85,7 +85,7 @@ pub fn show_info(ui: &mut egui::Ui, log_output: &Arc<Mutex<String>>) {
 
     ui.separator();
     ui.label("📖 About:");
-    ui.label("Eoliann Windows Tools Version 1.0.4");
+    ui.label("Eoliann Windows Tools Version 1.0.6");
     ui.label("Created by Eoliann");
     ui.label("Quick tools for Windows administration.");
     // if ui.button("Open GitHub Repo").clicked() {

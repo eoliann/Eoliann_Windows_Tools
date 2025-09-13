@@ -60,8 +60,9 @@ Includes useful administration commands and tweaks for Windows 11.
 - `Power Tweaks` → Disable Sleep (fără standby/sleep/hibernate), Disable HDD/SSD turn off, Disable Monitor turn off și funcționează atât pe baterie (DC) cât și la priză (AC) / Disable Sleep (no standby/sleep/hibernate), Disable HDD/SSD turn off, Disable Monitor turn off, and works on both battery (DC) and mains power (AC)
 
 ### INSTALL
-<img width="1402" height="932" alt="1 0 8_install" src="https://github.com/user-attachments/assets/ecd871d7-e5b9-43a6-bb7a-30e9496af2f7" />
+<img width="1402" height="932" alt="1 0 9_install" src="https://github.com/user-attachments/assets/b8334a1b-faae-487e-969a-3a81ec369bc1" />
 
+- `Install selections, Uninstall selections, Update selections, Clear selections, Upgrade All Applications, Reinstall winget`
 - `Browsers`
 - `Communications`
 - `Development`

@@ -1,6 +1,6 @@
 [package]
 name = "eoliann_windows_tools_w11"
-version = "1.0.7"
+version = "1.0.8"
 summary = "Quick tools for Windows administration"
 edition = "2021"
 authors = ["Eoliann Dev"]

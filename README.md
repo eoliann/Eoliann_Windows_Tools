@@ -104,3 +104,17 @@ Includes useful administration commands and tweaks for Windows 11.
 ```powershell
 git clone https://github.com/eoliann/Eoliann_Windows_Tools
 cd Eoliann_Windows_Tools
+```
+
+---
+
+## 🛠 Bug-uri i erori / Bugs and Errors
+- În cazul în care descoperiți bug-uri sau erori, vă rog să le trimiteți pe canalul meu de **[Discord](https://discord.com/channels/977086560782663680/1416056622069055580)** / If you discover any bugs or errors, please send them to my channel at **[Discord](https://discord.com/channels/977086560782663680/1416056622069055580)**
+- Documentație / Documentation <a href="https://discord.com/channels/977086560782663680/1416056737047253156" target="_blank"><img src="https://img.shields.io/badge/documentation-available-blue?logo=readthedocs" alt="Documentation"/></a>
+
+---
+
+## 💖 Support
+- Pentru a susține moral și mental proiectul, nu uitați să lăsați un ⭐️! / To morally and mentally support the project, make sure to leave a ⭐️!
+- Susține acest proiect cu o donație / Support this project with a donation
+[![Donate](https://img.shields.io/badge/Donate-Revolut-purple)](http://revolut.me/adriannm9)

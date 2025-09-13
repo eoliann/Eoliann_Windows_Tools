@@ -26,7 +26,7 @@ Includes useful administration commands and tweaks for Windows 11.
 ## 🚀 Funcționalități / Features
 
 ### INFO
-<img width="1002" height="732" alt="1" src="https://github.com/user-attachments/assets/eafdb955-e54c-4016-9e83-a2c995b2baaa" />
+<img width="1002" height="732" alt="1 0 7_info" src="https://github.com/user-attachments/assets/dacc6483-85e4-44c4-b83b-75aa06f2ed6a" />
 
 - `whoami` → afișează utilizatorul curent / displays the current user
 - `ipconfig` → afișează setările de rețea / display network settings
@@ -34,7 +34,7 @@ Includes useful administration commands and tweaks for Windows 11.
 - `tasklist` → procese active / active processes
 
 ### TOOLS
-<img width="1252" height="914" alt="Screenshot 2025-09-11 170250" src="https://github.com/user-attachments/assets/4825115b-dc2d-4365-b574-f17b97953275" />
+<img width="1002" height="732" alt="1 0 7_tools" src="https://github.com/user-attachments/assets/1a5d2e7a-1034-4abf-a163-2c6d7017b5bd" />
 
 - `Toggle Context Menu` → schimbă instant între context menu **Win11 ↔ Classic** (cu restart Explorer) / Instantly switch between the **Win11 ↔ Classic** context menu (with Explorer restart)
 - `Disk Cleanup` → lansează curățarea de disc / start disk cleanup
@@ -59,7 +59,7 @@ Includes useful administration commands and tweaks for Windows 11.
 - `Power Tweaks` → Disable Sleep (fără standby/sleep/hibernate), Disable HDD/SSD turn off, Disable Monitor turn off și funcționează atât pe baterie (DC) cât și la priză (AC) / Disable Sleep (no standby/sleep/hibernate), Disable HDD/SSD turn off, Disable Monitor turn off, and works on both battery (DC) and mains power (AC)
 
 ### INSTALL
-<img width="1002" height="732" alt="2" src="https://github.com/user-attachments/assets/d26ed7ea-be21-41f6-93a2-b6ce629a9012" />
+<img width="1002" height="732" alt="1 0 7_install" src="https://github.com/user-attachments/assets/76e4928e-a724-435e-927c-e8ea1283cdf6" />
 
 - `Browsers`
 - `Communications`
@@ -72,7 +72,7 @@ Includes useful administration commands and tweaks for Windows 11.
 - `Utilities`
   
 ### WINDOWS APP REMOVAL
-<img width="1006" height="766" alt="EWT_winapp_removal" src="https://github.com/user-attachments/assets/a1026b80-a125-4f77-9650-8558d88ffb35" />
+<img width="1002" height="732" alt="1 0 7_winapp_removal" src="https://github.com/user-attachments/assets/1b18b88a-b495-40ad-b116-af0f605db107" />
 
 - `Communication` → elimină aplicațiile implicite care vin cu instalarea Windows, precum: Outlook for Windows, Skype, Teams, GroupMe, To-Do, Your Phone, CommsPhone, Messaging, Mail & Calendar și altele / remove default applications that come with Windows installation, such as: Outlook for Windows, Skype, Teams, GroupMe, To-Do, Your Phone, CommsPhone, Messaging, Mail & Calendar, and others.
 - `Media & Creativity` → elimină aplicațiile implicite care vin cu instalarea Windows, precum: Climpchamp, Camera, MS Paint, 3D Builder, 3D Viewer, Print 3D, Mixed Reality Portal / removes default applications that come with Windows installation, such as: Climpchamp, Camera, MS Paint, 3D Builder, 3D Viewer, Print 3D, Mixed Reality Portal
@@ -82,7 +82,7 @@ Includes useful administration commands and tweaks for Windows 11.
 - `System & Misc` → elimină aplicațiile implicite care vin cu instalarea Windows, precum: People, Maps, Wallet, Get Started, Feedback Hub, Alarms & Clock, OneConnect, Windows Phone, Voice Recorder / remove default applications that come with Windows installation, such as: People, Maps, Wallet, Get Started, Feedback Hub, Alarms & Clock, OneConnect, Windows Phone, Voice Recorder
 
 ### SETTINGS
-<img width="1252" height="914" alt="3" src="https://github.com/user-attachments/assets/ee3963ac-f848-4741-8b7a-24e3b85b824c" />
+<img width="1002" height="732" alt="1 0 7_settings" src="https://github.com/user-attachments/assets/bcd09f66-89a8-4553-b5fd-770bdbb8ddbb" />
 
 - `Dark / Light Theme` → schimbă între temele Light și Dark ale Windows / switch between Windows Light and Dark themes
 - `Open Display Settings` → deschide fereastra cu opțiunile de afișare ale sistemului / opens the window with the system display options

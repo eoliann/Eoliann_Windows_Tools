@@ -1,5 +1,5 @@
 [package]
-name = "EWT"
+name = "eoliann_windows_tools_w11"
 version = "1.0.7"
 summary = "Quick tools for Windows administration"
 edition = "2021"

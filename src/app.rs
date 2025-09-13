@@ -50,6 +50,8 @@ enum Page {
 }
 
 pub struct App {
+    pub latest_release: Option<crate::utils::GithubRelease>,
+    pub update_available: bool,
     page: Page,
     log: Arc<Mutex<String>>,
     show_popup: bool,
@@ -59,6 +61,8 @@ pub struct App {
 impl Default for App {
     fn default() -> Self {
         Self {
+            latest_release: None,
+            update_available: false,
             page: Page::Info,
             log: Arc::new(Mutex::new(String::new())),
             show_popup: false,
@@ -69,7 +73,23 @@ impl Default for App {
 
 impl App {
     pub fn new() -> Self {
-        Self::default()
+        let current_version = env!("CARGO_PKG_VERSION");
+
+        let mut update_available = false;
+        let mut latest_release = None;
+
+        if let Some(release) = crate::utils::check_latest_version() {
+            if crate::utils::is_update_available(current_version, &release.tag_name) {
+                update_available = true;
+                latest_release = Some(release);
+            }
+        }
+
+        Self {
+            latest_release,
+            update_available,
+            ..Self::default()
+        }
     }
 
     fn clear_log(&self) {
@@ -82,6 +102,8 @@ impl App {
     fn sidebar(&mut self, ui: &mut egui::Ui) {
         ui.add_space(6.0);
         ui.heading(RichText::new("Eoliann Win Tools").color(Color32::from_rgb(0, 255, 140)));
+        ui.add_space(10.0);
+        ui.label(format!("Version: {}", env!("CARGO_PKG_VERSION")));
         ui.add_space(10.0);
         ui.separator();
         ui.add_space(6.0);
@@ -192,6 +214,24 @@ impl eframe::App for App {
                         });
                     });
             }
+            // --- verificare update ---
+            if self.update_available {
+                egui::Window::new("Update Available")
+                    .collapsible(false)
+                    .resizable(false)
+                    .show(ctx, |ui| {
+                        ui.label("A new version is available!");
+                        if let Some(release) = &self.latest_release {
+                            ui.label(format!("Latest version: {}", release.tag_name));
+                            // Removed the opener::open call as it's not directly available here
+                            // and would require a different approach for opening URLs in egui.
+                            // For now, the user can manually visit the URL.
+                        }
+                        if ui.button("Close").clicked() {
+                            self.update_available = false; // închide fereastra
+                        }
+                    });
+            }       
         });
     }
 }

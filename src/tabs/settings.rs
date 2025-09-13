@@ -29,7 +29,12 @@ pub fn show_settings(ui: &mut egui::Ui, log_output: &Arc<Mutex<String>>) {
 
         if ui.button(button_style).clicked() {
             let mut log = log_output.lock().unwrap();
-            *log = "Eoliann Windows Tools v1.0.6\nCreated by Eoliann Dev\nQuick tools for Windows administration.\nWebsite: https://github.com/eoliann".to_string();
+            // *log = "Eoliann Windows Tools v1.0.7\nCreated by Eoliann Dev\nQuick tools for Windows administration.\nWebsite: https://github.com/eoliann".to_string();
+            *log = format!(
+                "Eoliann Windows Tools v{}\nCreated by Eoliann Dev\nQuick tools for Windows administration.\nWebsite: https://github.com/eoliann",
+                env!("CARGO_PKG_VERSION")
+            );
+
         }
     });
     ui.separator();

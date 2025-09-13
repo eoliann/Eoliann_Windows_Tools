@@ -849,3 +849,104 @@ pub fn winget_upgrade(id: &str, log: Arc<Mutex<String>>) -> i32 {
         Err(_) => -1,
     }
 }
+
+/// seteaza un dns custom pentru toate adaptoarele de retea
+pub fn set_dns(provider: &str) -> String {
+    match provider {
+        "Google" => run_dns("8.8.8.8", "8.8.4.4"),
+        "Cloudflare" => run_dns("1.1.1.1", "1.0.0.1"),
+        "Cloudflare_Malware" => run_dns("1.1.1.2", "1.0.0.2"),
+        "Cloudflare_Malware_Adult" => run_dns("1.1.1.3", "1.0.0.3"),
+        "Open_DNS" => run_dns("208.67.222.222", "208.67.220.220"),
+        "Quad9" => run_dns("9.9.9.9", "149.112.112.112"),
+        "AdGuard_Ads_Trackers" => run_dns("94.140.14.14", "94.140.15.15"),
+        "AdGuard_Ads_Trackers_Malware_Adult" => run_dns("94.140.14.15", "94.140.15.16"),
+        "dns0.eu_Open" => run_dns("193.110.81.254", "185.253.5.254"),
+        "dns0.eu_ZERO" => run_dns("193.110.81.9", "185.253.5.9"),
+        "dns0.eu_KIDS" => run_dns("193.110.81.1", "185.253.5.1"),
+        "Automatic (DHCP)" => reset_dns(),
+        _ => "❌ Unknown DNS provider".to_string(),
+    }
+}
+
+fn run_dns(primary: &str, secondary: &str) -> String {
+    let mut output = String::new();
+
+    // Get all network adapter names
+    let get_interfaces_cmd = "Get-NetAdapter | Select-Object -ExpandProperty Name";
+    let interfaces_output = run_command(&format!("powershell -Command \"{}\"", get_interfaces_cmd));
+
+    let interfaces: Vec<&str> = interfaces_output
+        .lines()
+        .filter(|s| !s.trim().is_empty())
+        .collect();
+
+    if interfaces.is_empty() {
+        return "❌ No network adapters found.".to_string();
+    }
+
+    for iface in interfaces {
+        // Set primary DNS
+        let set_primary_cmd = format!(
+            "netsh interface ip set dns name=\"{}\" static {}",
+            iface, primary
+        );
+        let res_primary = run_command(&set_primary_cmd);
+        output.push_str(&format!("Setting primary DNS for '{}' to {}: {}\n", iface, primary, res_primary.trim()));
+
+        // Set secondary DNS
+        let set_secondary_cmd = format!(
+            "netsh interface ip add dns name=\"{}\" {} index=2",
+            iface, secondary
+        );
+        let res_secondary = run_command(&set_secondary_cmd);
+        output.push_str(&format!("Setting secondary DNS for '{}' to {}: {}\n", iface, secondary, res_secondary.trim()));
+    }
+
+    // Flush DNS cache
+    let flush_dns_cmd = "ipconfig /flushdns";
+    let res_flush = run_command(flush_dns_cmd);
+    output.push_str(&format!("Flushing DNS cache: {}\n", res_flush.trim()));
+
+    output
+}
+
+fn reset_dns() -> String {
+    let iface_output = std::process::Command::new("cmd")
+        .args(["/C", "netsh interface show interface"])
+        .output();
+
+    let iface_name = match iface_output {
+        Ok(output) => {
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            if let Some(line) = stdout.lines().find(|l| l.contains("Connected")) {
+                line.split_whitespace().last().unwrap_or("Ethernet").to_string()
+            } else {
+                "Ethernet".to_string()
+            }
+        }
+        Err(_) => "Ethernet".to_string(),
+    };
+
+    let cmd = format!(
+        "netsh interface ip set dns name=\"{iface}\" dhcp",
+        iface = iface_name
+    );
+
+    match std::process::Command::new("cmd")
+        .args(["/C", &cmd])
+        .output()
+    {
+        Ok(output) => {
+            if output.status.success() {
+                format!("✅ DNS reset to Automatic (DHCP) on {iface_name}")
+            } else {
+                format!(
+                    "❌ Failed to reset DNS: {}",
+                    String::from_utf8_lossy(&output.stderr)
+                )
+            }
+        }
+        Err(e) => format!("❌ Error running command: {e}"),
+    }
+}

@@ -240,6 +240,101 @@ pub fn show_tools(
     ui.add_space(6.0);
 
     // ---- Advanced Tweaks ----
+    // ui.group(|ui| {
+    //     ui.label("Advanced Tweaks");
+    //     ui.horizontal_wrapped(|ui| {
+    //         if ui.button("🚫 Adobe Network Block")
+    //             .on_hover_ui(|ui| {
+    //                 ui.vertical(|ui| {
+    //                     ui.colored_label(
+    //                         egui::Color32::from_rgb(255, 80, 80),
+    //                         "Blocks Adobe activation & telemetry servers"
+    //                     );
+    //                     ui.label("• Edits the HOSTS file with blocklist");
+    //                     ui.colored_label(
+    //                         egui::Color32::YELLOW,
+    //                         "⚠ Requires admin rights"
+    //                     );
+    //                     ui.colored_label(
+    //                         egui::Color32::LIGHT_BLUE,
+    //                         "ℹ DNS cache will be flushed"
+    //                     );
+    //                 });
+    //             })
+    //             .clicked()
+    //         {
+    //             *log.lock().unwrap() = commands::adobe_network_block();
+    //         }
+
+    //         if ui.button("📉 Debloat Adobe")
+    //             .on_hover_ui(|ui| {
+    //                 ui.vertical(|ui| {
+    //                     ui.colored_label(
+    //                         egui::Color32::from_rgb(57, 255, 20),
+    //                         "Disables Adobe background services & updates"
+    //                     );
+    //                     ui.label("• Stops Adobe Desktop Service");
+    //                     ui.label("• Disables Acrobat auto updates");
+    //                     ui.colored_label(
+    //                         egui::Color32::YELLOW,
+    //                         "⚠ May break Adobe CC auto updates"
+    //                     );
+    //                 });
+    //             })
+    //             .clicked()
+    //         {
+    //             *log.lock().unwrap() = commands::adobe_debloat();
+    //         }
+
+    //         if ui.button("🚫 Disable Microsoft Copilot")
+    //             .on_hover_ui(|ui| {
+    //                 ui.vertical(|ui| {
+    //                     ui.colored_label(
+    //                         egui::Color32::from_rgb(255, 100, 100),
+    //                         "Removes Microsoft Copilot integration"
+    //                     );
+    //                     ui.label("• Disables registry & Copilot button");
+    //                     ui.colored_label(
+    //                         egui::Color32::YELLOW,
+    //                         "⚠ Requires Windows 23H2+"
+    //                     );
+    //                     ui.colored_label(
+    //                         egui::Color32::LIGHT_BLUE,
+    //                         "ℹ Restart required to apply"
+    //                     );
+    //                 });
+    //             })
+    //             .clicked()
+    //         {
+    //             *log.lock().unwrap() = crate::commands::disable_copilot();
+    //         }
+    //         if ui.button("🖥 Set Display for Performance")
+    //             .on_hover_ui(|ui| {
+    //                 ui.vertical(|ui| {
+    //                     ui.colored_label(
+    //                         egui::Color32::from_rgb(57, 255, 20), // verde neon
+    //                         "✔ Optimizes system for best performance"
+    //                     );
+    //                     ui.label("• Disables animations and visual effects");
+    //                     ui.colored_label(
+    //                         egui::Color32::YELLOW,
+    //                         "⚠ May make UI less smooth but faster"
+    //                     );
+    //                     ui.colored_label(
+    //                         egui::Color32::LIGHT_BLUE,
+    //                         "ℹ Requires logoff/restart to fully apply"
+    //                     );
+    //                 });
+    //             })
+    //             .clicked()
+    //         {
+    //             *log.lock().unwrap() = crate::commands::set_display_for_performance();
+    //         }
+
+    //     });
+    // });
+
+    // ---- Advanced Tweaks ----
     ui.group(|ui| {
         ui.label("Advanced Tweaks");
         ui.horizontal_wrapped(|ui| {
@@ -308,6 +403,7 @@ pub fn show_tools(
             {
                 *log.lock().unwrap() = crate::commands::disable_copilot();
             }
+
             if ui.button("🖥 Set Display for Performance")
                 .on_hover_ui(|ui| {
                     ui.vertical(|ui| {
@@ -330,9 +426,59 @@ pub fn show_tools(
             {
                 *log.lock().unwrap() = crate::commands::set_display_for_performance();
             }
+        });
 
+        ui.add_space(10.0);
+
+        // ---- DNS Selector ----
+        ui.group(|ui| {
+            ui.label("Set DNS");
+
+            let dns_options = vec![
+                "Google",
+                "Cloudflare",
+                "Cloudflare_Malware",
+                "Cloudflare_Malware_Adult",
+                "Open_DNS",
+                "Quad9",
+                "AdGuard_Ads_Trackers",
+                "AdGuard_Ads_Trackers_Malware_Adult",
+                "dns0.eu_Open",
+                "dns0.eu_ZERO",
+                "dns0.eu_KIDS",
+            ];
+
+            // dropdown state
+            static mut SELECTED_DNS: &str = "Google";
+            let mut selected = unsafe { SELECTED_DNS };
+
+            egui::ComboBox::from_label("Choose DNS provider")
+                .selected_text(selected)
+                .show_ui(ui, |ui| {
+                    for option in &dns_options {
+                        if ui.selectable_label(selected == *option, *option).clicked() {
+                            selected = option;
+                        }
+                    }
+                });
+
+            unsafe { SELECTED_DNS = selected; }
+
+            ui.add_space(6.0);
+
+            if ui.button("▶ Run").clicked() {
+                let provider = selected.to_string();
+                *log.lock().unwrap() = format!("⏳ Setting DNS to {provider}...");
+                let log_clone = log.clone();
+
+                thread::spawn(move || {
+                    let result = commands::set_dns(&provider);
+                    *log_clone.lock().unwrap() = result;
+                });
+            }
         });
     });
+
 
     ui.add_space(6.0);
 

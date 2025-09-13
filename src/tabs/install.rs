@@ -1,9 +1,7 @@
 use std::collections::{BTreeMap, HashSet};
 use std::sync::{Arc, Mutex, OnceLock};
 use egui::{self, ProgressBar};
-
-
-// use crate::commands::winget_ensure_ready; // Removed: no such function in commands
+use crate::commands;
 
 /// Un element instalabil via winget.
 struct AppItem {
@@ -308,6 +306,14 @@ pub fn show_install(ui: &mut egui::Ui, log: &Arc<Mutex<String>>) {
         if ui.button("Clear selection").clicked() {
             state().lock().unwrap().selected.clear();
         }
+        if ui.button("Upgrade all Applications").clicked() {
+            commands::upgrade_all_apps();
+        }
+
+        if ui.button("WinGet Reinstall").clicked() {
+            commands::reinstall_winget();
+        }
+
     });
 
     ui.add_space(6.0);
@@ -317,30 +323,6 @@ pub fn show_install(ui: &mut egui::Ui, log: &Arc<Mutex<String>>) {
     for item in APP_CATALOG.iter() {
         by_cat.entry(item.category).or_default().push(item);
     }
-
-    // egui::ScrollArea::vertical()
-    //     .id_salt("install_scroll")
-    //     .auto_shrink([false, false])
-    //     .show(ui, |ui| {
-    //         for (category, items) in by_cat.into_iter() {
-    //             ui.collapsing(category, |ui| {
-    //                 for app in items {
-    //                     let mut checked = state().lock().unwrap().selected.contains(app.winget_id);
-    //                     ui.horizontal(|ui| {
-    //                         if ui.checkbox(&mut checked, app.name).clicked() {
-    //                             let mut st = state().lock().unwrap();
-    //                             if checked {
-    //                                 st.selected.insert(app.winget_id.to_string());
-    //                             } else {
-    //                                 st.selected.remove(app.winget_id);
-    //                             }
-    //                         }
-    //                         ui.label(app.desc); // Show description to use the field
-    //                     });
-    //                 }
-    //             });
-    //         }
-    //     });
 
     egui::ScrollArea::vertical()
     .id_salt("install_scroll")
@@ -392,7 +374,7 @@ fn spawn_task(what: DoWhat, log: Arc<Mutex<String>>) {
     }
 
     // winget ready?
-    if !crate::commands::ensure_winget_ready(log.clone()) {
+    if !commands::ensure_winget_ready(log.clone()) {
         return;
     }
 
@@ -415,25 +397,25 @@ fn spawn_task(what: DoWhat, log: Arc<Mutex<String>>) {
 
             match what {
                 DoWhat::Install => {
-                    if crate::commands::winget_is_installed(id) {
+                    if commands::winget_is_installed(id) {
                         log_line(&log, format!("ℹ {} already installed. Skipping.", name));
                     } else {
                         log_line(&log, format!("⬇ Installing {}...", name)); //
-                        let _ = crate::commands::winget_install(id, log.clone());
+                        let _ = commands::winget_install(id, log.clone());
                     }
                 }
                 DoWhat::Uninstall => {
-                    if crate::commands::winget_is_installed(id) {
+                    if commands::winget_is_installed(id) {
                         log_line(&log, format!("🗑 Uninstalling {}...", name));
-                        let _ = crate::commands::winget_uninstall(id, log.clone());
+                        let _ = commands::winget_uninstall(id, log.clone());
                     } else {
                         log_line(&log, format!("ℹ {} not found. Skipping.", name));
                     }
                 }
                 DoWhat::Update => {
-                    if crate::commands::winget_is_installed(id) {
+                    if commands::winget_is_installed(id) {
                         log_line(&log, format!("⤴ Updating {}...", name));
-                        let _ = crate::commands::winget_upgrade(id, log.clone());
+                        let _ = commands::winget_upgrade(id, log.clone());
                     } else {
                         log_line(&log, format!("ℹ {} not installed. Skipping update.", name));
                     }
@@ -454,3 +436,4 @@ fn spawn_task(what: DoWhat, log: Arc<Mutex<String>>) {
         state().lock().unwrap().selected.clear();
     });
 }
+

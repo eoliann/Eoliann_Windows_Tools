@@ -950,3 +950,53 @@ fn reset_dns() -> String {
         Err(e) => format!("❌ Error running command: {e}"),
     }
 }
+
+
+/// upgrade all applications installed in system
+// use std::process::Command;
+
+pub fn upgrade_all_apps() {
+    // Chocolatey upgrade
+    let choco_status = Command::new("choco")
+        .args(&["upgrade", "all", "-y"])
+        .status();
+
+    match choco_status {
+        Ok(status) if status.success() => {
+            println!("✅ Chocolatey upgrade successful");
+            return;
+        }
+        _ => {
+            println!("⚠️ Chocolatey upgrade failed or not installed. Trying Winget...");
+        }
+    }
+
+    // Winget upgrade
+    let winget_status = Command::new("winget")
+        .args(&["upgrade", "--all", "--silent"])
+        .status();
+
+    match winget_status {
+        Ok(status) if status.success() => {
+            println!("✅ Winget upgrade successful");
+        }
+        _ => {
+            println!("❌ Upgrade failed (neither Chocolatey nor Winget worked)");
+        }
+    }
+}
+
+pub fn reinstall_winget() {
+    let status = Command::new("choco")
+        .args(&["install", "winget", "-y", "--force"])
+        .status();
+
+    match status {
+        Ok(status) if status.success() => {
+            println!("✅ Winget reinstalled via Chocolatey");
+        }
+        _ => {
+            println!("❌ Failed to reinstall Winget (is Chocolatey installed?)");
+        }
+    }
+}

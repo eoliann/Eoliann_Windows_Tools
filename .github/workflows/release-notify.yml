@@ -19,9 +19,9 @@ jobs:
     steps:
       - name: Send Telegram notifications
         run: |
-          TEXT="📢 <b>Nou release pe GitHub!</b>
+          TEXT="📢 <b>Avem o nouă versiune de software pe GitHub!</b>
           <b>${RELEASE_NAME}</b> (tag: <code>${RELEASE_TAG}</code>)
-          👉 <a href='${RELEASE_URL}'>Pagina release</a>"
+          👉 <a href='${RELEASE_URL}'>Mergi la pagina noii versiuni</a>"
 
           if [[ -n "${ASSET_URL}" ]]; then
             TEXT="$TEXT\n⬇️ <a href='${ASSET_URL}'>Descarcă .exe</a>"

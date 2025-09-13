@@ -304,17 +304,79 @@ pub fn show_install(ui: &mut egui::Ui, log: &Arc<Mutex<String>>) {
             spawn_task(DoWhat::Update, log.clone());
         }
         if ui.button("Clear selection").clicked() {
-            state().lock().unwrap().selected.clear();
+            state().lock().unwrap().selected.clear(); // Clear selected items
         }
         if ui.button("Upgrade all Applications").clicked() {
-            commands::upgrade_all_apps();
+            let log = log.clone();
+            std::thread::spawn(move || { // Use the correct function name
+                commands::upgrade_all_apps_with_log(log);
+            });
         }
-
-        if ui.button("WinGet Reinstall").clicked() {
-            commands::reinstall_winget();
+        // Reinstall winget (if needed)
+        if ui.button("Reinstall winget").clicked() {
+            let log = log.clone();
+            std::thread::spawn(move || {
+                commands::reinstall_winget_with_log(log);
+            });
         }
-
     });
+    ui.add_space(6.0);
+    ui.separator();
+
+    // use eframe::egui::ScrollArea;
+
+    // ui.group(|ui| {
+    //     ui.label("Output:");
+
+    //     let log = log.lock().unwrap();
+    //     ScrollArea::vertical()
+    //         .stick_to_bottom(true) // rămâne focus pe ultimele linii
+    //         .show(ui, |ui| {
+    //             ui.add(
+    //                 egui::TextEdit::multiline(&mut log.clone())
+    //                     .desired_rows(15)
+    //                     .desired_width(f32::INFINITY)
+    //                     .font(egui::TextStyle::Monospace) // ca un terminal
+    //             );
+    //         });
+    // });
+
+    use eframe::egui::{self, ScrollArea, TextStyle};
+    
+    use crate::commands; // Removed SharedOutput as it's not directly used here and is private
+
+    // ===== Output (fix la N linii cu scrollbar și autoscroll) =====
+    const LOG_LINES: usize = 12; // număr fix de linii vizibile
+
+    ui.label("Output:");
+
+    // Calculăm înălțimea exactă pentru N linii monospace.
+    // .text_style_height returnează înălțimea unei linii pentru stilul dat.
+    let line_h = ui.text_style_height(&TextStyle::Monospace);
+    let fixed_height = line_h * LOG_LINES as f32;
+
+    // Un frame/grup care are înălțime FIXĂ; în interior punem ScrollArea cu stick_to_bottom(true)
+    egui::Frame::group(ui.style()).show(ui, |ui| {
+        // Fixăm dimensiunea pe verticală (nu crește indiferent de conținut)
+        ui.set_min_height(fixed_height);
+        ui.set_max_height(fixed_height);
+
+        // Lățimea se întinde pe tot spațiul disponibil
+        let _width = ui.available_width();
+
+        ScrollArea::vertical()
+            .auto_shrink([false, false])     // să nu micșoreze conținutul
+            .stick_to_bottom(true)           // autoscroll pe ultimele linii
+            .show(ui, |ui| {
+                // citim textul din log (read-only); ScrollArea oferă scrollbar-ul
+                let log_guard = log.lock().unwrap();
+                ui.monospace(log_guard.as_str());
+            });
+    });
+    // ==============================================================
+
+
+
 
     ui.add_space(6.0);
 
@@ -437,3 +499,6 @@ fn spawn_task(what: DoWhat, log: Arc<Mutex<String>>) {
     });
 }
 
+
+
+// ...

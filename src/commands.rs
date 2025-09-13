@@ -951,52 +951,53 @@ fn reset_dns() -> String {
     }
 }
 
+use std::io::Read;
+/// Tipul logului partajat între threads/UI
+type SharedOutput = Arc<Mutex<String>>;
 
-/// upgrade all applications installed in system
-// use std::process::Command;
+/// Rulează o comandă și trimite output-ul în `output_log`
+fn run_command_and_log(cmd: &str, args: &[&str], output_log: &SharedOutput) -> bool {
+    let mut child = Command::new(cmd)
+        .args(args)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("❌ Failed to spawn process");
 
-pub fn upgrade_all_apps() {
-    // Chocolatey upgrade
-    let choco_status = Command::new("choco")
-        .args(&["upgrade", "all", "-y"])
-        .status();
-
-    match choco_status {
-        Ok(status) if status.success() => {
-            println!("✅ Chocolatey upgrade successful");
-            return;
-        }
-        _ => {
-            println!("⚠️ Chocolatey upgrade failed or not installed. Trying Winget...");
-        }
+    let mut stdout = String::new();
+    if let Some(mut out) = child.stdout.take() {
+        let _ = out.read_to_string(&mut stdout);
     }
 
-    // Winget upgrade
-    let winget_status = Command::new("winget")
-        .args(&["upgrade", "--all", "--silent"])
-        .status();
+    let mut stderr = String::new();
+    if let Some(mut err) = child.stderr.take() {
+        let _ = err.read_to_string(&mut stderr);
+    }
 
-    match winget_status {
-        Ok(status) if status.success() => {
-            println!("✅ Winget upgrade successful");
-        }
-        _ => {
-            println!("❌ Upgrade failed (neither Chocolatey nor Winget worked)");
-        }
+    let status = child.wait().unwrap();
+
+    let mut log = output_log.lock().unwrap();
+    log.push_str(&format!("▶ {} {}\n", cmd, args.join(" ")));
+    if !stdout.is_empty() {
+        log.push_str(&format!("{}\n", stdout));
+    }
+    if !stderr.is_empty() {
+        log.push_str(&format!("{}\n", stderr));
+    }
+    log.push_str(&format!("Exit code: {}\n\n", status.code().unwrap_or(-1)));
+
+    status.success()
+}
+
+/// Upgrade all applications via Chocolatey, fallback to Winget
+pub fn upgrade_all_apps_with_log(output_log: SharedOutput) {
+    let success = run_command_and_log("choco", &["upgrade", "all", "-y"], &output_log);
+    if !success {
+        run_command_and_log("winget", &["upgrade", "--all", "--silent"], &output_log);
     }
 }
 
-pub fn reinstall_winget() {
-    let status = Command::new("choco")
-        .args(&["install", "winget", "-y", "--force"])
-        .status();
-
-    match status {
-        Ok(status) if status.success() => {
-            println!("✅ Winget reinstalled via Chocolatey");
-        }
-        _ => {
-            println!("❌ Failed to reinstall Winget (is Chocolatey installed?)");
-        }
-    }
+/// Reinstall Winget via Chocolatey
+pub fn reinstall_winget_with_log(output_log: SharedOutput) {
+    run_command_and_log("choco", &["install", "winget", "-y", "--force"], &output_log);
 }

@@ -24,7 +24,8 @@ jobs:
           👉 <a href='${RELEASE_URL}'>Mergi la pagina noii versiuni</a>"
 
           if [[ -n "${ASSET_URL}" ]]; then
-            TEXT="$TEXT\n⬇️ <a href='${ASSET_URL}'>Descarcă .exe</a>"
+            TEXT="$TEXT
+            ⬇️ <a href='${ASSET_URL}'>Descarcă .exe</a>"
           fi
 
           IFS=',' read -r -a CHATS <<< "${TG_CHATS}"

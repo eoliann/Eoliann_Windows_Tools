@@ -26,7 +26,7 @@ Includes useful administration commands and tweaks for Windows 11.
 ## 🚀 Funcționalități / Features
 
 ### INFO
-<img width="1002" height="732" alt="1 0 7_info" src="https://github.com/user-attachments/assets/dacc6483-85e4-44c4-b83b-75aa06f2ed6a" />
+<img width="1402" height="932" alt="1 0 8_info" src="https://github.com/user-attachments/assets/e7ae7f17-642c-4765-8c49-43f707f95d44" />
 
 - `whoami` → afișează utilizatorul curent / displays the current user
 - `ipconfig` → afișează setările de rețea / display network settings
@@ -34,7 +34,7 @@ Includes useful administration commands and tweaks for Windows 11.
 - `tasklist` → procese active / active processes
 
 ### TOOLS
-<img width="1002" height="732" alt="1 0 7_tools" src="https://github.com/user-attachments/assets/1a5d2e7a-1034-4abf-a163-2c6d7017b5bd" />
+<img width="1402" height="932" alt="1 0 8_tools" src="https://github.com/user-attachments/assets/cb41a670-bd34-4ae6-8b23-a5a9e1a42b83" />
 
 - `Toggle Context Menu` → schimbă instant între context menu **Win11 ↔ Classic** (cu restart Explorer) / Instantly switch between the **Win11 ↔ Classic** context menu (with Explorer restart)
 - `Disk Cleanup` → lansează curățarea de disc / start disk cleanup
@@ -55,11 +55,12 @@ Includes useful administration commands and tweaks for Windows 11.
 - `Adobe Debloat` → gestionează serviciile Adobe, serviciul Adobe Desktop și actualizările Acrobat / manages Adobe Services, Adobe Desktop Service, and Acrobat Updates
 - `Disable Microsoft Copilot` → dezactivează MS Copilot AI integrat în Windows începând cu versiunea 23H2 / disables MS Copilot AI built into Windows since 23H2
 - `Set Display for Performance` → setează preferințele sistemului pentru performanță. Puteți face acest lucru manual și cu sysdm.cpl / sets the system preferences to performance. You can do this manually with sysdm.cpl as well
+- `Set DNS` → setează DNS-urile pentru placa de rețea / set the DNS for the network card
 - `Power Plan Switcher` → schimbă rapid între High Performance, Balanced, Power Saver / quickly switch between High Performance, Balanced, and Power Saver modes
 - `Power Tweaks` → Disable Sleep (fără standby/sleep/hibernate), Disable HDD/SSD turn off, Disable Monitor turn off și funcționează atât pe baterie (DC) cât și la priză (AC) / Disable Sleep (no standby/sleep/hibernate), Disable HDD/SSD turn off, Disable Monitor turn off, and works on both battery (DC) and mains power (AC)
 
 ### INSTALL
-<img width="1002" height="732" alt="1 0 7_install" src="https://github.com/user-attachments/assets/76e4928e-a724-435e-927c-e8ea1283cdf6" />
+<img width="1402" height="932" alt="1 0 8_install" src="https://github.com/user-attachments/assets/ecd871d7-e5b9-43a6-bb7a-30e9496af2f7" />
 
 - `Browsers`
 - `Communications`
@@ -72,7 +73,7 @@ Includes useful administration commands and tweaks for Windows 11.
 - `Utilities`
   
 ### WINDOWS APP REMOVAL
-<img width="1002" height="732" alt="1 0 7_winapp_removal" src="https://github.com/user-attachments/assets/1b18b88a-b495-40ad-b116-af0f605db107" />
+<img width="1402" height="932" alt="1 0 8_winapp_removal" src="https://github.com/user-attachments/assets/4e12505e-9eb8-497b-9956-a6860731df30" />
 
 - `Communication` → elimină aplicațiile implicite care vin cu instalarea Windows, precum: Outlook for Windows, Skype, Teams, GroupMe, To-Do, Your Phone, CommsPhone, Messaging, Mail & Calendar și altele / remove default applications that come with Windows installation, such as: Outlook for Windows, Skype, Teams, GroupMe, To-Do, Your Phone, CommsPhone, Messaging, Mail & Calendar, and others.
 - `Media & Creativity` → elimină aplicațiile implicite care vin cu instalarea Windows, precum: Climpchamp, Camera, MS Paint, 3D Builder, 3D Viewer, Print 3D, Mixed Reality Portal / removes default applications that come with Windows installation, such as: Climpchamp, Camera, MS Paint, 3D Builder, 3D Viewer, Print 3D, Mixed Reality Portal
@@ -82,7 +83,7 @@ Includes useful administration commands and tweaks for Windows 11.
 - `System & Misc` → elimină aplicațiile implicite care vin cu instalarea Windows, precum: People, Maps, Wallet, Get Started, Feedback Hub, Alarms & Clock, OneConnect, Windows Phone, Voice Recorder / remove default applications that come with Windows installation, such as: People, Maps, Wallet, Get Started, Feedback Hub, Alarms & Clock, OneConnect, Windows Phone, Voice Recorder
 
 ### SETTINGS
-<img width="1002" height="732" alt="1 0 7_settings" src="https://github.com/user-attachments/assets/bcd09f66-89a8-4553-b5fd-770bdbb8ddbb" />
+<img width="1402" height="932" alt="1 0 8_settings" src="https://github.com/user-attachments/assets/68bb163a-6cf3-49dc-b4e2-26f242441ea2" />
 
 - `Dark / Light Theme` → schimbă între temele Light și Dark ale Windows / switch between Windows Light and Dark themes
 - `Open Display Settings` → deschide fereastra cu opțiunile de afișare ale sistemului / opens the window with the system display options

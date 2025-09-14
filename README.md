@@ -26,7 +26,7 @@ Includes useful administration commands and tweaks for Windows 11.
 ## 🚀 Funcționalități / Features
 
 ### INFO
-<img width="1402" height="932" alt="1 0 8_info" src="https://github.com/user-attachments/assets/e7ae7f17-642c-4765-8c49-43f707f95d44" />
+<img width="1402" height="932" alt="1 0 9_info" src="https://github.com/user-attachments/assets/6997729f-bcf7-42e1-a669-0450507bc6b8" />
 
 - `whoami` → afișează utilizatorul curent / displays the current user
 - `ipconfig` → afișează setările de rețea / display network settings
@@ -34,7 +34,7 @@ Includes useful administration commands and tweaks for Windows 11.
 - `tasklist` → procese active / active processes
 
 ### TOOLS
-<img width="1402" height="932" alt="1 0 8_tools" src="https://github.com/user-attachments/assets/cb41a670-bd34-4ae6-8b23-a5a9e1a42b83" />
+<img width="1402" height="932" alt="1 0 9_tools" src="https://github.com/user-attachments/assets/e86dce7f-e46b-4054-b678-19b1c5cc3dc7" />
 
 - `Toggle Context Menu` → schimbă instant între context menu **Win11 ↔ Classic** (cu restart Explorer) / Instantly switch between the **Win11 ↔ Classic** context menu (with Explorer restart)
 - `Disk Cleanup` → lansează curățarea de disc / start disk cleanup
@@ -61,6 +61,7 @@ Includes useful administration commands and tweaks for Windows 11.
 
 ### INSTALL
 <img width="1402" height="932" alt="1 0 9_install" src="https://github.com/user-attachments/assets/b8334a1b-faae-487e-969a-3a81ec369bc1" />
+<img width="1402" height="932" alt="1 0 9_install_1" src="https://github.com/user-attachments/assets/f517e296-1e35-4687-bc12-d7a8896832ba" />
 
 - `Install selections, Uninstall selections, Update selections, Clear selections, Upgrade All Applications, Reinstall winget`
 - `Browsers`
@@ -74,7 +75,7 @@ Includes useful administration commands and tweaks for Windows 11.
 - `Utilities`
   
 ### WINDOWS APP REMOVAL
-<img width="1402" height="932" alt="1 0 8_winapp_removal" src="https://github.com/user-attachments/assets/4e12505e-9eb8-497b-9956-a6860731df30" />
+<img width="1402" height="932" alt="1 0 9_winapp_remover" src="https://github.com/user-attachments/assets/b5e01c69-22ef-40a0-b344-2d355601df6a" />
 
 - `Communication` → elimină aplicațiile implicite care vin cu instalarea Windows, precum: Outlook for Windows, Skype, Teams, GroupMe, To-Do, Your Phone, CommsPhone, Messaging, Mail & Calendar și altele / remove default applications that come with Windows installation, such as: Outlook for Windows, Skype, Teams, GroupMe, To-Do, Your Phone, CommsPhone, Messaging, Mail & Calendar, and others.
 - `Media & Creativity` → elimină aplicațiile implicite care vin cu instalarea Windows, precum: Climpchamp, Camera, MS Paint, 3D Builder, 3D Viewer, Print 3D, Mixed Reality Portal / removes default applications that come with Windows installation, such as: Climpchamp, Camera, MS Paint, 3D Builder, 3D Viewer, Print 3D, Mixed Reality Portal
@@ -84,7 +85,7 @@ Includes useful administration commands and tweaks for Windows 11.
 - `System & Misc` → elimină aplicațiile implicite care vin cu instalarea Windows, precum: People, Maps, Wallet, Get Started, Feedback Hub, Alarms & Clock, OneConnect, Windows Phone, Voice Recorder / remove default applications that come with Windows installation, such as: People, Maps, Wallet, Get Started, Feedback Hub, Alarms & Clock, OneConnect, Windows Phone, Voice Recorder
 
 ### SETTINGS
-<img width="1402" height="932" alt="1 0 8_settings" src="https://github.com/user-attachments/assets/68bb163a-6cf3-49dc-b4e2-26f242441ea2" />
+<img width="1402" height="932" alt="1 0 9_settings" src="https://github.com/user-attachments/assets/58f7c75c-dc01-4428-ab1d-68b27524ed28" />
 
 - `Dark / Light Theme` → schimbă între temele Light și Dark ale Windows / switch between Windows Light and Dark themes
 - `Open Display Settings` → deschide fereastra cu opțiunile de afișare ale sistemului / opens the window with the system display options

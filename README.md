@@ -120,8 +120,6 @@ cd Eoliann_Windows_Tools
 ## 💖 Support
 - Pentru a susține moral și mental proiectul, nu uitați să lăsați un ⭐️! / To morally and mentally support the project, make sure to leave a ⭐️!
 - Susține acest proiect cu o donație / Support this project with a donation
-[![Donate](https://img.shields.io/badge/Donate-Revolut-purple)](http://revolut.me/adriannm9)
-
-- Donează prin stripe.com / Donate on stripe.com
- [![Donate](https://img.shields.io/badge/Donate-Stripe-blue)](https://donate.stripe.com/28E3cvatZ9vF2ym77U9ws02)
+  - Revolut [![Donate](https://img.shields.io/badge/Donate-Revolut-purple)](http://revolut.me/adriannm9)
+  - Stripe [![Donate](https://img.shields.io/badge/Donate-Stripe-blue)](https://donate.stripe.com/28E3cvatZ9vF2ym77U9ws02)
 

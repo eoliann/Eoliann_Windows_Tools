@@ -123,5 +123,5 @@ cd Eoliann_Windows_Tools
 [![Donate](https://img.shields.io/badge/Donate-Revolut-purple)](http://revolut.me/adriannm9)
 
 - Donează prin stripe.com / Donate on stripe.com
-<img width="150" height="250" alt="image" src="https://github.com/user-attachments/assets/49b39397-33ba-49dd-aed6-dc966bb60871" />
+ [![Donate](https://img.shields.io/badge/Donate-Stripe-blue)](https://donate.stripe.com/fZuaEXeKf0Z9a0Odwi9ws01)
 

@@ -121,3 +121,7 @@ cd Eoliann_Windows_Tools
 - Pentru a susține moral și mental proiectul, nu uitați să lăsați un ⭐️! / To morally and mentally support the project, make sure to leave a ⭐️!
 - Susține acest proiect cu o donație / Support this project with a donation
 [![Donate](https://img.shields.io/badge/Donate-Revolut-purple)](http://revolut.me/adriannm9)
+
+- Donează prin stripe.com / Donate on stripe.com
+<img width="150" height="250" alt="image" src="https://github.com/user-attachments/assets/49b39397-33ba-49dd-aed6-dc966bb60871" />
+

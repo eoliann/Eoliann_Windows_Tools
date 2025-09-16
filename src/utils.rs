@@ -78,9 +78,10 @@ pub fn run_powershell(script: &str) -> String {
     }
 }
 
-use crate::reqwest::blocking::Client;
+use reqwest::blocking::Client;
 use serde::Deserialize;
-use crate::semver::Version;
+#[allow(unused_imports)]
+use semver::Version;
 
 #[derive(Deserialize, Debug)]
 pub struct GithubRelease {

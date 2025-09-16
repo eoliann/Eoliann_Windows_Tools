@@ -12,3 +12,5 @@ src\tabs\winapp_removal.rs:
 src\tabs\install.rs:
 src\commands.rs:
 src\utils.rs:
+
+# env-dep:CARGO_PKG_VERSION=1.1.0

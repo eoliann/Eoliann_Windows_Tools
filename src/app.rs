@@ -135,9 +135,7 @@ impl App {
 
         ui.with_layout(egui::Layout::bottom_up(egui::Align::LEFT), |ui| {
             ui.separator();
-            if ui.button("Clear Log").clicked() {
-                self.clear_log();
-            }
+            
 
             let button_style = egui::RichText::new("💖 Donate")
                 .color(egui::Color32::from_rgb(57, 255, 20)) // verde neon
@@ -146,6 +144,10 @@ impl App {
             if ui.button(button_style).clicked() {
                 // *self.log.lock().unwrap() = crate::utils::run_command("explorer https://www.paypal.com/donate/?hosted_button_id=U9XAX3XBTU67G");
                 let _ = webbrowser::open("https://www.paypal.com/donate/?hosted_button_id=U9XAX3XBTU67G"); // Fix: Added missing semicolon
+            }
+
+            if ui.button("Clear Log").clicked() {
+                self.clear_log();
             }
         });
     }

@@ -90,9 +90,6 @@ pub fn show_info(ui: &mut egui::Ui, log_output: &Arc<Mutex<String>>) {
     ui.add_space(8.0);
     ui.label("Created by Eoliann");
     ui.label("Quick tools for Windows administration.");
-    // if ui.button("Open GitHub Repo").clicked() {
-    //     *log_output.lock().unwrap() = run_command("explorer https://github.com/eoliann/");
-    // }
     let button_style = egui::RichText::new("🌐 Open GitHub Repo")
         .color(egui::Color32::from_rgb(57, 255, 20)) // verde neon
         .strong();

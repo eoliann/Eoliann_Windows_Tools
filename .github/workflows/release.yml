@@ -1,0 +1,85 @@
+name: Build WhatsApp Tray
+
+on:
+  release:
+    types: [created]
+
+jobs:
+  build-windows:
+    name: Build Windows MSI
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Install Tauri CLI
+        run: cargo install --locked tauri-cli
+
+      - name: Build MSI
+        run: npm run tauri build -- --target x86_64-pc-windows-msvc
+
+      - name: Upload MSI Artifact
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ github.event.release.upload_url }}
+          asset_path: src-tauri/target/release/bundle/msi/whatsapp-web-tray_1.0.1_x64_en-US.msi
+          asset_name: whatsapp-web-tray_${{ github.ref_name }}_x64.msi
+          asset_content_type: application/x-msi
+
+  build-linux:
+    name: Build Linux DEB
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install system deps
+        run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Install Tauri CLI
+        run: cargo install --locked tauri-cli
+
+      - name: Build DEB
+        run: npm run tauri build -- --target x86_64-unknown-linux-gnu
+
+      - name: Upload DEB Artifact
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ github.event.release.upload_url }}
+          asset_path: src-tauri/target/release/bundle/deb/whatsapp-web-tray_1.0.1_amd64.deb
+          asset_name: whatsapp-web-tray_${{ github.ref_name }}_amd64.deb
+          asset_content_type: application/vnd.debian.binary-package

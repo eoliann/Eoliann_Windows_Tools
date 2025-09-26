@@ -1,7 +1,7 @@
 # Tauri
-/src-tauri/target
-/src-tauri/.DS_Store
-/src-tauri/debug
+/target
+.DS_Store
+/debug
 
 # Rust
 **/*.rs.bk

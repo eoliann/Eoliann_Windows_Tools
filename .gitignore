@@ -19,3 +19,5 @@ Thumbs.db
 check_winget_ids.py
 
 .gitattributes
+
+.gitignore

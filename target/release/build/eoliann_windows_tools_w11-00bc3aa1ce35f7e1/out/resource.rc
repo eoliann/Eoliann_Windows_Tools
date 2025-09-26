@@ -2,21 +2,21 @@
 1 VERSIONINFO
 FILEVERSION 1, 1, 0, 0
 PRODUCTVERSION 1, 1, 0, 0
+FILEOS 0x40004
+FILESUBTYPE 0x0
 FILETYPE 0x1
 FILEFLAGSMASK 0x3f
-FILESUBTYPE 0x0
 FILEFLAGS 0x0
-FILEOS 0x40004
 {
 BLOCK "StringFileInfo"
 {
 BLOCK "000004b0"
 {
-VALUE "FileDescription", "eoliann_windows_tools_w11"
-VALUE "ProductVersion", "1.1.0"
-VALUE "ProductName", "eoliann_windows_tools_w11"
-VALUE "windows_subsystem", "windows"
 VALUE "FileVersion", "1.1.0"
+VALUE "windows_subsystem", "windows"
+VALUE "ProductName", "eoliann_windows_tools_w11"
+VALUE "ProductVersion", "1.1.0"
+VALUE "FileDescription", "eoliann_windows_tools_w11"
 }
 }
 BLOCK "VarFileInfo" {

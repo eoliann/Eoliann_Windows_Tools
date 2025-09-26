@@ -13,4 +13,4 @@ src\tabs\install.rs:
 src\commands.rs:
 src\utils.rs:
 
-# env-dep:CARGO_PKG_VERSION=1.1.0
+# env-dep:CARGO_PKG_VERSION=1.1.1

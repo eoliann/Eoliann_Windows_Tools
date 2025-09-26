@@ -56,7 +56,6 @@ static APP_CATALOG: &[AppItem] = &[
     AppItem { name: "Everything Search", winget_id: "voidtools.Everything", category: "Utilities", desc: "Everything is a fast file search utility for Windows. It indexes all files and folders on the computer, allowing users to quickly locate files by name or other attributes." },
     AppItem { name: "ExifCleaner", winget_id: "szTheory.exifcleaner", category: "Utilities", desc: "ExifCleaner is a tool for removing EXIF metadata from image files. It helps protect user privacy by stripping out sensitive information such as location data and camera settings." },
     AppItem { name: "File-Converter", winget_id: "AdrienAllard.FileConverter", category: "Utilities", desc: "File Converter is a context menu extension for Windows that allows users to quickly convert files between different formats. It supports a wide range of file types, including images, documents, and audio files." },
-    AppItem { name: "FileZilla", winget_id: "FileZilla.FileZilla", category: "Utilities", desc: "FileZilla is a free and open-source FTP client that allows users to transfer files between their local computer and a remote server. It supports FTP, SFTP, and FTPS protocols." },
     AppItem { name: "F.lux", winget_id: "flux.flux", category: "Utilities", desc: "f.lux is a software application that adjusts the color temperature of your computer screen based on the time of day. It helps reduce eye strain and improve sleep quality by reducing blue light exposure in the evening." },
     AppItem { name: "Google Drive", winget_id: "Google.GoogleDrive", category: "Utilities", desc: "Google Drive is a cloud storage service that allows users to store and access files online. It offers file synchronization, sharing, and collaboration features." },
     AppItem { name: "GPU-Z", winget_id: "TechPowerUp.GPU-Z", category: "Utilities", desc: "GPU-Z is a lightweight utility that provides detailed information about the graphics card and GPU. It helps users monitor GPU performance and diagnose issues." },
@@ -86,8 +85,8 @@ static APP_CATALOG: &[AppItem] = &[
     // Communications
     AppItem { name: "BlueMail", winget_id: "Blix.BlueMail", category: "Communications", desc: "BlueMail is a versatile email client that supports multiple email accounts and provides features like unified inbox, customizable interface, and advanced security options." },
     AppItem { name: "Discord", winget_id: "Discord.Discord", category: "Communications", desc: "Discord is a popular communication platform designed for creating communities. It offers text, voice, and video chat features, making it ideal for gamers, hobbyists, and various interest groups." },
-    AppItem { name: "Franz", winget_id: "tefanMalzner.Franz", category: "Communications", desc: "Franz is a messaging app that combines multiple chat and messaging services into a single interface. It supports platforms like WhatsApp, Facebook Messenger, Slack, and more." },
-    AppItem { name: "Hexchat", winget_id: "Hexchat.Hexchat", category: "Communications", desc: "HexChat is an open-source IRC (Internet Relay Chat) client that allows users to connect to IRC networks and participate in chat rooms. It provides a customizable interface and supports various plugins and scripts." },
+    AppItem { name: "Franz", winget_id: "StefanMalzner.Franz", category: "Communications", desc: "Franz is a messaging app that combines multiple chat and messaging services into a single interface. It supports platforms like WhatsApp, Facebook Messenger, Slack, and more." },
+    AppItem { name: "Hexchat", winget_id: "HexChat.HexChat", category: "Communications", desc: "HexChat is an open-source IRC (Internet Relay Chat) client that allows users to connect to IRC networks and participate in chat rooms. It provides a customizable interface and supports various plugins and scripts." },
     AppItem { name: "Mumble (client)", winget_id: "Mumble.Mumble.Client", category: "Communications", desc: "Mumble is an open-source, low-latency, high-quality voice chat software primarily intended for use while gaming. It provides secure communication with features like positional audio and echo cancellation." },
     AppItem { name: "Mumble (server)", winget_id: "Mumble.Mumble.Server", category: "Communications", desc: "Mumble is an open-source, low-latency, high-quality voice chat software primarily intended for use while gaming. It provides secure communication with features like positional audio and echo cancellation." },
     AppItem { name: "Revolt", winget_id: "Revolt.RevoltDesktop", category: "Communications", desc: "Revolt is an open-source, privacy-focused chat platform that offers features like end-to-end encryption, group chats, and file sharing. It aims to provide a secure and user-friendly communication experience." },
@@ -132,7 +131,6 @@ static APP_CATALOG: &[AppItem] = &[
     AppItem { name: "Postman", winget_id: "Postman.Postman", category: "Development", desc: "Postman is a collaboration platform for API development. It provides tools for designing, testing, and documenting APIs, making it easier for developers to work with APIs." },
     AppItem { name: "PyCharm", winget_id: "JetBrains.PyCharm", category: "Development", desc: "PyCharm is an integrated development environment (IDE) used for programming in Python. It provides code analysis, a graphical debugger, an integrated unit tester, and supports web development with Django." },
     AppItem { name: "Python 3", winget_id: "Python.Python.3.13", category: "Development", desc: "Python is a high-level, interpreted programming language known for its simplicity and readability. It is widely used for web development, data analysis, artificial intelligence, and scientific computing." },
-    AppItem { name: "RStudio", winget_id: "JetBrains.RStudio", category: "Development", desc: "RStudio is an integrated development environment (IDE) for R, a programming language for statistical computing and graphics. It provides tools for data analysis, visualization, and reporting." },
     AppItem { name: "RubyMine", winget_id: "JetBrains.RubyMine", category: "Development", desc: "RubyMine is a cross-platform IDE for Ruby and Ruby on Rails development, built by JetBrains. It provides tools and features for efficient Ruby development, including code completion, debugging, and version control integration." },
     AppItem { name: "Rust", winget_id: "Rustlang.Rust.MSVC", category: "Development", desc: "Rust is a systems programming language that focuses on safety, speed, and concurrency. It is designed to provide memory safety without sacrificing performance." },
     AppItem { name: "Sublime Text", winget_id: "SublimeHQ.SublimeText.4", category: "Development", desc: "Sublime Text is a sophisticated text editor for code, markup, and prose. It offers a sleek interface, powerful features, and a wide range of plugins to enhance productivity." },
@@ -141,7 +139,7 @@ static APP_CATALOG: &[AppItem] = &[
     AppItem { name: "VS Code", winget_id: "Microsoft.VisualStudioCode", category: "Development", desc: "Visual Studio Code (VS Code) is a lightweight, open-source code editor developed by Microsoft. It supports various programming languages and provides features like debugging, version control, and extensions." },
     AppItem { name: "VS Codium", winget_id: "VSCodium.VSCodium", category: "Development", desc: "VSCodium is a community-driven, freely-licensed binary distribution of Microsoft's VS Code editor. It removes telemetry and branding, providing a more privacy-focused alternative." },
     AppItem { name: "XAMPP 8.2", winget_id: "ApacheFriends.Xampp.8.2", category: "Development", desc: "XAMPP is a free and open-source cross-platform web server solution stack package developed by Apache Friends, consisting mainly of the Apache HTTP Server, MariaDB database, and interpreters for scripts written in the PHP and Perl programming languages." },
-    AppItem { name: "WampServer", winget_id: "WampServer.WampServer", category: "Development", desc: "WampServer is a Windows web development environment that allows you to create web applications with Apache2, PHP, and a MySQL database. It also comes with PHPMyAdmin and SQLiteManager to manage your databases." },
+    AppItem { name: "WampServer", winget_id: "Wampserver.Wampserver", category: "Development", desc: "WampServer is a Windows web development environment that allows you to create web applications with Apache2, PHP, and a MySQL database. It also comes with PHPMyAdmin and SQLiteManager to manage your databases." },
     AppItem { name: "WebStorm", winget_id: "JetBrains.WebStorm", category: "Development", desc: "WebStorm is a powerful IDE for modern JavaScript development, built by JetBrains. It provides tools and features for efficient web development, including code completion, debugging, and version control integration." },
 
     // Document
@@ -156,7 +154,6 @@ static APP_CATALOG: &[AppItem] = &[
     AppItem { name: "OnlyOffice", winget_id: "ONLYOFFICE.DesktopEditors", category: "Document", desc: "OnlyOffice is a free and open-source office suite that includes applications for word processing, spreadsheets, and presentations. It is compatible with various file formats, including Microsoft Office formats." },
     AppItem { name: "PDF24 creator", winget_id: "geeksoftwareGmbH.PDF24Creator", category: "Document", desc: "PDF24 Creator is a free PDF creation and editing software that allows users to create, edit, and convert PDF documents. It provides features like merging, splitting, and compressing PDF files." },
     AppItem { name: "PDFgear", winget_id: "PDFgear.PDFgear", category: "Document", desc: "PDFgear is a free and easy-to-use PDF editor that allows users to view, edit, and annotate PDF documents. It provides features like text editing, image manipulation, and form filling." },
-    AppItem { name: "PDF-XChange Editor", winget_id: "TrackerSoftware.PDFXChangeEditor", category: "Document", desc: "PDF-XChange Editor is a feature-rich PDF editing software that allows users to create, edit, and annotate PDF documents. It provides tools for text editing, image manipulation, and form filling." },
     AppItem { name: "Scribus", winget_id: "Scribus.Scribus", category: "Document", desc: "Scribus is a free and open-source desktop publishing software that allows users to create professional-quality documents, including brochures, newsletters, and magazines. It provides tools for layout design, typography, and color management." },
     AppItem { name: "Sumatra PDF", winget_id: "SumatraPDF.SumatraPDF", category: "Document", desc: "Sumatra PDF is a lightweight and fast PDF viewer that allows users to view PDF documents quickly and efficiently. It supports various document formats, including PDF, EPUB, MOBI, and images." },    
     AppItem { name: "WPS Office", winget_id: "Kingsoft.WPSOffice", category: "Document", desc: "WPS Office is a free office suite that includes applications for word processing, spreadsheets, and presentations. It is compatible with various file formats, including Microsoft Office formats." },
@@ -169,7 +166,7 @@ static APP_CATALOG: &[AppItem] = &[
     AppItem { name: "EarTrumpet (Audio)", winget_id: "File-New-Project.EarTrumpet", category: "Multimedia Tools", desc: "EarTrumpet is a free and open-source volume control app for Windows that provides advanced audio management features. It allows users to control the volume of individual applications and provides a more intuitive interface for managing audio devices." },
     AppItem { name: "FFmpeg (full)", winget_id: "Gyan.FFmpeg", category: "Multimedia Tools", desc: "FFmpeg is a free and open-source multimedia framework that allows users to record, convert, and stream audio and video files. It supports a wide range of formats and provides powerful command-line tools for multimedia processing." },
     AppItem { name: "FreeCAD", winget_id: "FreeCAD.FreeCAD", category: "Multimedia Tools", desc: "FreeCAD is a free and open-source parametric 3D CAD modeler that allows users to create and modify 3D models. It is suitable for a wide range of applications, including product design, mechanical engineering, and architecture." },
-    AppItem { name: "FxSound", winget_id: "FXSound.FxSound", category: "Multimedia Tools", desc: "FxSound is a premium audio enhancement software that improves the sound quality of music and other audio content. It provides features like 3D surround sound, bass boost, and equalizer presets." },
+    AppItem { name: "FxSound", winget_id: "FxSound.FxSound", category: "Multimedia Tools", desc: "FxSound is a premium audio enhancement software that improves the sound quality of music and other audio content. It provides features like 3D surround sound, bass boost, and equalizer presets." },
     AppItem { name: "GIMP (Image Editor)", winget_id: "GIMP.GIMP.3", category: "Multimedia Tools", desc: "GIMP (GNU Image Manipulation Program) is a free and open-source raster graphics editor used for image retouching, editing, and composition. It provides a wide range of tools and features for photo manipulation and graphic design." },
     AppItem { name: "ImgBurn", winget_id: "LIGHTNINGUK.ImgBurn", category: "Multimedia Tools", desc: "ImgBurn is a free and lightweight disc burning software that allows users to create, burn, and verify CD, DVD, and Blu-ray discs. It supports various image file formats and provides advanced features for disc burning." },
     AppItem { name: "Inkscape (Vector Graphics)", winget_id: "Inkscape.Inkscape", category: "Multimedia Tools", desc: "Inkscape is a free and open-source vector graphics editor used for creating and editing scalable vector graphics (SVG) files. It provides a wide range of tools and features for graphic design, illustration, and web graphics." },
@@ -183,7 +180,6 @@ static APP_CATALOG: &[AppItem] = &[
     AppItem { name: "Plex Desktop", winget_id: "Plex.Plex", category: "Multimedia Tools", desc: "Plex is a media server software that allows users to organize, stream, and share their digital media files, including movies, TV shows, music, and photos. It provides a user-friendly interface and supports various devices for media playback." },
     AppItem { name: "Plex Media Server", winget_id: "Plex.PlexMediaServer", category: "Multimedia Tools", desc: "Plex is a media server software that allows users to organize, stream, and share their digital media files, including movies, TV shows, music, and photos. It provides a user-friendly interface and supports various devices for media playback." },
     AppItem { name: "Spotify", winget_id: "Spotify.Spotify", category: "Multimedia Tools", desc: "Spotify is a popular music streaming service that provides access to a vast library of songs, albums, and playlists. It offers personalized recommendations, offline listening, and social sharing features." },
-    AppItem { name: "Strawberry (Music Player)", winget_id: "StrawberryMusicPlayer.Strawberry", category: "Multimedia Tools", desc: "Strawberry is a free and open-source music player and library organizer. It provides a user-friendly interface for managing and playing music collections, as well as features like internet radio support and playlist creation." },
     AppItem { name: "Stremio", winget_id: "Stremio.Stremio", category: "Multimedia Tools", desc: "Stremio is a free and open-source media center application that allows users to organize, stream, and watch video content from various sources. It provides a user-friendly interface and supports various add-ons for extended functionality." },
     AppItem { name: "VLC", winget_id: "VideoLAN.VLC", category: "Multimedia Tools", desc: "VLC (VideoLAN Client) is a free and open-source multimedia player that supports a wide range of audio and video formats. It provides features like media playback, streaming, and media conversion." },
     AppItem { name: "Yt-dlp (YouTube Downloader)", winget_id: "yt-dlp.yt-dlp", category: "Multimedia Tools", desc: "yt-dlp is a command-line program that allows users to download videos from YouTube and other video-sharing platforms. It supports various video formats and provides options for video quality and metadata." },
@@ -192,7 +188,7 @@ static APP_CATALOG: &[AppItem] = &[
 
     // Games/platforms
     AppItem { name: "EA App", winget_id: "ElectronicArts.EADesktop", category: "Games", desc: "The EA App is a digital distribution platform developed by Electronic Arts (EA) for purchasing and playing video games. It serves as a hub for EA's game library, providing access to popular titles such as The Sims, FIFA, Battlefield, and more. The app offers features like game downloads, updates, social integration, and exclusive content for EA games." },
-    AppItem { name: "Battle.net", winget_id: "Blizzard.Battle.net", category: "Games", desc: "Battle.net is an online gaming platform developed by Blizzard Entertainment. It serves as a hub for Blizzard's game library, including popular titles like World of Warcraft, Overwatch, Diablo, and StarCraft. The platform offers features such as game downloads, updates, social integration, and access to multiplayer gaming." },
+    AppItem { name: "Battle.net", winget_id: "Blizzard.BattleNet", category: "Games", desc: "Battle.net is an online gaming platform developed by Blizzard Entertainment. It serves as a hub for Blizzard's game library, including popular titles like World of Warcraft, Overwatch, Diablo, and StarCraft. The platform offers features such as game downloads, updates, social integration, and access to multiplayer gaming." },
     AppItem { name: "Epic Games Launcher", winget_id: "EpicGames.EpicGamesLauncher", category: "Games", desc: "The Epic Games Launcher is a digital distribution platform developed by Epic Games for purchasing and playing video games. It serves as a hub for Epic Games' game library, including popular titles like Fortnite, Unreal Tournament, and more. The launcher offers features such as game downloads, updates, social integration, and access to exclusive content and free games." },
     AppItem { name: "GOG Galaxy", winget_id: "GOG.Galaxy", category: "Games", desc: "GOG Galaxy is a digital distribution platform developed by GOG.com for purchasing and playing video games. It serves as a hub for GOG's game library, which includes DRM-free titles from various developers and publishers. The platform offers features such as game downloads, updates, cloud saves, achievements, and social integration." },
     AppItem { name: "PS Remote Play", winget_id: "PlayStation.PSRemotePlay", category: "Games", desc: "PS Remote Play is an application developed by Sony that allows users to stream and play PlayStation games on their PC or mobile devices. It enables players to connect to their PlayStation console remotely and access their game library, providing a seamless gaming experience outside of the console." },
@@ -264,6 +260,12 @@ fn log_line(log: &Arc<Mutex<String>>, s: impl AsRef<str>) {
     }
 }
 
+/// 🔎 Stocăm query-ul de search global pentru tab
+static SEARCH_QUERY: OnceLock<Mutex<String>> = OnceLock::new();
+fn search_query() -> &'static Mutex<String> {
+    SEARCH_QUERY.get_or_init(|| Mutex::new(String::new()))
+}
+
 pub fn show_install(ui: &mut egui::Ui, log: &Arc<Mutex<String>>) {
     // Snapshot info
     let (sel_count, running, p_snapshot) = {
@@ -304,15 +306,14 @@ pub fn show_install(ui: &mut egui::Ui, log: &Arc<Mutex<String>>) {
             spawn_task(DoWhat::Update, log.clone());
         }
         if ui.button("Clear selection").clicked() {
-            state().lock().unwrap().selected.clear(); // Clear selected items
+            state().lock().unwrap().selected.clear();
         }
         if ui.button("Upgrade all Applications").clicked() {
             let log = log.clone();
-            std::thread::spawn(move || { // Use the correct function name
+            std::thread::spawn(move || {
                 commands::upgrade_all_apps_with_log(log);
             });
         }
-        // Reinstall winget (if needed)
         if ui.button("Reinstall winget").clicked() {
             let log = log.clone();
             std::thread::spawn(move || {
@@ -320,107 +321,109 @@ pub fn show_install(ui: &mut egui::Ui, log: &Arc<Mutex<String>>) {
             });
         }
     });
+
     ui.add_space(6.0);
     ui.separator();
 
-    // use eframe::egui::ScrollArea;
+    // 🔎 Search bar cu chenar verde
+    {
+        use egui::{Frame, Stroke, Color32, Margin}; // import corect
 
-    // ui.group(|ui| {
-    //     ui.label("Output:");
+        let mut query = search_query().lock().unwrap();
 
-    //     let log = log.lock().unwrap();
-    //     ScrollArea::vertical()
-    //         .stick_to_bottom(true) // rămâne focus pe ultimele linii
-    //         .show(ui, |ui| {
-    //             ui.add(
-    //                 egui::TextEdit::multiline(&mut log.clone())
-    //                     .desired_rows(15)
-    //                     .desired_width(f32::INFINITY)
-    //                     .font(egui::TextStyle::Monospace) // ca un terminal
-    //             );
-    //         });
-    // });
+        ui.horizontal(|ui| {
+            ui.label("Search:");
 
-    use eframe::egui::{self, ScrollArea, TextStyle};
-    
-    use crate::commands; // Removed SharedOutput as it's not directly used here and is private
+            // Stil verde corect pentru egui 0.32
+            let frame = Frame::new()
+                .stroke(Stroke::new(1.5, Color32::GREEN))
+                .corner_radius(4.0) // f32 acceptat aici
+                .inner_margin(Margin::symmetric(4, 2)); // i8, deci fără punct zecimal
 
-    // ===== Output (fix la N linii cu scrollbar și autoscroll) =====
-    const LOG_LINES: usize = 12; // număr fix de linii vizibile
+            frame.show(ui, |ui| {
+                ui.text_edit_singleline(&mut *query);
+            });
 
+            if ui.button("Filtrare").clicked() {
+                // filtrarea se aplică automat
+            }
+            if ui.button("Reset").clicked() {
+                query.clear();
+            }
+        });
+    }
+
+
+    ui.add_space(6.0);
+
+    // ===== Output =====
+    use eframe::egui::{ScrollArea, TextStyle};
+
+    const LOG_LINES: usize = 12;
     ui.label("Output:");
 
-    // Calculăm înălțimea exactă pentru N linii monospace.
-    // .text_style_height returnează înălțimea unei linii pentru stilul dat.
     let line_h = ui.text_style_height(&TextStyle::Monospace);
     let fixed_height = line_h * LOG_LINES as f32;
 
-    // Un frame/grup care are înălțime FIXĂ; în interior punem ScrollArea cu stick_to_bottom(true)
     egui::Frame::group(ui.style()).show(ui, |ui| {
-        // Fixăm dimensiunea pe verticală (nu crește indiferent de conținut)
         ui.set_min_height(fixed_height);
         ui.set_max_height(fixed_height);
 
-        // Lățimea se întinde pe tot spațiul disponibil
-        let _width = ui.available_width();
-
         ScrollArea::vertical()
-            .auto_shrink([false, false])     // să nu micșoreze conținutul
-            .stick_to_bottom(true)           // autoscroll pe ultimele linii
+            .auto_shrink([false, false])
+            .stick_to_bottom(true)
             .show(ui, |ui| {
-                // citim textul din log (read-only); ScrollArea oferă scrollbar-ul
                 let log_guard = log.lock().unwrap();
                 ui.monospace(log_guard.as_str());
             });
     });
-    // ==============================================================
-
-
-
 
     ui.add_space(6.0);
 
-    // Listă pe categorii cu scroll
+    // ===== Listă aplicații =====
+    let query = search_query().lock().unwrap().to_lowercase();
+
     let mut by_cat: BTreeMap<&'static str, Vec<&'static AppItem>> = BTreeMap::new();
     for item in APP_CATALOG.iter() {
-        by_cat.entry(item.category).or_default().push(item);
+        // dacă query-ul e gol, afișăm tot; altfel filtrăm după nume sau descriere
+        if query.is_empty()
+            || item.name.to_lowercase().contains(&query)
+            || item.desc.to_lowercase().contains(&query)
+        {
+            by_cat.entry(item.category).or_default().push(item);
+        }
     }
 
     egui::ScrollArea::vertical()
-    .id_salt("install_scroll")
-    .auto_shrink([false, false])
-    .show(ui, |ui| {
-        for (category, items) in by_cat.into_iter() {
-            ui.collapsing(category, |ui| {
-                for app in items {
-                    // 1) citim starea curentă (bifat sau nu)
-                    let mut checked = {
-                        state().lock().unwrap().selected.contains(app.winget_id)
-                    };
+        .id_salt("install_scroll")
+        .auto_shrink([false, false])
+        .show(ui, |ui| {
+            for (category, items) in by_cat.into_iter() {
+                ui.collapsing(category, |ui| {
+                    for app in items {
+                        let mut checked = {
+                            state().lock().unwrap().selected.contains(app.winget_id)
+                        };
 
-                    // 2) desenăm checkbox-ul și atașăm tooltip-ul din `desc`
-                    let resp = ui
-                        .checkbox(&mut checked, app.name)
-                        .on_hover_text(app.desc);
+                        let resp = ui
+                            .checkbox(&mut checked, app.name)
+                            .on_hover_text(app.desc);
 
-                    // 3) dacă s-a schimbat bifa, actualizăm selecția
-                    if resp.changed() {
-                        let mut st = state().lock().unwrap();
-                        if checked {
-                            st.selected.insert(app.winget_id.to_string());
-                        } else {
-                            st.selected.remove(app.winget_id);
+                        if resp.changed() {
+                            let mut st = state().lock().unwrap();
+                            if checked {
+                                st.selected.insert(app.winget_id.to_string());
+                            } else {
+                                st.selected.remove(app.winget_id);
+                            }
                         }
                     }
-                }
-            });
-        }
-    });
-
+                });
+            }
+        });
 }
 
 fn spawn_task(what: DoWhat, log: Arc<Mutex<String>>) {
-    // colectăm selecția + pregătim progresul
     let (list, progress) = {
         let st = state().lock().unwrap();
         let v: Vec<(String, String)> = APP_CATALOG
@@ -435,12 +438,10 @@ fn spawn_task(what: DoWhat, log: Arc<Mutex<String>>) {
         return;
     }
 
-    // winget ready?
     if !commands::ensure_winget_ready(log.clone()) {
         return;
     }
 
-    // rulează în fundal
     std::thread::spawn(move || {
         {
             let mut p = progress.lock().unwrap();
@@ -462,7 +463,7 @@ fn spawn_task(what: DoWhat, log: Arc<Mutex<String>>) {
                     if commands::winget_is_installed(id) {
                         log_line(&log, format!("ℹ {} already installed. Skipping.", name));
                     } else {
-                        log_line(&log, format!("⬇ Installing {}...", name)); //
+                        log_line(&log, format!("⬇ Installing {}...", name));
                         let _ = commands::winget_install(id, log.clone());
                     }
                 }
@@ -493,12 +494,6 @@ fn spawn_task(what: DoWhat, log: Arc<Mutex<String>>) {
         }
 
         log_line(&log, "✅ Finished processing selection.");
-
-        // Debifează tot după terminare
         state().lock().unwrap().selected.clear();
     });
 }
-
-
-
-// ...

@@ -1,9 +1,0 @@
-D:\8.cloudDigi\windows app work\Eoliann_Windows_Tools\target\release\deps\egui_winit-bbd8ef73cc369186.d: C:\Users\User\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\egui-winit-0.32.2\src\lib.rs C:\Users\User\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\egui-winit-0.32.2\src\clipboard.rs C:\Users\User\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\egui-winit-0.32.2\src\window_settings.rs
-
-D:\8.cloudDigi\windows app work\Eoliann_Windows_Tools\target\release\deps\libegui_winit-bbd8ef73cc369186.rlib: C:\Users\User\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\egui-winit-0.32.2\src\lib.rs C:\Users\User\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\egui-winit-0.32.2\src\clipboard.rs C:\Users\User\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\egui-winit-0.32.2\src\window_settings.rs
-
-D:\8.cloudDigi\windows app work\Eoliann_Windows_Tools\target\release\deps\libegui_winit-bbd8ef73cc369186.rmeta: C:\Users\User\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\egui-winit-0.32.2\src\lib.rs C:\Users\User\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\egui-winit-0.32.2\src\clipboard.rs C:\Users\User\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\egui-winit-0.32.2\src\window_settings.rs
-
-C:\Users\User\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\egui-winit-0.32.2\src\lib.rs:
-C:\Users\User\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\egui-winit-0.32.2\src\clipboard.rs:
-C:\Users\User\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\egui-winit-0.32.2\src\window_settings.rs:

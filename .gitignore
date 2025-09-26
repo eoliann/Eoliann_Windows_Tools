@@ -1,0 +1,16 @@
+# Tauri
+/src-tauri/target
+/src-tauri/.DS_Store
+/src-tauri/debug
+
+# Rust
+**/*.rs.bk
+ Cargo.lock
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db

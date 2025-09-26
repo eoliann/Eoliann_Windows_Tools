@@ -17,3 +17,5 @@ Thumbs.db
 
 # Python
 check_winget_ids.py
+
+.gitattributes

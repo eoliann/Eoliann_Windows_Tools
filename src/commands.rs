@@ -292,66 +292,107 @@ pub fn disable_monitor() -> String {
 
 #[allow(dead_code)]
 pub fn remove_app(package: &str) -> String {
-    // Remove for current user
-    let user_cmd = format!(
-        "powershell -ExecutionPolicy Unrestricted -Command \"Get-AppxPackage '{}' | Remove-AppxPackage\"",
-        package
-    );
-    let result_user = run_command(&user_cmd);
+    // Robust remove: tries current user, -AllUsers (if supported), remove provisioned + DISM fallback
+    let ps = format!(r#"
+$needle = "{0}"
+Write-Output "=== Remove (current user) matching: $needle ==="
+Get-AppxPackage |
+  Where-Object {{ $_.Name -like "*{0}*" -or $_.PackageFullName -like "*{0}*" }} |
+  ForEach-Object {{
+    try {{ Remove-AppxPackage -Package $_.PackageFullName -ErrorAction Stop; Write-Output ("REMOVED_CURRENTUSER:" + $_.PackageFullName) }} catch {{ Write-Output ("ERR_REMOVE_CURRENTUSER:" + $_.PackageFullName + " -> " + $_.Exception.Message) }}
+  }}
 
-    // Remove provisioned (system-wide)
-    let system_cmd = format!(
-        "powershell -ExecutionPolicy Unrestricted -Command \"Get-AppxProvisionedPackage -Online | Where-Object DisplayName -like '{}' | Remove-AppxProvisionedPackage -Online\"",
-        package
-    );
-    let result_system = run_command(&system_cmd);
+Write-Output "=== Attempting -AllUsers (requires elevation) matching: $needle ==="
+try {{
+  Get-AppxPackage -AllUsers |
+    Where-Object {{ $_.Name -like "*{0}*" -or $_.PackageFullName -like "*{0}*" }} |
+    ForEach-Object {{
+      try {{ Remove-AppxPackage -Package $_.PackageFullName -AllUsers -ErrorAction Stop; Write-Output ("REMOVED_ALLUSERS:" + $_.PackageFullName) }} catch {{ Write-Output ("ERR_REMOVE_ALLUSERS:" + $_.PackageFullName + " -> " + $_.Exception.Message) }}
+    }}
+}} catch {{
+  Write-Output ("WARN: -AllUsers failed or not supported: " + $_.Exception.Message)
+}}
 
-    if (result_user.trim().is_empty() || result_user.contains("completed"))
-        && (result_system.trim().is_empty() || result_system.contains("completed"))
-    {
-        format!("✅ {package} removed (User + Provisioned).")
-    } else {
-        format!(
-            "⚠ Attempted removal of {package}\nUser: {}\nSystem: {}",
-            result_user.trim(),
-            result_system.trim()
-        )
-    }
+Write-Output "=== Removing provisioned packages (image) matching: $needle ==="
+Get-AppxProvisionedPackage -Online |
+  Where-Object {{ $_.DisplayName -like "*{0}*" -or $_.PackageName -like "*{0}*" }} |
+  ForEach-Object {{
+    try {{ Remove-AppxProvisionedPackage -Online -PackageName $_.PackageName -ErrorAction Stop; Write-Output ("REMOVED_PROVISIONED:" + $_.PackageName) }} catch {{ Write-Output ("ERR_REMOVE_PROVISIONED:" + $_.PackageName + " -> " + $_.Exception.Message) }}
+  }}
+
+Write-Output "=== DISM fallback for provisioned packages ==="
+$prov = Get-AppxProvisionedPackage -Online |
+        Where-Object {{ $_.DisplayName -like "*{0}*" -or $_.PackageName -like "*{0}*" }}
+foreach ($p in $prov) {{
+  try {{
+    $pkg = $p.PackageName
+    Write-Output ("DISM_REMOVE:" + $pkg)
+    dism.exe /Online /Remove-ProvisionedAppxPackage /PackageName:"$pkg"
+  }} catch {{
+    Write-Output ("ERR_DISM:" + $p.PackageName + " -> " + $_.Exception.Message)
+  }}
+}}
+Write-Output "=== Done ==="
+"#, package);
+
+    crate::utils::run_powershell(&ps)
 }
 
 #[allow(dead_code)]
 pub fn remove_app_force(package: &str) -> String {
-    // Step 1: User-level
-    let user_cmd = format!(
-        "powershell -ExecutionPolicy Unrestricted -Command \"Get-AppxPackage '{}' | Remove-AppxPackage\"",
-        package
-    );
-    let result_user = run_command(&user_cmd);
+    // Force remove: same as above, with additional attempts by PackageFamilyName
+    let ps = format!(r#"
+        $needle = "{0}"
+        Write-Output "=== FORCE Remove (current user) matching: $needle ==="
+        Get-AppxPackage |
+        Where-Object {{ $_.Name -like "*{0}*" -or $_.PackageFullName -like "*{0}*" }} |
+        ForEach-Object {{
+            try {{ Remove-AppxPackage -Package $_.PackageFullName -ErrorAction SilentlyContinue; Write-Output ("REMOVED_CURRENTUSER:" + $_.PackageFullName) }} catch {{ Write-Output ("ERR_REMOVE_CURRENTUSER:" + $_.PackageFullName + " -> " + $_.Exception.Message) }}
+        }}
 
-    // Step 2: Provisioned
-    let system_cmd = format!(
-        "powershell -ExecutionPolicy Unrestricted -Command \"Get-AppxProvisionedPackage -Online | Where-Object DisplayName -like '{}' | Remove-AppxProvisionedPackage -Online\"",
-        package
-    );
-    let result_system = run_command(&system_cmd);
+        Write-Output "=== FORCE Attempting -AllUsers (requires elevation) ==="
+        try {{
+        Get-AppxPackage -AllUsers |
+            Where-Object {{ $_.Name -like "*{0}*" -or $_.PackageFullName -like "*{0}*" }} |
+            ForEach-Object {{
+            try {{ Remove-AppxPackage -Package $_.PackageFullName -AllUsers -ErrorAction SilentlyContinue; Write-Output ("REMOVED_ALLUSERS:" + $_.PackageFullName) }} catch {{ Write-Output ("ERR_REMOVE_ALLUSERS:" + $_.PackageFullName + " -> " + $_.Exception.Message) }}
+            }}
+        }} catch {{
+        Write-Output ("WARN: -AllUsers failed: " + $_.Exception.Message)
+        }}
 
-    // Step 3: DISM Force Remove (poate necesita numele exact al pachetului în unele cazuri)
-    let dism_cmd = format!("dism /Online /Remove-ProvisionedAppxPackage /PackageName:{}", package);
-    let result_dism = run_command(&dism_cmd);
+        Write-Output "=== FORCE Removing provisioned packages (image) ==="
+        Get-AppxProvisionedPackage -Online |
+        Where-Object {{ $_.DisplayName -like "*{0}*" -or $_.PackageName -like "*{0}*" }} |
+        ForEach-Object {{
+            try {{ Remove-AppxProvisionedPackage -Online -PackageName $_.PackageName -ErrorAction SilentlyContinue; Write-Output ("REMOVED_PROVISIONED:" + $_.PackageName) }} catch {{ Write-Output ("ERR_REMOVE_PROVISIONED:" + $_.PackageName + " -> " + $_.Exception.Message) }}
+        }}
 
-    if result_dism.contains("completed")
-        || (result_user.trim().is_empty() && result_system.trim().is_empty())
-    {
-        format!("✅ {package} removed (Force).")
-    } else {
-        format!(
-            "⚠ Attempted force removal of {package}\nUser: {}\nSystem: {}\nDISM: {}",
-            result_user.trim(),
-            result_system.trim(),
-            result_dism.trim()
-        )
-    }
+        Write-Output "=== FORCE DISM fallback ==="
+        $prov = Get-AppxProvisionedPackage -Online |
+                Where-Object {{ $_.DisplayName -like "*{0}*" -or $_.PackageName -like "*{0}*" }}
+        foreach ($p in $prov) {{
+        try {{
+            $pkg = $p.PackageName
+            Write-Output ("DISM_REMOVE:" + $pkg)
+            dism.exe /Online /Remove-ProvisionedAppxPackage /PackageName:"$pkg"
+        }} catch {{
+            Write-Output ("ERR_DISM:" + $p.PackageName + " -> " + $_.Exception.Message)
+        }}
+        }}
+
+        Write-Output "=== FORCE: Attempt removal by PackageFamilyName and wildcard ==="
+        $family = Get-AppxPackage -AllUsers | Where-Object {{ $_.PackageFamilyName -like "*{0}*" }} | Select-Object -ExpandProperty PackageFullName -Unique
+        foreach ($f in $family) {{
+        try {{ Remove-AppxPackage -Package $f -AllUsers -ErrorAction SilentlyContinue; Write-Output ("REMOVED_BY_FAMILY:" + $f) }} catch {{ Write-Output ("ERR_REMOVE_BY_FAMILY:" + $f + " -> " + $_.Exception.Message) }}
+        }}
+
+        Write-Output "=== FORCE Done ==="
+        "#, package);
+
+    crate::utils::run_powershell(&ps)
 }
+
 
 #[allow(dead_code)]
 pub fn remove_all_apps(force: bool) -> String {
@@ -402,7 +443,7 @@ pub fn remove_all_apps(force: bool) -> String {
 
     for (name, package) in apps {
         let output = if force {
-            remove_app_force(package)
+            remove_app(package) // Call the unified remove_app function
         } else {
             remove_app(package)
         };

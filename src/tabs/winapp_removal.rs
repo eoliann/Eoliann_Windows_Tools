@@ -135,6 +135,36 @@ pub fn show_winapp_removal(
     ui.heading("🗑 WinApp Removal");
     ui.add_space(4.0);
 
+        // --- CHECK ELEVATION (show hint + relaunch button) ---
+    {
+        let elevated = crate::utils::is_elevated();
+        if !elevated {
+            ui.horizontal(|ui| {
+                ui.colored_label(egui::Color32::from_rgb(255, 200, 0), "⚠ Not running as Administrator. Some removals (system/provisioned) require elevation.");
+                if ui.button("Relaunch as Administrator").clicked() {
+                    match crate::utils::relaunch_as_admin() {
+                        Ok(_) => {
+                            // optionally exit current instance so user uses elevated one
+                            std::process::exit(0);
+                        }
+                        Err(e) => {
+                            // show error in log
+                            append_line(log, format!("❌ Failed to relaunch as admin: {}", e));
+                        }
+                    }
+                }
+                ui.add_space(6.0);
+                if ui.button("Continue without elevation").clicked() {
+                    append_line(log, "ℹ Continuing without elevation (may fail for some packages).");
+                }
+            });
+            ui.add_space(6.0);
+        } else {
+            ui.label(egui::RichText::new("✅ Running as Administrator").color(egui::Color32::from_rgb(0, 255, 140)));
+            ui.add_space(6.0);
+        }
+    }
+
     // --- mic output cu progres (sus) ---
     {
         let p = progress_state().lock().unwrap().clone();
@@ -222,9 +252,9 @@ fn spawn_bulk(force: bool, log: Arc<Mutex<String>>) {
             }
             append_line(&log, format!("→ {} {}", if force { "Force-removing" } else { "Removing" }, it.label));
             let res = if force {
-                commands::remove_app_force(it.pkg)
+ commands::remove_app(it.pkg)
             } else {
-                commands::remove_app(it.pkg)
+ commands::remove_app(it.pkg)
             };
             append_line(&log, res);
         }
@@ -278,9 +308,9 @@ fn spawn_selected(force: bool, log: Arc<Mutex<String>>) {
 
             append_line(&log, format!("→ {} {}", if force { "Force-removing" } else { "Removing" }, it.label));
             let res = if force {
-                commands::remove_app_force(it.pkg)
+ commands::remove_app(it.pkg)
             } else {
-                commands::remove_app(it.pkg)
+ commands::remove_app(it.pkg)
             };
             append_line(&log, res);
         }

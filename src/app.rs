@@ -104,6 +104,24 @@ impl App {
         ui.heading(RichText::new("Eoliann Win Tools").color(Color32::from_rgb(0, 255, 140)));
         ui.add_space(10.0);
         ui.label(format!("Version: {}", env!("CARGO_PKG_VERSION")));
+
+        // show update info if available (uses latest_release and update_available)
+        // show update info if available (simple inline indicator + open button)
+        if self.update_available {
+            ui.horizontal(|ui| {
+                ui.colored_label(Color32::from_rgb(0, 255, 140), "⬆ Update available");
+                if ui.small_button("Open").clicked() {
+                    if let Some(release) = &self.latest_release {
+                        let _ = webbrowser::open(release.html_url.as_str());
+                    } else {
+                        let _ = webbrowser::open("https://github.com/eoliann/");
+                    }
+                }
+            });
+            ui.add_space(6.0);
+        }
+
+
         ui.add_space(10.0);
         ui.separator();
         ui.add_space(6.0);
@@ -135,15 +153,13 @@ impl App {
 
         ui.with_layout(egui::Layout::bottom_up(egui::Align::LEFT), |ui| {
             ui.separator();
-            
 
             let button_style = egui::RichText::new("💖 Donate")
                 .color(egui::Color32::from_rgb(57, 255, 20)) // verde neon
                 .strong();
 
             if ui.button(button_style).clicked() {
-                // *self.log.lock().unwrap() = crate::utils::run_command("explorer https://www.paypal.com/donate/?hosted_button_id=U9XAX3XBTU67G");
-                let _ = webbrowser::open("https://www.paypal.com/donate/?hosted_button_id=U9XAX3XBTU67G"); // Fix: Added missing semicolon
+                let _ = webbrowser::open("https://www.paypal.com/donate/?hosted_button_id=U9XAX3XBTU67G");
             }
 
             if ui.button("Clear Log").clicked() {
@@ -160,7 +176,7 @@ impl App {
             .auto_shrink([false; 2])
             .stick_to_bottom(true) // 🔥 stă lipit jos
             .show(ui, |ui| {
-                ui.label(egui::RichText::new(text).monospace()); // nu rupe liniile; e mai bun pt log
+                ui.label(egui::RichText::new(text).monospace());
             });
     }
 }
@@ -169,80 +185,106 @@ impl eframe::App for App {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         apply_neon_theme(ctx);
 
+        // Sidebar (lăsăm neschimbat)
         egui::SidePanel::left("side_panel").show(ctx, |ui| {
-            self.sidebar(ui);
+            egui::ScrollArea::vertical().auto_shrink([false; 2]).show(ui, |ui| {
+                self.sidebar(ui);
+            });
         });
 
+                // --- Update popup (foloseste ctx) ---
+        if self.update_available {
+            egui::Window::new("Update Available")
+                .collapsible(false)
+                .resizable(false)
+                .show(ctx, |ui| {
+                    ui.label("A new version is available!");
+                    if let Some(release) = &self.latest_release {
+                        ui.label(format!("Latest version: {}", release.tag_name));
+                        if ui.button("Open release on GitHub").clicked() {
+                            let _ = webbrowser::open(release.html_url.as_str());
+                        }
+                    } else {
+                        if ui.button("Open GitHub").clicked() {
+                            let _ = webbrowser::open("https://github.com/eoliann/");
+                        }
+                    }
+                    if ui.button("Close").clicked() {
+                        self.update_available = false;
+                    }
+                });
+        }
+
+        // === 1) Bottom panel FIRST (rezervă spațiul) ===
+        egui::TopBottomPanel::bottom("log_bottom_panel")
+            .resizable(true)
+            .default_height(220.0)
+            .min_height(80.0)
+            .show(ctx, |ui| {
+                ui.horizontal(|ui| {
+                    ui.label(egui::RichText::new("Output / Log:").strong());
+                    if ui.button("Clear").clicked() {
+                        self.clear_log();
+                    }
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::TOP), |ui| {
+                        if ui.small_button("Pop out").clicked() {
+                            self.show_popup = true;
+                            self.popup_message = String::from("Log popped out.");
+                        }
+                    });
+                });
+
+                egui::Frame::group(ui.style()).show(ui, |ui| {
+                    // reutilizăm log_view care conține ScrollArea + stick_to_bottom
+                    self.log_view(ui);
+                });
+            });
+
+        // === 2) Central panel AFTER bottom (va primi doar spațiul rămas) ===
         egui::CentralPanel::default().show(ctx, |ui| {
-            match self.page {
-                Page::Tools => {
-                    tools::show_tools(
-                        ui,
-                        &self.log,
-                        &mut self.show_popup,
-                        &mut self.popup_message,
-                    );
-                }
-                Page::Install => {
-                    install::show_install(
-                        ui, 
-                        &self.log
-                    );
-                }
-                Page::WinAppRemoval => {
-                    winapp_removal::show_winapp_removal(
-                        ui,
-                        &self.log,
-                        &mut self.show_popup,
-                        &mut self.popup_message,
-                    );
-                }
-                Page::Info => {
-                    info::show_info(ui, &self.log);
-                }
-                Page::Settings => {
-                    settings::show_settings(ui, &self.log);
-                }
-            }
-
-            ui.separator();
-            self.log_view(ui);
-
-            // (opțional) popup generic; dacă nu-l folosești, îl poți elimina
-            if self.show_popup {
-                egui::Window::new("Confirm")
-                    .collapsible(false)
-                    .resizable(false)
-                    .show(ctx, |ui| {
-                        ui.label(&self.popup_message);
-                        ui.horizontal(|ui| {
-                            if ui.button("OK").clicked() {
-                                self.show_popup = false;
-                            }
-                            if ui.button("Cancel").clicked() {
-                                self.show_popup = false;
-                            }
-                        });
-                    });
-            }
-            // --- verificare update ---
-            if self.update_available {
-                egui::Window::new("Update Available")
-                    .collapsible(false)
-                    .resizable(false)
-                    .show(ctx, |ui| {
-                        ui.label("A new version is available!");
-                        if let Some(release) = &self.latest_release {
-                            ui.label(format!("Latest version: {}", release.tag_name));
-                            // Removed the opener::open call as it's not directly available here
-                            // and would require a different approach for opening URLs in egui.
-                            // For now, the user can manually visit the URL.
+            let avail_h = ui.available_height(); // acum corect — după bottom panel
+            egui::ScrollArea::vertical()
+                .auto_shrink([false; 2])
+                .max_height(avail_h)
+                .show(ui, |ui| {
+                    match self.page {
+                        Page::Tools => {
+                            tools::show_tools(ui, &self.log, &mut self.show_popup, &mut self.popup_message);
                         }
-                        if ui.button("Close").clicked() {
-                            self.update_available = false; // închide fereastra
+                        Page::Install => { install::show_install(ui, &self.log); }
+                        Page::WinAppRemoval => {
+                            winapp_removal::show_winapp_removal(ui, &self.log, &mut self.show_popup, &mut self.popup_message);
                         }
-                    });
-            }       
+                        // Page::Info => { info::show_info(ui, &self.log); }
+                        Page::Info => {
+                            info::show_info(ui, &self.log, self.update_available, self.latest_release.as_ref());
+                        }
+                        Page::Settings => { settings::show_settings(ui, &self.log); }
+                    }
+
+                    ui.add_space(6.0);
+                });
         });
+
+        // popup / update windows etc. (rămân neschimbate)
+        if self.show_popup {
+            egui::Window::new("Confirm / Log")
+                .collapsible(false)
+                .resizable(true)
+                .default_size([600.0, 400.0])
+                .show(ctx, |ui| {
+                    ui.label(&self.popup_message);
+                    egui::ScrollArea::vertical().show(ui, |ui| {
+                        let text = { self.log.lock().unwrap().clone() };
+                        ui.label(egui::RichText::new(text).monospace());
+                    });
+                    ui.horizontal(|ui| {
+                        if ui.button("Close").clicked() { self.show_popup = false; }
+                        if ui.button("Clear Log").clicked() { self.clear_log(); }
+                    });
+                });
+        }
+
+        // update window (unchanged)...
     }
 }

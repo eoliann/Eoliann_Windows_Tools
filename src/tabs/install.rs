@@ -354,29 +354,29 @@ pub fn show_install(ui: &mut egui::Ui, log: &Arc<Mutex<String>>) {
     }
 
 
-    ui.add_space(6.0);
+    // ui.add_space(6.0);
 
-    // ===== Output =====
-    use eframe::egui::{ScrollArea, TextStyle};
+    // // ===== Output =====
+    // use eframe::egui::{ScrollArea, TextStyle};
 
-    const LOG_LINES: usize = 12;
-    ui.label("Output:");
+    // const LOG_LINES: usize = 12;
+    // ui.label("Output:");
 
-    let line_h = ui.text_style_height(&TextStyle::Monospace);
-    let fixed_height = line_h * LOG_LINES as f32;
+    // let line_h = ui.text_style_height(&TextStyle::Monospace);
+    // let fixed_height = line_h * LOG_LINES as f32;
 
-    egui::Frame::group(ui.style()).show(ui, |ui| {
-        ui.set_min_height(fixed_height);
-        ui.set_max_height(fixed_height);
+    // egui::Frame::group(ui.style()).show(ui, |ui| {
+    //     ui.set_min_height(fixed_height);
+    //     ui.set_max_height(fixed_height);
 
-        ScrollArea::vertical()
-            .auto_shrink([false, false])
-            .stick_to_bottom(true)
-            .show(ui, |ui| {
-                let log_guard = log.lock().unwrap();
-                ui.monospace(log_guard.as_str());
-            });
-    });
+    //     ScrollArea::vertical()
+    //         .auto_shrink([false, false])
+    //         .stick_to_bottom(true)
+    //         .show(ui, |ui| {
+    //             let log_guard = log.lock().unwrap();
+    //             ui.monospace(log_guard.as_str());
+    //         });
+    // });
 
     ui.add_space(6.0);
 

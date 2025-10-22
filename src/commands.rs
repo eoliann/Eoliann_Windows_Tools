@@ -393,7 +393,6 @@ pub fn remove_app_force(package: &str) -> String {
     crate::utils::run_powershell(&ps)
 }
 
-
 #[allow(dead_code)]
 pub fn remove_all_apps(force: bool) -> String {
     use std::time::Instant;
@@ -522,6 +521,33 @@ pub fn disable_wifi_sense() -> String {
     crate::utils::run_powershell(ps_script)
 }
 
+
+
+/// Disable Windows Consumer Features (prevents automatic Store app/game installs).
+/// Applies: sets HKLM:\SOFTWARE\Policies\Microsoft\Windows\CloudContent\DisableWindowsConsumerFeatures = 1
+/// Requires admin. Returns textual result for log.
+pub fn disable_consumer_features() -> String {
+    let ps_script = r#"
+    Write-Host 'Disabling Windows Consumer Features...'
+    New-Item -Path 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\CloudContent' -Force | Out-Null
+    Set-ItemProperty -Path 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\CloudContent' -Name 'DisableWindowsConsumerFeatures' -Value 1 -Type DWord -Force
+    Write-Output '✅ DisableWindowsConsumerFeatures set to 1. Some default Store apps may become inaccessible. A restart may be required.'
+    "#;
+    crate::utils::run_powershell(ps_script)
+}
+
+/// Enable (or restore) Windows Consumer Features by setting the policy to 0.
+/// This will set DisableWindowsConsumerFeatures = 0. If you prefer to remove the value instead,
+/// change the script to Remove-ItemProperty.
+pub fn enable_consumer_features() -> String {
+    let ps_script = r#"
+    Write-Host 'Enabling Windows Consumer Features (restoring policy)...'
+    New-Item -Path 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\CloudContent' -Force | Out-Null
+    Set-ItemProperty -Path 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\CloudContent' -Name 'DisableWindowsConsumerFeatures' -Value 0 -Type DWord -Force
+    Write-Output '✅ DisableWindowsConsumerFeatures set to 0. A restart may be required for full effect.'
+    "#;
+    crate::utils::run_powershell(ps_script)
+}
 #[allow(dead_code)]
 /// ✅ Enable End Task With Right Click
 pub fn enable_end_task_right_click() -> String {
@@ -807,7 +833,6 @@ pub fn set_display_for_performance() -> String {
     "##)
 }
 
-
 use std::process::Output;
 
 // Rulează un proces ascuns și capturează output.
@@ -1042,3 +1067,697 @@ pub fn upgrade_all_apps_with_log(output_log: SharedOutput) {
 pub fn reinstall_winget_with_log(output_log: SharedOutput) {
     run_command_and_log("choco", &["install", "winget", "-y", "--force"], &output_log);
 }
+
+use std::sync::atomic::{AtomicBool, Ordering};
+
+/// Global flag: true dacă operațiunea este în desfășurare.
+pub static CREATE_RESTORE_POINT_RUNNING: AtomicBool = AtomicBool::new(false);
+
+/// Runs the "create restore point" PowerShell script in a background thread
+/// and appends INFO/WARNING/ERROR/SUCCESS lines into `log`.
+pub fn create_restore_point_live(log: Arc<Mutex<String>>) {
+    // Dacă e deja în execuție, scriem un mesaj și ieșim rapid.
+    if CREATE_RESTORE_POINT_RUNNING
+        .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+        .is_err()
+    {
+        let mut lg = log.lock().unwrap();
+        if lg.is_empty() {
+            *lg = "INFO: Restore point creation already running.".to_string();
+        } else {
+            *lg = format!("{}\nINFO: Restore point creation already running.", lg);
+        }
+        return;
+    }
+
+    // RAII guard pentru a ne asigura că flag-ul e resetat la final, oricum s-ar termina thread-ul.
+    struct RunningGuard;
+    impl Drop for RunningGuard {
+        fn drop(&mut self) {
+            CREATE_RESTORE_POINT_RUNNING.store(false, Ordering::SeqCst);
+        }
+    }
+
+    let log_for_thread = log.clone();
+
+    thread::spawn(move || {
+        let _guard = RunningGuard; // se va executa Drop când thread-ul se termină
+
+        // Inițial: mesaj de start
+        {
+            let mut lg = log_for_thread.lock().unwrap();
+            if lg.is_empty() {
+                *lg = "INFO: Starting restore point creation...".to_string();
+            } else {
+                *lg = format!("{}\nINFO: Starting restore point creation...", lg);
+            }
+        }
+
+        let script = r#"
+            # Check if the user has administrative privileges
+            if (-Not ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
+                Write-Output "ERROR: Please run this as administrator."
+                exit 1
+            }
+
+            # Ensure System Restore is enabled on the system drive
+            try {
+                Enable-ComputerRestore -Drive "$env:SystemDrive" | Out-Null
+            } catch {
+                Write-Output ("WARNING: Could not explicitly enable System Restore: " + $_.Exception.Message)
+            }
+
+            # Allow multiple restore points per day if the policy key doesn't exist
+            $exists = Get-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\SystemRestore" -Name "SystemRestorePointCreationFrequency" -ErrorAction SilentlyContinue
+            if ($null -eq $exists) {
+                Write-Output "INFO: Changing system to allow multiple restore points per day..."
+                try {
+                    Set-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\SystemRestore" -Name "SystemRestorePointCreationFrequency" -Value 0 -Type DWord -Force -ErrorAction Stop
+                } catch {
+                    Write-Output ("WARNING: Failed to set SystemRestorePointCreationFrequency: " + $_.Exception.Message)
+                }
+            }
+
+            # Try to import module (Get-ComputerRestorePoint)
+            try {
+                Import-Module Microsoft.PowerShell.Management -ErrorAction Stop
+            } catch {
+                Write-Output ("ERROR: Failed to load Microsoft.PowerShell.Management module: " + $_.Exception.Message)
+                exit 1
+            }
+
+            # Get restore points for today
+            try {
+                $existingRestorePoints = Get-ComputerRestorePoint | Where-Object { $_.CreationTime.Date -eq (Get-Date).Date }
+            } catch {
+                Write-Output ("ERROR: Failed to retrieve restore points: " + $_.Exception.Message)
+                exit 1
+            }
+
+            if ($existingRestorePoints.Count -eq 0) {
+                $description = "System Restore Point created by Eoliann Windows Tools on $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')"
+                try {
+                    Checkpoint-Computer -Description $description -RestorePointType "MODIFY_SETTINGS" -ErrorAction Stop
+                    Write-Output "SUCCESS: System Restore Point Created Successfully"
+                } catch {
+                    Write-Output ("ERROR: Failed to create restore point: " + $_.Exception.Message)
+                    exit 1
+                }
+            } else {
+                Write-Output "INFO: A restore point already exists for today; skipping creation."
+            }
+            "#;
+
+        // Spawn PowerShell și capture stdout/stderr
+        let mut child = match Command::new("powershell")
+            .arg("-NoProfile")
+            .arg("-ExecutionPolicy").arg("Bypass")
+            .arg("-Command").arg(script)
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+        {
+            Ok(c) => c,
+            Err(e) => {
+                let mut lg = log_for_thread.lock().unwrap();
+                *lg = format!("{}{}\nERROR: Failed to spawn PowerShell: {}", lg, if lg.is_empty() { "" } else { "\n" }, e);
+                return;
+            }
+        };
+
+        // Preluăm stdout/stderr și le citim în thread-uri separate; ca să păstrăm istoricul, facem append.
+        let mut handles = Vec::new();
+
+        if let Some(out) = child.stdout.take() {
+            let lg_clone = log_for_thread.clone();
+            handles.push(thread::spawn(move || {
+                let reader = BufReader::new(out);
+                for line_res in reader.lines() {
+                    let line = line_res.unwrap_or_default();
+                    let mut lg = lg_clone.lock().unwrap();
+                    if lg.is_empty() {
+                        *lg = line.clone();
+                    } else {
+                        *lg = format!("{}\n{}", lg, line);
+                    }
+                }
+            }));
+        }
+
+        if let Some(err) = child.stderr.take() {
+            let lg_clone = log_for_thread.clone();
+            handles.push(thread::spawn(move || {
+                let reader = BufReader::new(err);
+                for line_res in reader.lines() {
+                    let line = line_res.unwrap_or_default();
+                    // Prefixăm liniile din stderr cu "ERROR: " dacă nu sunt deja prefixate
+                    let to_append = if line.starts_with("ERROR:") || line.starts_with("WARNING:") || line.starts_with("INFO:") || line.starts_with("SUCCESS:") {
+                        line.clone()
+                    } else {
+                        format!("ERROR: {}", line)
+                    };
+                    let mut lg = lg_clone.lock().unwrap();
+                    if lg.is_empty() {
+                        *lg = to_append;
+                    } else {
+                        *lg = format!("{}\n{}", lg, to_append);
+                    }
+                }
+            }));
+        }
+
+        // Așteptăm terminarea procesului
+        match child.wait() {
+            Ok(status) => {
+                // așteptăm reader threads
+                for h in handles {
+                    let _ = h.join();
+                }
+
+                let mut lg = log_for_thread.lock().unwrap();
+                if status.success() {
+                    // adăugăm un mesaj final de succes (doar dacă nu a mai apărut deja unul)
+                    if !lg.contains("SUCCESS:") {
+                        if lg.is_empty() {
+                            *lg = "SUCCESS: Restore point creation finished successfully.".to_string();
+                        } else {
+                            *lg = format!("{}\nSUCCESS: Restore point creation finished successfully.", lg);
+                        }
+                    }
+                } else {
+                    if lg.is_empty() {
+                        *lg = format!("ERROR: PowerShell exited with status: {}.", status);
+                    } else {
+                        *lg = format!("{}\nERROR: PowerShell exited with status: {}.", lg, status);
+                    }
+                }
+            }
+            Err(e) => {
+                let mut lg = log_for_thread.lock().unwrap();
+                if lg.is_empty() {
+                    *lg = format!("ERROR: Failed to wait for PowerShell: {}", e);
+                } else {
+                    *lg = format!("{}\nERROR: Failed to wait for PowerShell: {}", lg, e);
+                }
+            }
+        }
+
+        // RunningGuard va fi drop-uit aici și va reseta CREATE_RESTORE_POINT_RUNNING = false
+    });
+}
+
+
+/// Flag global: true dacă *orice* operațiune din fereastra asta e în execuție.
+pub static GLOBAL_OP_RUNNING: AtomicBool = AtomicBool::new(false);
+
+/// Guard RAII: când este droppuit, resetează `GLOBAL_OP_RUNNING` = false.
+pub struct GlobalOpGuard;
+
+impl Drop for GlobalOpGuard {
+    fn drop(&mut self) {
+        GLOBAL_OP_RUNNING.store(false, Ordering::SeqCst);
+    }
+}
+
+/// Încearcă să seteze flag-ul global. Dacă reușește, adaugă un mesaj inițial în `log`
+/// și returnează `Some(GlobalOpGuard)` — mută acel guard în thread pentru a păstra flag-ul.
+/// Dacă nu reușește (altă operațiune rulează deja), returnează `None` și scrie un mesaj în `log`.
+#[allow(dead_code)]
+pub fn try_start_global_op(op_name: &str, log: &Arc<Mutex<String>>) -> Option<GlobalOpGuard> {
+    // încercăm tranzacțional să setăm flag-ul
+    match GLOBAL_OP_RUNNING.compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst) {
+        Ok(_) => {
+            // setat cu succes — scriem mesaj inițial
+            let mut lg = log.lock().unwrap();
+            if lg.is_empty() {
+                *lg = format!("INFO: Starting {}...", op_name);
+            } else {
+                *lg = format!("{}\nINFO: Starting {}...", lg, op_name);
+            }
+            Some(GlobalOpGuard)
+        }
+        Err(_) => {
+            // deja rulează altceva
+            let mut lg = log.lock().unwrap();
+            if lg.is_empty() {
+                *lg = "INFO: Another operation is already running. Please wait...".to_string();
+            } else {
+                *lg = format!("{}\nINFO: Another operation is already running. Please wait...", lg);
+            }
+            None
+        }
+    }
+}
+
+/// Disable Activity History: sets EnableActivityFeed, PublishUserActivities, UploadUserActivities = 0
+/// This also attempts light cleanup for Timeline/Activity data. Requires admin. Returns textual result.
+pub fn disable_activity_history() -> String {
+    let ps = r#"
+    Write-Host 'Disabling Activity History policies...'
+    New-Item -Path 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\System' -Force | Out-Null
+    Set-ItemProperty -Path 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\System' -Name 'EnableActivityFeed' -Value 0 -Type DWord -Force
+    Set-ItemProperty -Path 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\System' -Name 'PublishUserActivities' -Value 0 -Type DWord -Force
+    Set-ItemProperty -Path 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\System' -Name 'UploadUserActivities' -Value 0 -Type DWord -Force
+
+    # Optional cleanup: clear Timeline/Activity & recent items (may require admin)
+    try {
+        $timeline = "$env:LOCALAPPDATA\ConnectedDevicesPlatform\Livedata"
+        if (Test-Path $timeline) { Remove-Item -Path $timeline -Recurse -Force -ErrorAction SilentlyContinue }
+    } catch {
+        # ignore errors from cleanup
+    }
+
+    Write-Output '✅ Activity History policies set to 0. Recent docs/clipboard/run history may require additional cleanup and a restart.'
+    "#;
+    crate::utils::run_powershell(ps)
+}
+
+/// Enable Activity History (restore) by setting policies back to 1.
+/// Note: this sets the policy values to 1; if you prefer to remove the policy values instead, modify the script.
+pub fn enable_activity_history() -> String {
+    let ps = r#"
+    Write-Host 'Restoring Activity History policies...'
+    New-Item -Path 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\System' -Force | Out-Null
+    Set-ItemProperty -Path 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\System' -Name 'EnableActivityFeed' -Value 1 -Type DWord -Force
+    Set-ItemProperty -Path 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\System' -Name 'PublishUserActivities' -Value 1 -Type DWord -Force
+    Set-ItemProperty -Path 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\System' -Name 'UploadUserActivities' -Value 1 -Type DWord -Force
+    Write-Output '✅ Activity History policies set to 1.'
+    "#;
+    crate::utils::run_powershell(ps)
+}
+
+/// Disable Storage Sense for the current user by setting StoragePolicy '01' = 0.
+/// Note: acest tweak modifică HKCU și afectează utilizatorul curent (nu necesită admin).
+/// Returnează textul rezultatului pentru log.
+pub fn disable_storage_sense() -> String {
+    let ps = r#"
+    Write-Host 'Disabling Storage Sense for current user...'
+    New-Item -Path 'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\StorageSense\Parameters\StoragePolicy' -Force | Out-Null
+    Set-ItemProperty -Path 'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\StorageSense\Parameters\StoragePolicy' -Name '01' -Value 0 -Type DWord -Force
+    Write-Output '✅ Storage Sense disabled (StoragePolicy[01] = 0) for current user. Temporary files will no longer be auto-deleted by Storage Sense.'
+    "#;
+    crate::utils::run_powershell(ps)
+}
+
+/// Enable (restore) Storage Sense for the current user by setting StoragePolicy '01' = 1.
+/// Returnează textul rezultatului pentru log.
+pub fn enable_storage_sense() -> String {
+    let ps = r#"
+    Write-Host 'Enabling Storage Sense for current user (restoring)...'
+    New-Item -Path 'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\StorageSense\Parameters\StoragePolicy' -Force | Out-Null
+    Set-ItemProperty -Path 'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\StorageSense\Parameters\StoragePolicy' -Name '01' -Value 1 -Type DWord -Force
+    Write-Output '✅ Storage Sense enabled (StoragePolicy[01] = 1) for current user.'
+    "#;
+    crate::utils::run_powershell(ps)
+}
+
+/// Set Hibernation as default (good for laptops).
+/// Most modern laptops have connected standby enabled which drains the battery;
+/// this enables hibernation and exposes the relevant power options in UI.
+/// Requires admin. Returns textual result for logging.
+pub fn set_hibernation_default() -> String {
+    let ps = r#"
+    Write-Host 'Setting Hibernation as default (applying registry tweaks and powercfg settings)...'
+
+    # Expose Hibernation powersettings in Power Options (Attributes = 2)
+    New-Item -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\Power\PowerSettings\238C9FA8-0AAD-41ED-83F4-97BE242C8F20\7bc4a2f9-d8fc-4469-b07b-33eb785aaca0' -Force | Out-Null
+    Set-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\Power\PowerSettings\238C9FA8-0AAD-41ED-83F4-97BE242C8F20\7bc4a2f9-d8fc-4469-b07b-33eb785aaca0' -Name 'Attributes' -Value 2 -Type DWord -Force
+
+    New-Item -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\Power\PowerSettings\abfc2519-3608-4c2a-94ea-171b0ed546ab\94ac6d29-73ce-41a6-809f-6363ba21b47e' -Force | Out-Null
+    Set-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\Power\PowerSettings\abfc2519-3608-4c2a-94ea-171b0ed546ab\94ac6d29-73ce-41a6-809f-6363ba21b47e' -Name 'Attributes' -Value 2 -Type DWord -Force
+
+    # Turn on hibernation and tweak default timeouts to prefer hibernate (good for battery)
+    Write-Host 'Turning on hibernation...'
+    Start-Process -FilePath powercfg -ArgumentList '/hibernate on' -NoNewWindow -Wait
+
+    # Adjust timeouts (these mirror the example; adapt numbers as desired)
+    Start-Process -FilePath powercfg -ArgumentList '/change standby-timeout-ac 60' -NoNewWindow -Wait
+    Start-Process -FilePath powercfg -ArgumentList '/change standby-timeout-dc 60' -NoNewWindow -Wait
+    Start-Process -FilePath powercfg -ArgumentList '/change monitor-timeout-ac 10' -NoNewWindow -Wait
+    Start-Process -FilePath powercfg -ArgumentList '/change monitor-timeout-dc 1' -NoNewWindow -Wait
+
+    Write-Output '✅ Hibernation enabled and defaults applied. A restart is recommended for all changes to take full effect.'
+    "#;
+    crate::utils::run_powershell(ps)
+}
+
+/// Restore previous/default Hibernation settings (undo).
+/// Restores registry Attributes values to conservative defaults and turns hibernation off.
+/// Requires admin. Returns textual result for logging.
+pub fn restore_hibernation_defaults() -> String {
+    let ps = r#"
+    Write-Host 'Restoring Hibernation defaults (undo)...'
+
+    # Restore Attributes to original values (as per manifest defaults)
+    # First path: original was 1
+    New-Item -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\Power\PowerSettings\238C9FA8-0AAD-41ED-83F4-97BE242C8F20\7bc4a2f9-d8fc-4469-b07b-33eb785aaca0' -Force | Out-Null
+    Set-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\Power\PowerSettings\238C9FA8-0AAD-41ED-83F4-97BE242C8F20\7bc4a2f9-d8fc-4469-b07b-33eb785aaca0' -Name 'Attributes' -Value 1 -Type DWord -Force
+
+    # Second path: original was 0
+    New-Item -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\Power\PowerSettings\abfc2519-3608-4c2a-94ea-171b0ed546ab\94ac6d29-73ce-41a6-809f-6363ba21b47e' -Force | Out-Null
+    Set-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\Power\PowerSettings\abfc2519-3608-4c2a-94ea-171b0ed546ab\94ac6d29-73ce-41a6-809f-6363ba21b47e' -Name 'Attributes' -Value 0 -Type DWord -Force
+
+    # Turn off hibernation (if you want to disable)
+    Write-Host 'Turning off hibernation...'
+    Start-Process -FilePath powercfg -ArgumentList '/hibernate off' -NoNewWindow -Wait
+
+    # Restore timeouts to conservative defaults (example values)
+    Start-Process -FilePath powercfg -ArgumentList '/change standby-timeout-ac 15' -NoNewWindow -Wait
+    Start-Process -FilePath powercfg -ArgumentList '/change standby-timeout-dc 15' -NoNewWindow -Wait
+    Start-Process -FilePath powercfg -ArgumentList '/change monitor-timeout-ac 15' -NoNewWindow -Wait
+    Start-Process -FilePath powercfg -ArgumentList '/change monitor-timeout-dc 15' -NoNewWindow -Wait
+
+    Write-Output '✅ Hibernation and power settings restored to defaults. A restart is recommended.'
+    "#;
+    crate::utils::run_powershell(ps)
+}
+
+/// Set Time to UTC (Dual Boot)
+/// Essential for computers that are dual booting with Linux. Sets HKLM:\SYSTEM\CurrentControlSet\Control\TimeZoneInformation\RealTimeIsUniversal = 1
+/// Requires Administrator. Returns textual result for log.
+pub fn set_time_utc() -> String {
+    let ps = r#"
+    Write-Host 'Setting RealTimeIsUniversal = 1 (use UTC for hardware clock)...'
+    New-Item -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\TimeZoneInformation' -Force | Out-Null
+    Set-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\TimeZoneInformation' -Name 'RealTimeIsUniversal' -Value 1 -Type DWord -Force
+    Write-Output '✅ RealTimeIsUniversal set to 1. The hardware clock will be treated as UTC (good for dual-boot with Linux). A reboot is recommended.'
+    "#;
+    crate::utils::run_powershell(ps)
+}
+
+/// Restore Time to Local (undo)
+/// Restores RealTimeIsUniversal to 0 (default Windows behaviour — hardware clock is local time).
+/// Requires Administrator. Returns textual result for log.
+pub fn restore_time_local() -> String {
+    let ps = r#"
+    Write-Host 'Restoring RealTimeIsUniversal = 0 (use local time for hardware clock)...'
+    New-Item -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\TimeZoneInformation' -Force | Out-Null
+    Set-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\TimeZoneInformation' -Name 'RealTimeIsUniversal' -Value 0 -Type DWord -Force
+    Write-Output '✅ RealTimeIsUniversal set to 0. The hardware clock will be treated as local time. A reboot is recommended.'
+    "#;
+    crate::utils::run_powershell(ps)
+}
+
+/// Remove OneDrive: moves OneDrive files to user profile default folders and uninstalls OneDrive.
+/// Requires Administrator. Returns textual result for display/logging.
+pub fn remove_onedrive() -> String {
+    let ps = r#"
+    $OneDrivePath = $($env:OneDrive)
+    Write-Host "Removing OneDrive"
+    $regPath = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\OneDriveSetup.exe"
+
+    if (Test-Path $regPath) {
+        try {
+            $OneDriveUninstallString = Get-ItemPropertyValue $regPath -Name "UninstallString" -ErrorAction Stop
+
+            # Extract executable and args robustly (support quoted path)
+            $OneDriveExe = ""
+            $OneDriveArgs = ""
+            if ($OneDriveUninstallString -match '^\s*"(.*?)"(.*)$') {
+                $OneDriveExe = $matches[1]
+                $OneDriveArgs = $matches[2].Trim()
+            } elseif ($OneDriveUninstallString -match '^\s*(\S+)(.*)$') {
+                $OneDriveExe = $matches[1]
+                $OneDriveArgs = $matches[2].Trim()
+            } else {
+                $OneDriveExe = $OneDriveUninstallString.Trim()
+                $OneDriveArgs = ""
+            }
+
+            # Ensure we always pass /silent to the uninstall if possible
+            if ($OneDriveExe -eq "") {
+                Write-Host "Could not parse uninstall executable from registry value: $OneDriveUninstallString" -ForegroundColor Red
+            } else {
+                if ($OneDriveArgs -ne "") { $OneDriveArgs = "$OneDriveArgs /silent" } else { $OneDriveArgs = "/silent" }
+                Write-Host "Running uninstall: $OneDriveExe $OneDriveArgs"
+                Start-Process -FilePath $OneDriveExe -ArgumentList $OneDriveArgs -NoNewWindow -Wait -ErrorAction Stop
+            }
+        } catch {
+            Write-Host "Failed to run uninstall string: $_" -ForegroundColor Red
+        }
+    } else {
+        Write-Host "OneDrive doesn't seem to be installed anymore" -ForegroundColor Yellow
+        return
+    }
+
+    # Check if OneDrive got Uninstalled
+    if (-not (Test-Path $regPath)) {
+        Write-Host "Copy downloaded Files from the OneDrive Folder to Root UserProfile"
+        try {
+            if (Test-Path $OneDrivePath) {
+                # Move files from OneDrive to user profile root (robocopy /mov /e /xj)
+                Start-Process -FilePath powershell -ArgumentList "robocopy '$($OneDrivePath)' '$($env:USERPROFILE.TrimEnd())\ ' /mov /e /xj" -NoNewWindow -Wait
+            } else {
+                Write-Host "OneDrive folder not found at $OneDrivePath" -ForegroundColor Yellow
+            }
+        } catch {
+            Write-Host "Robocopy failed: $_" -ForegroundColor Yellow
+        }
+
+        Write-Host "Removing OneDrive leftovers"
+        Remove-Item -Recurse -Force -ErrorAction SilentlyContinue "$env:localappdata\Microsoft\OneDrive"
+        Remove-Item -Recurse -Force -ErrorAction SilentlyContinue "$env:localappdata\OneDrive"
+        Remove-Item -Recurse -Force -ErrorAction SilentlyContinue "$env:programdata\Microsoft OneDrive"
+        Remove-Item -Recurse -Force -ErrorAction SilentlyContinue "$env:systemdrive\OneDriveTemp"
+        reg delete "HKEY_CURRENT_USER\Software\Microsoft\OneDrive" -f 2>$null
+
+        # check if directory is empty before removing:
+        try {
+            if (Test-Path $OneDrivePath) {
+                $count = (Get-ChildItem $OneDrivePath -Recurse -Force -ErrorAction SilentlyContinue | Measure-Object).Count
+                if ($count -eq 0) {
+                    Remove-Item -Recurse -Force -ErrorAction SilentlyContinue $OneDrivePath
+                } else {
+                    Write-Host "Note: OneDrive folder still contains $count items. Manual check recommended." -ForegroundColor Yellow
+                }
+            }
+        } catch {
+            # ignore
+        }
+
+        Write-Host "Remove OneDrive from explorer sidebar"
+        try {
+            Set-ItemProperty -Path "HKCR:\CLSID\{018D5C66-4533-4307-9B53-224DE2ED1FE6}" -Name "System.IsPinnedToNameSpaceTree" -Value 0 -ErrorAction SilentlyContinue
+            Set-ItemProperty -Path "HKCR:\Wow6432Node\CLSID\{018D5C66-4533-4307-9B53-224DE2ED1FE6}" -Name "System.IsPinnedToNameSpaceTree" -Value 0 -ErrorAction SilentlyContinue
+        } catch { }
+
+        Write-Host "Removing run hook for new users"
+        try {
+            reg load "hku\Default" "C:\Users\Default\NTUSER.DAT" 2>$null
+            reg delete "HKEY_USERS\Default\SOFTWARE\Microsoft\Windows\CurrentVersion\Run" /v "OneDriveSetup" /f 2>$null
+            reg unload "hku\Default" 2>$null
+        } catch { }
+
+        Write-Host "Removing startmenu entry"
+        Remove-Item -Force -ErrorAction SilentlyContinue "$env:userprofile\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\OneDrive.lnk"
+
+        Write-Host "Removing scheduled task(s)"
+        Get-ScheduledTask -TaskPath '\' -TaskName 'OneDrive*' -ea SilentlyContinue | Unregister-ScheduledTask -Confirm:$false -ErrorAction SilentlyContinue
+
+        Write-Host "Shell Fixing: restoring default user shell folders"
+        $ushell = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\User Shell Folders'
+        Set-ItemProperty -Path $ushell -Name "AppData" -Value "$env:userprofile\AppData\Roaming" -Type ExpandString -ErrorAction SilentlyContinue
+        Set-ItemProperty -Path $ushell -Name "Cache" -Value "$env:userprofile\AppData\Local\Microsoft\Windows\INetCache" -Type ExpandString -ErrorAction SilentlyContinue
+        Set-ItemProperty -Path $ushell -Name "Cookies" -Value "$env:userprofile\AppData\Local\Microsoft\Windows\INetCookies" -Type ExpandString -ErrorAction SilentlyContinue
+        Set-ItemProperty -Path $ushell -Name "Favorites" -Value "$env:userprofile\Favorites" -Type ExpandString -ErrorAction SilentlyContinue
+        Set-ItemProperty -Path $ushell -Name "History" -Value "$env:userprofile\AppData\Local\Microsoft\Windows\History" -Type ExpandString -ErrorAction SilentlyContinue
+        Set-ItemProperty -Path $ushell -Name "Local AppData" -Value "$env:userprofile\AppData\Local" -Type ExpandString -ErrorAction SilentlyContinue
+        Set-ItemProperty -Path $ushell -Name "My Music" -Value "$env:userprofile\Music" -Type ExpandString -ErrorAction SilentlyContinue
+        Set-ItemProperty -Path $ushell -Name "My Video" -Value "$env:userprofile\Videos" -Type ExpandString -ErrorAction SilentlyContinue
+        Set-ItemProperty -Path $ushell -Name "NetHood" -Value "$env:userprofile\AppData\Roaming\Microsoft\Windows\Network Shortcuts" -Type ExpandString -ErrorAction SilentlyContinue
+        Set-ItemProperty -Path $ushell -Name "PrintHood" -Value "$env:userprofile\AppData\Roaming\Microsoft\Windows\Printer Shortcuts" -Type ExpandString -ErrorAction SilentlyContinue
+        Set-ItemProperty -Path $ushell -Name "Programs" -Value "$env:userprofile\AppData\Roaming\Microsoft\Windows\Start Menu\Programs" -Type ExpandString -ErrorAction SilentlyContinue
+        Set-ItemProperty -Path $ushell -Name "Recent" -Value "$env:userprofile\AppData\Roaming\Microsoft\Windows\Recent" -Type ExpandString -ErrorAction SilentlyContinue
+        Set-ItemProperty -Path $ushell -Name "SendTo" -Value "$env:userprofile\AppData\Roaming\Microsoft\Windows\SendTo" -Type ExpandString -ErrorAction SilentlyContinue
+        Set-ItemProperty -Path $ushell -Name "Start Menu" -Value "$env:userprofile\AppData\Roaming\Microsoft\Windows\Start Menu" -Type ExpandString -ErrorAction SilentlyContinue
+        Set-ItemProperty -Path $ushell -Name "Startup" -Value "$env:userprofile\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup" -Type ExpandString -ErrorAction SilentlyContinue
+        Set-ItemProperty -Path $ushell -Name "Templates" -Value "$env:userprofile\AppData\Roaming\Microsoft\Windows\Templates" -Type ExpandString -ErrorAction SilentlyContinue
+        Set-ItemProperty -Path $ushell -Name "{374DE290-123F-4565-9164-39C4925E467B}" -Value "$env:userprofile\Downloads" -Type ExpandString -ErrorAction SilentlyContinue
+        Set-ItemProperty -Path $ushell -Name "Desktop" -Value "$env:userprofile\Desktop" -Type ExpandString -ErrorAction SilentlyContinue
+        Set-ItemProperty -Path $ushell -Name "My Pictures" -Value "$env:userprofile\Pictures" -Type ExpandString -ErrorAction SilentlyContinue
+        Set-ItemProperty -Path $ushell -Name "Personal" -Value "$env:userprofile\Documents" -Type ExpandString -ErrorAction SilentlyContinue
+        Set-ItemProperty -Path $ushell -Name "{F42EE2D3-909F-4907-8871-4C22FC0BF756}" -Value "$env:userprofile\Documents" -Type ExpandString -ErrorAction SilentlyContinue
+        Set-ItemProperty -Path $ushell -Name "{0DDD015D-B06C-45D5-8C4C-F59713854639}" -Value "$env:userprofile\Pictures" -Type ExpandString -ErrorAction SilentlyContinue
+
+        Write-Host "Restarting explorer"
+        taskkill.exe /F /IM "explorer.exe" 2>$null
+        Start-Process "explorer.exe"
+
+        Write-Host "Waiting for explorer to complete loading"
+        Start-Sleep 5
+
+        Write-Host "Please Note - The OneDrive folder at $OneDrivePath may still have items in it. You must manually delete it, but all files should already be copied to the base user folder." -ForegroundColor Yellow
+        Write-Host "If there are files missing afterwards, please Login to Onedrive.com and download them manually" -ForegroundColor Yellow
+
+        Write-Output "✅ OneDrive removal completed (files moved where possible)."
+    } else {
+        Write-Host "Something went wrong during the uninstallation of OneDrive" -ForegroundColor Red
+        Write-Output "❌ OneDrive uninstall may have failed."
+    }
+    "#;
+    crate::utils::run_powershell(ps)
+}
+
+/// Install (restore) OneDrive via winget (Undo)
+pub fn install_onedrive() -> String {
+    let ps = r#"
+    Write-Host "Install OneDrive via winget"
+    try {
+        Start-Process -FilePath winget -ArgumentList "install -e --accept-source-agreements --accept-package-agreements --silent Microsoft.OneDrive" -NoNewWindow -Wait
+        Write-Output "✅ OneDrive installation (winget) completed."
+    } catch {
+        Write-Output "❌ OneDrive installation failed: $_"
+    }
+    "#;
+    crate::utils::run_powershell(ps)
+}
+
+/// Download and run OO Shutup 10 (Invoke-WebRequest -> save to %temp% -> Start-Process)
+/// Note: downloads an executable from the internet and runs it. This may trigger AV/SmartScreen.
+/// Requires network access; elevation may be requested by the executable itself.
+pub fn run_ooshutup10() -> String {
+    let ps = r#"
+    try {
+        $OOSU_filepath = Join-Path $env:TEMP 'OOSU10.exe'
+        $Initial_ProgressPreference = $ProgressPreference
+        $ProgressPreference = 'SilentlyContinue' # speed up Invoke-WebRequest
+        Write-Host 'Downloading OO Shutup 10 to' $OOSU_filepath
+        Invoke-WebRequest -Uri 'https://dl5.oo-software.com/files/ooshutup10/OOSU10.exe' -OutFile $OOSU_filepath -UseBasicParsing -ErrorAction Stop
+        Write-Host 'Download complete. Starting OO Shutup 10...'
+        Start-Process -FilePath $OOSU_filepath -WorkingDirectory $env:TEMP
+        Write-Output '✅ OO Shutup 10 launched. Please follow the application UI to apply settings.'
+    } catch {
+        Write-Output ('⚠ ERROR downloading or launching OO Shutup 10: ' + $_.Exception.Message)
+    } finally {
+        $ProgressPreference = $Initial_ProgressPreference
+    }
+    "#;
+    crate::utils::run_powershell(ps)
+}
+
+// /// Set Taskbar alignment: Center (true) or Left (false).
+// /// Writes HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Advanced\TaskbarAl
+// /// Requires current user registry access. Returns textual result for logs.
+// pub fn set_taskbar_alignment_center(enabled: bool) -> String {
+//     let value = if enabled { 1 } else { 0 };
+//     let state = if enabled { "Center" } else { "Left" };
+//     let ps = format!(r#"
+// try {{
+//     Write-Host 'Setting Taskbar alignment to: {state}'
+//     $Path = 'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Advanced'
+//     New-Item -Path $Path -Force | Out-Null
+//     Set-ItemProperty -Path $Path -Name 'TaskbarAl' -Value {value} -Type DWord -Force
+//     Write-Output '✅ Taskbar alignment set to {state}. Log off or restart Explorer for full effect.'
+// }} catch {{
+//     Write-Output ('⚠ ERROR: Failed to set Taskbar alignment: ' + $_.Exception.Message)
+// }}
+// "#, value = value, state = state);
+
+//     crate::utils::run_powershell(&ps)
+// }
+
+// /// Convenience wrappers
+// #[allow(dead_code)]
+// pub fn enable_center_taskbar() -> String {
+//     set_taskbar_alignment_center(true)
+// }
+
+// #[allow(dead_code)]
+// pub fn disable_center_taskbar() -> String {
+//     set_taskbar_alignment_center(false)
+// }
+
+// /// Reads HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Advanced\TaskbarAl
+// /// Returns true when value == 1 (center), false otherwise.
+// #[allow(dead_code)]
+// pub fn get_taskbar_alignment() -> bool {
+//     // PowerShell returns '1' or '0' (fallback to 0)
+//     let ps = r#"
+//         try {
+//             $v = Get-ItemPropertyValue -Path 'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Advanced' -Name 'TaskbarAl' -ErrorAction Stop
+//             if ($v -eq 1) { Write-Output '1' } else { Write-Output '0' }
+//         } catch {
+//             Write-Output '0'
+//         }
+//         "#;
+//     let out = crate::utils::run_powershell(ps);
+//     // parse last non-empty line
+//     out.lines().rev().find(|s| !s.trim().is_empty()).unwrap_or("0").trim() == "1"
+// }
+
+// /// Set Taskbar alignment.
+// #[allow(dead_code)]
+// pub fn set_taskbar_alignment(enabled: bool) -> String {
+//     let value = if enabled { 1 } else { 0 };
+//     let state = if enabled { "Center" } else { "Left" };
+
+//     let ps = format!(r#"
+//         try {{
+//             Write-Host 'Setting Taskbar alignment to: {state}'
+//             $Path = 'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Advanced'
+
+//             # First try to set the value directly (no attempt to create key)
+//             try {{
+//                 Set-ItemProperty -Path $Path -Name 'TaskbarAl' -Value {value} -Type DWord -Force -ErrorAction Stop
+//             }} catch {{
+//                 Write-Host 'Set-ItemProperty failed, attempting reg.exe fallback...' -ForegroundColor Yellow
+//                 $regPath = 'HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Advanced'
+//                 reg add "$regPath" /v TaskbarAl /t REG_DWORD /d {value} /f > $null
+//             }}
+
+//             Write-Output '✅ Taskbar alignment set to {state}. Log off or restart Explorer for full effect.'
+//         }} catch {{
+//             Write-Output ('⚠ ERROR: Failed to set Taskbar alignment: ' + $_.Exception.Message)
+//         }}
+//         "#, state = state, value = value);
+
+//     crate::utils::run_powershell(&ps)
+// }
+
+
+/// Reads HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Advanced\TaskbarAl
+/// Returns true when value == 1 (center), false otherwise.
+pub fn get_taskbar_alignment() -> bool {
+    let ps = r#"
+try {
+    $v = Get-ItemPropertyValue -Path 'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Advanced' -Name 'TaskbarAl' -ErrorAction Stop
+    if ($v -eq 1) { Write-Output '1' } else { Write-Output '0' }
+} catch {
+    Write-Output '0'
+}
+"#;
+    let out = crate::utils::run_powershell(ps);
+    out.lines().rev().find(|s| !s.trim().is_empty()).unwrap_or("0").trim() == "1"
+}
+
+/// Set Taskbar alignment robustly: try Set-ItemProperty, fallback to reg.exe if needed.
+/// DOES NOT attempt to create the key with New-Item (avoids permission errors).
+pub fn set_taskbar_alignment_center(enabled: bool) -> String {
+    let value = if enabled { 1 } else { 0 };
+    let state = if enabled { "Center" } else { "Left" };
+
+    let ps = format!(r#"
+try {{
+    Write-Host 'Setting Taskbar alignment to: {state}'
+    $Path = 'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Advanced'
+
+    # Try direct PowerShell registry write first (no New-Item)
+    try {{
+        Set-ItemProperty -Path $Path -Name 'TaskbarAl' -Value {value} -Type DWord -Force -ErrorAction Stop
+    }} catch {{
+        Write-Host 'Set-ItemProperty failed, attempting reg.exe fallback...' -ForegroundColor Yellow
+        $regPath = 'HKCU\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced'
+        reg add "$regPath" /v TaskbarAl /t REG_DWORD /d {value} /f > $null
+    }}
+
+    Write-Output '✅ Taskbar alignment set to {state}. Log off or restart Explorer for full effect.'
+}} catch {{
+    Write-Output ('⚠ ERROR: Failed to set Taskbar alignment: ' + $_.Exception.Message)
+}}
+"#, state = state, value = value);
+
+    crate::utils::run_powershell(&ps)
+}
+
+pub fn enable_center_taskbar() -> String { set_taskbar_alignment_center(true) }
+pub fn disable_center_taskbar() -> String { set_taskbar_alignment_center(false) }

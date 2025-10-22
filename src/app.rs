@@ -101,7 +101,7 @@ impl App {
     // -------------- SIDEBAR --------------
     fn sidebar(&mut self, ui: &mut egui::Ui) {
         ui.add_space(6.0);
-        ui.heading(RichText::new("Eoliann Win Tools").color(Color32::from_rgb(0, 255, 140)));
+        ui.heading(RichText::new("Eoliann Windows Tools").color(Color32::from_rgb(0, 255, 140)));
         ui.add_space(10.0);
         ui.label(format!("Version: {}", env!("CARGO_PKG_VERSION")));
 

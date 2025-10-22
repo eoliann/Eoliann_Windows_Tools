@@ -51,7 +51,7 @@ Includes useful administration commands and tweaks for Windows 11.
 - `Disable Recall` → disables MS Recall built into Windows since 24H2
 - `Enable Recall` → enables MS Recall built into Windows since 24H2
 - `Debloat Edge` → disables various telemetry options, popups, and other annoyances in Edge
-- `Create Restore Point` → creates a restore point at runtime in case a revert is needed from Winutil modifications
+- `Create Restore Point` → creates a restore point at runtime in case a revert is needed from Eoliann Windows Tools modifications
 - `Disable Activity History` → erases recent docs, clipboard, and run history; disables Activity History features
 - `Enable Activity History` → restores Activity History policies to allow activity collection
 - `Disable Storage Sense` → prevents Storage Sense from automatically deleting temporary files for the current user

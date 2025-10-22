@@ -21,7 +21,8 @@ Includes useful administration commands and tweaks for Windows 11.
 ## 🚀 Features
 
 ### INFO
-<img width="1402" height="932" alt="1 0 9_info" src="https://github.com/user-attachments/assets/6997729f-bcf7-42e1-a669-0450507bc6b8" />
+<img width="1402" height="932" alt="EWT_info_update" src="https://github.com/user-attachments/assets/ee3a0082-3255-4a33-9985-97faf3795297" />
+<img width="1402" height="946" alt="EWT_info" src="https://github.com/user-attachments/assets/cf814e1b-409e-4cb6-9574-eecfad2dbbe4" />
 
 - `whoami` → displays the current user
 - `ipconfig` → display network settings
@@ -29,14 +30,19 @@ Includes useful administration commands and tweaks for Windows 11.
 - `tasklist` → active processes
 
 ### TOOLS
-<img width="1402" height="932" alt="1 0 9_tools" src="https://github.com/user-attachments/assets/e86dce7f-e46b-4054-b678-19b1c5cc3dc7" />
+<img width="1920" height="1032" alt="EWT_tools" src="https://github.com/user-attachments/assets/3146d072-50b7-44f2-9b37-c99ad2539716" />
 
+#### Context menu
 - `Toggle Context Menu` → instantly switch between the **Win11 ↔ Classic** context menu (with Explorer restart)
+#### Maintenance
 - `Disk Cleanup` → start disk cleanup
 - `Empty Recycle Bin` → initiates emptying of the trash bin
 - `Clean Temporary Files` → launches temporary file cleanup
 - `Network Reset` → completely reset the network (Winsock + IP)
 - `Verify System Integrity (SFC + DSIM)` → checks whether the system integrity is correct and, if not, repairs corrupted files
+#### Essential Tweaks
+- `Disable ConsumerFeatures` → prevents automatic installation of Store apps/games for the signed-in user
+- `Enable ConsumerFeatures` → restores policy to allow Store consumer features 
 - `Disable Telemetry` → disables various telemetry options, popups, and other annoyances in Edge
 - `Disable Location Tracking` → disables Location Tracking
 - `Disable Wifi-Sense` → Wifi Sense is a spying service that phones home all nearby scanned wifi networks and your current geo location
@@ -45,19 +51,42 @@ Includes useful administration commands and tweaks for Windows 11.
 - `Disable Recall` → disables MS Recall built into Windows since 24H2
 - `Enable Recall` → enables MS Recall built into Windows since 24H2
 - `Debloat Edge` → disables various telemetry options, popups, and other annoyances in Edge
+- `Create Restore Point` → creates a restore point at runtime in case a revert is needed from Winutil modifications
+- `Disable Activity History` → erases recent docs, clipboard, and run history; disables Activity History features
+- `Enable Activity History` → restores Activity History policies to allow activity collection
+- `Disable Storage Sense` → prevents Storage Sense from automatically deleting temporary files for the current user
+- `Enable Storage Sense` → restores Storage Sense automatic cleanup for the current user
+#### Advanced Tweaks
 - `Adobe Network Block` → reduce user interruptions by selectively blocking connections to Adobe’s activation and telemetry servers. Credit: Ruddernation-Designs
 - `Adobe Debloat` → manages Adobe Services, Adobe Desktop Service, and Acrobat Updates
 - `Disable Microsoft Copilot` → disables MS Copilot AI built into Windows since 23H2
 - `Set Display for Performance` → sets the system preferences to performance. You can do this manually with sysdm.cpl as well
+- `Set Time to UTC (Dual Boot)` → essential for dual-boot systems: syncs Windows with Linux hardware clock (UTC)
+- `Restore Time to Local` → restores Windows default: hardware clock treated as local time
+- `Remove OneDrive` → moves OneDrive files to default home folders and uninstalls OneDrive
+- `Install OneDrive (Restore)` → installs OneDrive using winget (undo)
+- `Run OO Shutup 10` → downloads and launches OO Shutup 10 (third-party executable)
 - `Set DNS` → set the DNS for the network card
-- `Power Plan Switcher` → quickly switch between High Performance, Balanced, and Power Saver modes
-- `Power Tweaks` → Disable Sleep (no standby/sleep/hibernate), Disable HDD/SSD turn off, Disable Monitor turn off, and works on both battery (DC) and mains power (AC)
+#### Power Plans
+- `High Performance` → maximizes performance at the cost of higher power usage
+- `Balanced` → default Windows plan (best for most users)
+- `Power Saver` → reduces system performance to save battery life
+- `Set Hibernation as default (laptops)` → most laptops with connected standby drain battery, this sets hibernation as default
+- `Restore Hibernation defaults` → restores registry Attributes and turns hibernation off
+#### Power Tweaks
+- `Disable Sleep` → prevents Windows from going into sleep mode
+- `Disable HDD/SSD Timeout` → prevents hard drives and SSDs from powering down after inactivity
+- `Disable Monitor Timeout` → prevents the monitor from turning off automatically
 
 ### INSTALL
-<img width="1402" height="932" alt="1 0 9_install" src="https://github.com/user-attachments/assets/b8334a1b-faae-487e-969a-3a81ec369bc1" />
-<img width="1402" height="932" alt="1 0 9_install_1" src="https://github.com/user-attachments/assets/f517e296-1e35-4687-bc12-d7a8896832ba" />
+<img width="1402" height="987" alt="EWT_install" src="https://github.com/user-attachments/assets/92dd36bc-35c8-4242-8613-2506daa263e7" />
+<img width="1402" height="932" alt="EWT_install_2" src="https://github.com/user-attachments/assets/d4f47a68-8650-4338-b873-e61c44349f25" />
+<img width="1402" height="932" alt="EWT_install_3" src="https://github.com/user-attachments/assets/b059bb25-24a0-4825-a377-e6a78177f8e4" />
+<img width="1402" height="932" alt="EWT_install_4" src="https://github.com/user-attachments/assets/ed990efd-4c0d-4bdf-ab64-8e361ef8ddd3" />
+<img width="1402" height="932" alt="EWT_install_5" src="https://github.com/user-attachments/assets/527c9273-22db-4479-bb74-dafee9799530" />
+<img width="1402" height="932" alt="EWT_install_6" src="https://github.com/user-attachments/assets/e0eca63a-9952-450c-a77f-76c3be858257" />
 
-- `Install selections, Uninstall selections, Update selections, Clear selections, Upgrade All Applications, Reinstall winget`
+- `Install selections, Uninstall selections, Update selections, Clear selections, Upgrade All Applications, Reinstall winget & search field to filter apps`
 - `Browsers`
 - `Communications`
 - `Development`
@@ -69,7 +98,7 @@ Includes useful administration commands and tweaks for Windows 11.
 - `Utilities`
   
 ### WINDOWS APP REMOVAL
-<img width="1402" height="932" alt="1 0 9_winapp_remover" src="https://github.com/user-attachments/assets/b5e01c69-22ef-40a0-b344-2d355601df6a" />
+<img width="1402" height="987" alt="EWT_remove_winapp" src="https://github.com/user-attachments/assets/d9869dc3-07fd-4fad-a501-e8b02ffc3d30" />
 
 - `Communication` → remove default applications that come with Windows installation, such as: Outlook for Windows, Skype, Teams, GroupMe, To-Do, Your Phone, CommsPhone, Messaging, Mail & Calendar, and others.
 - `Media & Creativity` → removes default applications that come with Windows installation, such as: Climpchamp, Camera, MS Paint, 3D Builder, 3D Viewer, Print 3D, Mixed Reality Portal
@@ -81,8 +110,10 @@ Includes useful administration commands and tweaks for Windows 11.
 ### SETTINGS
 <img width="1402" height="932" alt="1 0 9_settings" src="https://github.com/user-attachments/assets/58f7c75c-dc01-4428-ab1d-68b27524ed28" />
 
-- `Dark / Light Theme` → switch between Windows Light and Dark themes
-- `Open Display Settings` → opens the window with the system display options
+- `Switch to Light Mode / Switch to Dark Mode` → switch between Windows Light and Dark themes
+- `Display Current alignment` → Display Current alignment of taskbar elements (Center or Left)
+- `Center Taskbar Items` → center the taskbar items (Windows 11)
+- `Left Taskbar Items` → align the taskbar items to the left (classic)
 - `About` → version information + GitHub link
 
 ---
@@ -91,7 +122,7 @@ Includes useful administration commands and tweaks for Windows 11.
 - Visual UI with tabs **INFO, TOOLS, WINAPP REMOVAL SETTINGS**
 - **Black** background
 - Text and buttons **fluorescent green (#39FF14)**
-- ASCII Retro Hacker Logo 🟩 la pornire (JetBrains Mono font)
+- ASCII Retro Hacker Logo 🟩 on start (JetBrains Mono font)
 
 ---
 

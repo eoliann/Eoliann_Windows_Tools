@@ -622,6 +622,115 @@ pub fn show_tools(
                     });
                 }
             }
+                        // Set Time to UTC (Dual Boot)
+            let resp = ui.add_enabled(!global_busy, egui::Button::new("⌚ Set Time to UTC (Dual Boot)"));
+            resp.clone().on_hover_ui(|ui| {
+                ui.vertical(|ui| {
+                    ui.colored_label(egui::Color32::YELLOW, "Essential for dual-boot systems: syncs Windows with Linux hardware clock (UTC).");
+                    ui.label("• Sets RealTimeIsUniversal = 1 under HKLM\\SYSTEM\\CurrentControlSet\\Control\\TimeZoneInformation");
+                    ui.colored_label(egui::Color32::RED, "⚠ Requires Administrator. Reboot recommended for changes to take effect.");
+                    ui.hyperlink("https://christitustech.github.io/Winutil/dev/tweaks/z--Advanced-Tweaks---CAUTION/UTC");
+                });
+            });
+            if resp.clicked() {
+                if let Some(guard) = commands::try_start_global_op("Set Time to UTC (Dual Boot)", log) {
+                    let log_clone = log.clone();
+                    thread::spawn(move || {
+                        let _guard = guard;
+                        let result = crate::commands::set_time_utc();
+                        let mut lg = log_clone.lock().unwrap();
+                        if lg.is_empty() { *lg = result; } else { *lg = format!("{}\n{}", lg, result); }
+                    });
+                }
+            }
+
+            // Restore Time to Local (undo)
+            let resp = ui.add_enabled(!global_busy, egui::Button::new("♻ Restore Time to Local"));
+            resp.clone().on_hover_ui(|ui| {
+                ui.vertical(|ui| {
+                    ui.colored_label(egui::Color32::from_rgb(57, 255, 20), "Restores Windows default: hardware clock treated as local time.");
+                    ui.label("• Sets RealTimeIsUniversal = 0 (or remove value if preferred)");
+                    ui.colored_label(egui::Color32::LIGHT_BLUE, "ℹ Requires Administrator. Reboot recommended.");
+                });
+            });
+            if resp.clicked() {
+                if let Some(guard) = commands::try_start_global_op("Restore Time to Local", log) {
+                    let log_clone = log.clone();
+                    thread::spawn(move || {
+                        let _guard = guard;
+                        let result = crate::commands::restore_time_local();
+                        let mut lg = log_clone.lock().unwrap();
+                        if lg.is_empty() { *lg = result; } else { *lg = format!("{}\n{}", lg, result); }
+                    });
+                }
+            }
+
+                        // Remove OneDrive (CAUTION)
+            let resp = ui.add_enabled(!global_busy, egui::Button::new("⛔ Remove OneDrive"));
+            resp.clone().on_hover_ui(|ui| {
+                ui.vertical(|ui| {
+                    ui.colored_label(egui::Color32::RED, "Moves OneDrive files to default home folders and uninstalls OneDrive.");
+                    ui.label("• Uses robocopy to move files, deletes remnants, fixes shell folders and explorer pin.");
+                    ui.colored_label(egui::Color32::YELLOW, "⚠ HIGH RISK: test before use. Backup recommended. Requires Administrator.");
+                    ui.hyperlink("https://christitustech.github.io/Winutil/dev/tweaks/z--Advanced-Tweaks---CAUTION/RemoveOnedrive");
+                });
+            });
+            if resp.clicked() {
+                // start long-running operation
+                if let Some(guard) = commands::try_start_global_op("Remove OneDrive", log) {
+                    let log_clone = log.clone();
+                    thread::spawn(move || {
+                        let _guard = guard;
+                        let result = crate::commands::remove_onedrive();
+                        let mut lg = log_clone.lock().unwrap();
+                        if lg.is_empty() { *lg = result; } else { *lg = format!("{}\n{}", lg, result); }
+                    });
+                }
+            }
+
+            // Restore / Install OneDrive (undo)
+            let resp = ui.add_enabled(!global_busy, egui::Button::new("✅ Install OneDrive (Restore)"));
+            resp.clone().on_hover_ui(|ui| {
+                ui.vertical(|ui| {
+                    ui.colored_label(egui::Color32::from_rgb(57, 255, 20), "Installs OneDrive using winget (undo).");
+                    ui.label("• Requires network and winget available on system.");
+                    ui.colored_label(egui::Color32::LIGHT_BLUE, "ℹ Requires Administrator. You may need to sign in to OneDrive after install.");
+                });
+            });
+            if resp.clicked() {
+                if let Some(guard) = commands::try_start_global_op("Install OneDrive", log) {
+                    let log_clone = log.clone();
+                    thread::spawn(move || {
+                        let _guard = guard;
+                        let result = crate::commands::install_onedrive();
+                        let mut lg = log_clone.lock().unwrap();
+                        if lg.is_empty() { *lg = result; } else { *lg = format!("{}\n{}", lg, result); }
+                    });
+                }
+            }
+
+            // Run OO Shutup 10 (CAUTION)
+            let resp = ui.add_enabled(!global_busy, egui::Button::new("⚙ Run OO Shutup 10"));
+            resp.clone().on_hover_ui(|ui| {
+                ui.vertical(|ui| {
+                    ui.colored_label(egui::Color32::YELLOW, "Downloads and launches OO Shutup 10 (third-party executable).");
+                    ui.label("• The tool will be downloaded to the current user's %TEMP% and executed.");
+                    ui.colored_label(egui::Color32::RED, "⚠ CAUTION: This downloads & runs an .exe from the internet. May trigger AV/SmartScreen/UAC. Test on VM first.");
+                    ui.hyperlink("https://dl5.oo-software.com/files/ooshutup10/OOSU10.exe");
+                    ui.hyperlink("https://christitustech.github.io/Winutil/dev/tweaks/z--Advanced-Tweaks---CAUTION/OOSUbutton");
+                });
+            });
+            if resp.clicked() {
+                if let Some(guard) = commands::try_start_global_op("Run OO Shutup 10", log) {
+                    let log_clone = log.clone();
+                    thread::spawn(move || {
+                        let _guard = guard;
+                        let result = crate::commands::run_ooshutup10();
+                        let mut lg = log_clone.lock().unwrap();
+                        if lg.is_empty() { *lg = result; } else { *lg = format!("{}\n{}", lg, result); }
+                    });
+                }
+            }
         });
 
         ui.add_space(10.0);
@@ -788,116 +897,6 @@ pub fn show_tools(
                     thread::spawn(move || {
                         let _guard = guard;
                         let result = crate::commands::restore_hibernation_defaults();
-                        let mut lg = log_clone.lock().unwrap();
-                        if lg.is_empty() { *lg = result; } else { *lg = format!("{}\n{}", lg, result); }
-                    });
-                }
-            }
-
-                        // Set Time to UTC (Dual Boot)
-            let resp = ui.add_enabled(!global_busy, egui::Button::new("⌚ Set Time to UTC (Dual Boot)"));
-            resp.clone().on_hover_ui(|ui| {
-                ui.vertical(|ui| {
-                    ui.colored_label(egui::Color32::YELLOW, "Essential for dual-boot systems: syncs Windows with Linux hardware clock (UTC).");
-                    ui.label("• Sets RealTimeIsUniversal = 1 under HKLM\\SYSTEM\\CurrentControlSet\\Control\\TimeZoneInformation");
-                    ui.colored_label(egui::Color32::RED, "⚠ Requires Administrator. Reboot recommended for changes to take effect.");
-                    ui.hyperlink("https://christitustech.github.io/Winutil/dev/tweaks/z--Advanced-Tweaks---CAUTION/UTC");
-                });
-            });
-            if resp.clicked() {
-                if let Some(guard) = commands::try_start_global_op("Set Time to UTC (Dual Boot)", log) {
-                    let log_clone = log.clone();
-                    thread::spawn(move || {
-                        let _guard = guard;
-                        let result = crate::commands::set_time_utc();
-                        let mut lg = log_clone.lock().unwrap();
-                        if lg.is_empty() { *lg = result; } else { *lg = format!("{}\n{}", lg, result); }
-                    });
-                }
-            }
-
-            // Restore Time to Local (undo)
-            let resp = ui.add_enabled(!global_busy, egui::Button::new("♻ Restore Time to Local"));
-            resp.clone().on_hover_ui(|ui| {
-                ui.vertical(|ui| {
-                    ui.colored_label(egui::Color32::from_rgb(57, 255, 20), "Restores Windows default: hardware clock treated as local time.");
-                    ui.label("• Sets RealTimeIsUniversal = 0 (or remove value if preferred)");
-                    ui.colored_label(egui::Color32::LIGHT_BLUE, "ℹ Requires Administrator. Reboot recommended.");
-                });
-            });
-            if resp.clicked() {
-                if let Some(guard) = commands::try_start_global_op("Restore Time to Local", log) {
-                    let log_clone = log.clone();
-                    thread::spawn(move || {
-                        let _guard = guard;
-                        let result = crate::commands::restore_time_local();
-                        let mut lg = log_clone.lock().unwrap();
-                        if lg.is_empty() { *lg = result; } else { *lg = format!("{}\n{}", lg, result); }
-                    });
-                }
-            }
-
-                        // Remove OneDrive (CAUTION)
-            let resp = ui.add_enabled(!global_busy, egui::Button::new("⛔ Remove OneDrive"));
-            resp.clone().on_hover_ui(|ui| {
-                ui.vertical(|ui| {
-                    ui.colored_label(egui::Color32::RED, "Moves OneDrive files to default home folders and uninstalls OneDrive.");
-                    ui.label("• Uses robocopy to move files, deletes remnants, fixes shell folders and explorer pin.");
-                    ui.colored_label(egui::Color32::YELLOW, "⚠ HIGH RISK: test before use. Backup recommended. Requires Administrator.");
-                    ui.hyperlink("https://christitustech.github.io/Winutil/dev/tweaks/z--Advanced-Tweaks---CAUTION/RemoveOnedrive");
-                });
-            });
-            if resp.clicked() {
-                // start long-running operation
-                if let Some(guard) = commands::try_start_global_op("Remove OneDrive", log) {
-                    let log_clone = log.clone();
-                    thread::spawn(move || {
-                        let _guard = guard;
-                        let result = crate::commands::remove_onedrive();
-                        let mut lg = log_clone.lock().unwrap();
-                        if lg.is_empty() { *lg = result; } else { *lg = format!("{}\n{}", lg, result); }
-                    });
-                }
-            }
-
-            // Restore / Install OneDrive (undo)
-            let resp = ui.add_enabled(!global_busy, egui::Button::new("✅ Install OneDrive (Restore)"));
-            resp.clone().on_hover_ui(|ui| {
-                ui.vertical(|ui| {
-                    ui.colored_label(egui::Color32::from_rgb(57, 255, 20), "Installs OneDrive using winget (undo).");
-                    ui.label("• Requires network and winget available on system.");
-                    ui.colored_label(egui::Color32::LIGHT_BLUE, "ℹ Requires Administrator. You may need to sign in to OneDrive after install.");
-                });
-            });
-            if resp.clicked() {
-                if let Some(guard) = commands::try_start_global_op("Install OneDrive", log) {
-                    let log_clone = log.clone();
-                    thread::spawn(move || {
-                        let _guard = guard;
-                        let result = crate::commands::install_onedrive();
-                        let mut lg = log_clone.lock().unwrap();
-                        if lg.is_empty() { *lg = result; } else { *lg = format!("{}\n{}", lg, result); }
-                    });
-                }
-            }
-
-            // Run OO Shutup 10 (CAUTION)
-            let resp = ui.add_enabled(!global_busy, egui::Button::new("⚙ Run OO Shutup 10"));
-            resp.clone().on_hover_ui(|ui| {
-                ui.vertical(|ui| {
-                    ui.colored_label(egui::Color32::YELLOW, "Downloads and launches OO Shutup 10 (third-party executable).");
-                    ui.label("• The tool will be downloaded to the current user's %TEMP% and executed.");
-                    ui.colored_label(egui::Color32::RED, "⚠ CAUTION: This downloads & runs an .exe from the internet. May trigger AV/SmartScreen/UAC. Test on VM first.");
-                    ui.hyperlink("https://dl5.oo-software.com/files/ooshutup10/OOSU10.exe");
-                    ui.hyperlink("https://christitustech.github.io/Winutil/dev/tweaks/z--Advanced-Tweaks---CAUTION/OOSUbutton");
-                });
-            });
-            if resp.clicked() {
-                if let Some(guard) = commands::try_start_global_op("Run OO Shutup 10", log) {
-                    let log_clone = log.clone();
-                    thread::spawn(move || {
-                        let _guard = guard;
-                        let result = crate::commands::run_ooshutup10();
                         let mut lg = log_clone.lock().unwrap();
                         if lg.is_empty() { *lg = result; } else { *lg = format!("{}\n{}", lg, result); }
                     });

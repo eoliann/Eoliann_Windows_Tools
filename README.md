@@ -14,6 +14,12 @@
 A quick toolkit for Windows 11, written in Rust + egui, with a retro hacker fluorescent green UI 🟩.  
 Includes useful administration commands and tweaks for Windows 11.
 
+
+Now install it on your system!
+
+![ewt](https://github.com/user-attachments/assets/b8d5978f-84e3-4db8-b7ae-c563181eaf05)
+
+
 ---
 
 <img width="456" height="403" alt="EWT_1" src="https://github.com/user-attachments/assets/2b430312-846a-433f-9559-e73c44bb264f" />

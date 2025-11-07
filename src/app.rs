@@ -249,7 +249,15 @@ impl eframe::App for App {
                 .show(ui, |ui| {
                     match self.page {
                         Page::Tools => {
-                            tools::show_tools(ui, &self.log, &mut self.show_popup, &mut self.popup_message);
+                            tools::show_tools(ui, &self.log, &mut self.show_popup, &mut self.popup_message, &mut tools::ToolsState {
+                                show_hidden_state: false,
+                                show_file_ext_state: false,
+                                pending_reset_rx: None,
+                                reset_in_progress: false,
+                                last_progress: 0.0,
+                                reset_aggressive: false,
+                                last_message: String::new(),
+                            });
                         }
                         Page::Install => { install::show_install(ui, &self.log); }
                         Page::WinAppRemoval => {
@@ -267,20 +275,48 @@ impl eframe::App for App {
         });
 
         // popup / update windows etc. (rămân neschimbate)
+        // if self.show_popup {
+        //     egui::Window::new("Confirm / Log")
+        //         .collapsible(false)
+        //         .resizable(true)
+        //         .default_size([600.0, 400.0])
+        //         .show(ctx, |ui| {
+        //             ui.label(&self.popup_message);
+        //             egui::ScrollArea::vertical().show(ui, |ui| {
+        //                 let text = { self.log.lock().unwrap().clone() };
+        //                 ui.label(egui::RichText::new(text).monospace());
+        //             });
+        //             ui.horizontal(|ui| {
+        //                 if ui.button("Close").clicked() { self.show_popup = false; }
+        //                 if ui.button("Clear Log").clicked() { self.clear_log(); }
+        //             });
+        //         });
+        // }
         if self.show_popup {
             egui::Window::new("Confirm / Log")
                 .collapsible(false)
                 .resizable(true)
-                .default_size([600.0, 400.0])
+                .default_size([800.0, 600.0])
                 .show(ctx, |ui| {
-                    ui.label(&self.popup_message);
-                    egui::ScrollArea::vertical().show(ui, |ui| {
-                        let text = { self.log.lock().unwrap().clone() };
-                        ui.label(egui::RichText::new(text).monospace());
-                    });
-                    ui.horizontal(|ui| {
-                        if ui.button("Close").clicked() { self.show_popup = false; }
-                        if ui.button("Clear Log").clicked() { self.clear_log(); }
+                    ui.vertical(|ui| {
+                        ui.label(&self.popup_message);
+                        
+                        // ScrollArea cu înălțime limitată - lasă spațiu pentru butoane
+                        egui::ScrollArea::vertical()
+                            .max_height(ui.available_height() - 50.0)
+                            .stick_to_bottom(true)
+                            .show(ui, |ui| {
+                                let text = { self.log.lock().unwrap().clone() };
+                                ui.label(egui::RichText::new(text).monospace());
+                            });
+                        
+                        ui.add_space(10.0);
+                        
+                        // Butoanele rămân întotdeauna vizibile jos
+                        ui.horizontal(|ui| {
+                            if ui.button("Close").clicked() { self.show_popup = false; }
+                            if ui.button("Clear Log").clicked() { self.clear_log(); }
+                        });
                     });
                 });
         }

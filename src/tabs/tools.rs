@@ -4,8 +4,9 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
 use std::sync::atomic::Ordering;
-
 use crate::commands;
+// use std::sync::mpsc;
+
 
 /// Helper: așteaptă în log până apare un mesaj final (SUCCESS: sau ERROR:) sau expiră.
 /// Returnează true dacă a găsit un final, false dacă a expirat.
@@ -26,17 +27,106 @@ fn wait_for_live_completion(log: &Arc<Mutex<String>>, timeout_secs: u64) -> bool
     }
 }
 
+
+#[allow(dead_code)]
+pub struct ToolsState {
+    pub show_hidden_state: bool,
+    pub show_file_ext_state: bool,
+    // în struct ToolsState (sau struct-ul tău de stare)
+    pub pending_reset_rx: Option<std::sync::mpsc::Receiver<String>>,
+    pub reset_in_progress: bool,
+    pub reset_aggressive: bool,
+    pub last_message: String,
+    pub last_progress: f32,
+
+}
+
+impl Default for ToolsState {
+    fn default() -> Self {
+        Self {
+            pending_reset_rx: None,
+            reset_in_progress: false,
+            reset_aggressive: false,
+            last_message: String::new(),
+            last_progress: 0.0,
+            show_hidden_state: false,
+            show_file_ext_state: false,
+            // --- IMPORTANT: dacă ai alte câmpuri în struct, inițializează-le explicit aici
+            // sau folosește struct update syntax după ce păstrezi valorile existente.
+        }
+    }
+}
+
+
+
 pub fn show_tools(
     ui: &mut egui::Ui,
     log: &Arc<Mutex<String>>,
     _show_popup: &mut bool,
     _popup_message: &mut String,
+    app_state: &mut ToolsState, // Add app_state as a mutable reference
 ) {
     ui.heading("🛠 Windows Tools");
     ui.add_space(6.0);
 
     // consultăm flag-ul global pentru a dezactiva butoanele dacă e cazul
     let global_busy = crate::commands::GLOBAL_OP_RUNNING.load(Ordering::SeqCst);
+
+    // Poll pending Reset Windows Update result (non-blocking)
+    // Poll pending Reset Windows Update result (non-blocking streaming)
+    if let Some(rx) = &app_state.pending_reset_rx {
+        loop {
+            match rx.try_recv() {
+                Ok(line) => {
+                    // Prioritize PROG lines
+                    if line.starts_with("PROG:") {
+                        // format PROG:<percent>:<text>
+                        let rest = &line[5..];
+                        if let Some(idx) = rest.find(':') {
+                            if let Ok(p) = rest[..idx].parse::<f32>() {
+                                app_state.last_progress = (p.clamp(0.0, 100.0)) / 100.0;
+                            }
+                            let msg = rest[idx+1..].to_string();
+                            app_state.last_message = msg.clone();
+                            let mut lg = log.lock().unwrap();
+                            if lg.is_empty() { *lg = msg.clone(); } else { *lg = format!("{}\n{}", lg, msg); }
+                        } else {
+                            app_state.last_message = rest.to_string();
+                        }
+                    } else if line.starts_with("ERR:") {
+                        let msg = line.clone();
+                        app_state.last_message = msg.clone();
+                        let mut lg = log.lock().unwrap();
+                        if lg.is_empty() { *lg = msg.clone(); } else { *lg = format!("{}\n{}", lg, msg); }
+                    } else if line.starts_with("PROCESS_EXIT:") {
+                        app_state.reset_in_progress = false;
+                        // optional: set progress to 1.0 on exit
+                        app_state.last_progress = 1.0;
+                        let mut lg = log.lock().unwrap();
+                        let msg = format!("Reset process exited: {}", &line["PROCESS_EXIT:".len()..]);
+                        if lg.is_empty() { *lg = msg.clone(); } else { *lg = format!("{}\n{}", lg, msg); }
+                        app_state.pending_reset_rx = None;
+                        break;
+                    } else {
+                        // general log line
+                        let msg = line.clone();
+                        app_state.last_message = msg.clone();
+                        let mut lg = log.lock().unwrap();
+                        if lg.is_empty() { *lg = msg.clone(); } else { *lg = format!("{}\n{}", lg, msg); }
+                    }
+                }
+                Err(std::sync::mpsc::TryRecvError::Empty) => break,
+                Err(std::sync::mpsc::TryRecvError::Disconnected) => {
+                    app_state.reset_in_progress = false;
+                    app_state.pending_reset_rx = None;
+                    let mut lg = log.lock().unwrap();
+                    if lg.is_empty() { *lg = "Reset thread disconnected unexpectedly.".to_string(); } else { *lg = format!("{}\n{}", lg, "Reset thread disconnected unexpectedly.") }
+                    break;
+                }
+            }
+        }
+    }
+
 
     // ---- Context menu ----
     ui.group(|ui| {
@@ -57,6 +147,7 @@ pub fn show_tools(
                 );
             });
         });
+
         if resp.clicked() { // `resp` is not moved here, it's a copy of the Response struct
             if let Some(guard) = commands::try_start_global_op("Toggle context menu", log) {
                 let log_clone = log.clone();
@@ -173,6 +264,7 @@ pub fn show_tools(
                     ui.colored_label(egui::Color32::YELLOW, "⚠ May take 10–30 minutes, do not close app");
                 });
             });
+            
             if resp.clicked() {
                 if let Some(guard) = commands::try_start_global_op("System Integrity Check (SFC+DISM)", log) {
                     let log_clone = log.clone();
@@ -190,6 +282,61 @@ pub fn show_tools(
                     });
                 }
             }
+
+            // Reset Windows Update
+            ui.separator();
+            ui.horizontal(|ui| {
+                ui.checkbox(&mut app_state.reset_aggressive, "Aggressive (runs chkdsk, SFC, DISM)");
+                let resp = ui.add_enabled(!global_busy && !app_state.reset_in_progress, egui::Button::new("🔁 Reset Windows Update"));
+                resp.clone().on_hover_ui(|ui| {
+                    ui.vertical(|ui| {
+                        ui.label("Attempts to repair Windows Update. Aggressive mode runs chkdsk, SFC and DISM and may take a long time.");
+                        ui.colored_label(egui::Color32::YELLOW, "⚠ Requires Administrator. May take many minutes.");
+                    });
+                });
+                
+                if resp.clicked() {
+                    if let Some(guard) = commands::try_start_global_op("Reset Windows Update", log) {
+                        let aggressive = app_state.reset_aggressive;
+                        let (tx, rx) = std::sync::mpsc::channel::<String>();
+                        app_state.pending_reset_rx = Some(rx);
+                        app_state.reset_in_progress = true;
+                        app_state.last_progress = 0.0;
+                        app_state.last_message.clear();
+
+                        // clonăm log-ul pentru a putea scrie erori dacă start_reset esuează
+                        let log_clone = log.clone();
+
+                        // mutăm guard în thread ca să rămână activ până la terminare
+                        std::thread::spawn(move || {
+                            let _guard = guard; // păstrăm guard-ul aici
+                            match crate::commands::start_reset_windows_update(aggressive, tx) {
+                                Ok(_) => { /* streamingul se ocupă de toate mesajele */ }
+                                Err(e) => {
+                                    // scriem eroarea direct în log dacă pornirea scriptului a eșuat
+                                    let mut lg = log_clone.lock().unwrap();
+                                    if lg.is_empty() {
+                                        *lg = format!("ERROR: {}", e);
+                                    } else {
+                                        *lg = format!("{}\nERROR: {}", lg, e);
+                                    }
+                                }
+                            }
+                            // când funcția se termină, `_guard` e droppuit și GLOBAL_OP_RUNNING se eliberează
+                        });
+                    }
+                }
+            });
+
+            // după blocul ui.horizontal(...) pentru buton
+            ui.add_space(6.0);
+            ui.horizontal(|ui| {
+                ui.label("Reset Windows Update:");
+                ui.add(egui::ProgressBar::new(app_state.last_progress).show_percentage());
+            });
+            ui.label(egui::RichText::new(&app_state.last_message).small());
+            ui.separator();
+
         });
     });
 
@@ -198,8 +345,7 @@ pub fn show_tools(
     // ---- Essential Tweaks ----
     ui.group(|ui| {
         ui.label("Essential Tweaks");
-
-            
+        
         ui.horizontal_wrapped(|ui| {
             // Disable ConsumerFeatures
             let resp = ui.add_enabled(!global_busy, egui::Button::new("🛡 Disable ConsumerFeatures"));
@@ -484,8 +630,8 @@ pub fn show_tools(
                     });
                 }
             }
-
-                        // Disable Storage Sense
+            
+            // Disable Storage Sense
             let resp = ui.add_enabled(!global_busy, egui::Button::new("🗄 Disable Storage Sense"));
             resp.clone().on_hover_ui(|ui| {
                 ui.vertical(|ui| {
@@ -528,9 +674,56 @@ pub fn show_tools(
                 }
             }
 
-            
+            // Show Hidden Files
+            let resp = ui.add_enabled(!global_busy, egui::Button::new(if app_state.show_hidden_state { "🙈 Hide Hidden Files" } else { "👁 Show Hidden Files" }));
+            resp.clone().on_hover_ui(|ui| {
+                ui.vertical(|ui| {
+                    ui.colored_label(egui::Color32::from_rgb(57, 255, 20), "Toggles visibility of hidden files and folders in Explorer.");
+                    ui.label("• Modifies registry key HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced\\Hidden");
+                    ui.colored_label(egui::Color32::LIGHT_BLUE, "ℹ Changes apply instantly to Explorer windows.");
+                });
+            });
+            if resp.clicked() {
+                if let Some(guard) = commands::try_start_global_op(if app_state.show_hidden_state { "Hide Hidden Files" } else { "Show Hidden Files" }, log) {
+                    let log_clone = log.clone();
+                    let current_state = app_state.show_hidden_state;
+                    thread::spawn(move || {
+                        let _guard = guard;
+                        let result = commands::show_hidden_files(!current_state).unwrap_or_else(|e| format!("ERROR: {}", e));
+                        let mut lg = log_clone.lock().unwrap();
+                        if lg.is_empty() { *lg = result; } else { *lg = format!("{}\n{}", lg, result); }
+                    });
+                }
+            }
+
+            // Show File Extensions
+            let resp_ext = ui.add_enabled(!global_busy, egui::Button::new(
+                if app_state.show_file_ext_state { "🔤 Hide File Extensions" } else { "🔤 Show File Extensions" }
+            ));
+            resp_ext.clone().on_hover_ui(|ui| {
+                ui.vertical(|ui| {
+                    ui.colored_label(egui::Color32::from_rgb(57, 255, 20), "Toggle showing file extensions for known file types.");
+                    ui.label("• Modifies registry key HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced\\HideFileExt");
+                    ui.colored_label(egui::Color32::LIGHT_BLUE, "ℹ Changes may require Explorer restart to display correctly.");
+                });
+            });
+            if resp_ext.clicked() {
+                if let Some(guard) = commands::try_start_global_op(if app_state.show_file_ext_state { "Hide File Extensions" } else { "Show File Extensions" }, log) {
+                    let log_clone = log.clone();
+                    let current_state = app_state.show_file_ext_state;
+                    thread::spawn(move || {
+                        let _guard = guard;
+                        let result = commands::show_file_extensions(!current_state).unwrap_or_else(|e| format!("ERROR: {}", e));
+                        let mut lg = log_clone.lock().unwrap();
+                        if lg.is_empty() { *lg = result; } else { *lg = format!("{}\n{}", lg, result); }
+                    });
+                }
+            }
+
 
         });
+
+        
     });
 
     ui.add_space(6.0);

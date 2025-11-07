@@ -314,12 +314,12 @@ pub fn show_install(ui: &mut egui::Ui, log: &Arc<Mutex<String>>) {
                 commands::upgrade_all_apps_with_log(log);
             });
         }
-        if ui.button("Reinstall winget").clicked() {
-            let log = log.clone();
-            std::thread::spawn(move || {
-                commands::reinstall_winget_with_log(log);
-            });
-        }
+        // if ui.button("Reinstall winget").clicked() {
+        //     let log = log.clone();
+        //     std::thread::spawn(move || {
+        //         commands::reinstall_winget_with_log(log);
+        //     });
+        // }
     });
 
     ui.add_space(6.0);

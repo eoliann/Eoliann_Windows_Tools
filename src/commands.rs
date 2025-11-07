@@ -1,16 +1,17 @@
 use crate::utils::run_command; // păstrează utilitarul tău existent
 
-use std::io::{BufRead, BufReader};
-use std::process::{Command, Stdio};
+use std::io::{self, BufReader};
+use std::process::{Command as StdCommand, Stdio};
 use std::sync::{Arc, Mutex};
 use std::thread;
 
 #[cfg(windows)]
-use std::os::windows::process::CommandExt; // .creation_flags pentru a ascunde fereastra
+use std::os::windows::process::CommandExt;
 
 #[cfg(windows)]
 const CREATE_NO_WINDOW: u32 = 0x08000000;
 
+use std::io::BufRead; // Import BufRead here
 // ---------- Helper logging ----------
 fn push_line(log: &Arc<Mutex<String>>, line: &str) {
     if let Ok(mut lg) = log.lock() {
@@ -24,10 +25,10 @@ fn push_line(log: &Arc<Mutex<String>>, line: &str) {
 /// Rulează un proces, citește stdout+stderr în paralel, scrie în `log` cu prefix și așteaptă să iasă.
 fn run_command_stream_and_wait(log: Arc<Mutex<String>>, cmd: &str, args: &[&str]) -> std::io::Result<i32> {
     let prefix = format!("{} {}", cmd, args.join(" "));
-
+ 
     #[allow(unused_mut)]
     let mut child = {
-        let mut c = Command::new(cmd);
+        let mut c = StdCommand::new(cmd);
         c.args(args)
             .stdin(Stdio::null())
             .stdout(Stdio::piped())
@@ -77,7 +78,7 @@ fn run_command_stream_and_wait(log: Arc<Mutex<String>>, cmd: &str, args: &[&str]
 #[allow(dead_code)]
 pub fn toggle_context_menu() -> String {
     // Verifică existența cheii pentru meniul clasic (Win10)
-    let check = Command::new("reg")
+    let check = StdCommand::new("reg")
         .args(&["query", r"HKCU\Software\Classes\CLSID\{86ca1aa0-34aa-4e8b-a509-50c905bae2a2}"])
         .output();
 
@@ -86,7 +87,7 @@ pub fn toggle_context_menu() -> String {
     match check {
         Ok(output) if output.status.success() => {
             // cheia există -> revii la meniul Win11
-            let result = Command::new("reg")
+            let result = StdCommand::new("reg")
                 .args(&[
                     "delete",
                     r"HKCU\Software\Classes\CLSID\{86ca1aa0-34aa-4e8b-a509-50c905bae2a2}",
@@ -106,7 +107,7 @@ pub fn toggle_context_menu() -> String {
         }
         _ => {
             // cheia nu există -> adaugi pentru meniul clasic (Win10-like)
-            let result = Command::new("reg")
+            let result = StdCommand::new("reg")
                 .args(&[
                     "add",
                     r"HKCU\Software\Classes\CLSID\{86ca1aa0-34aa-4e8b-a509-50c905bae2a2}\InprocServer32",
@@ -127,8 +128,8 @@ pub fn toggle_context_menu() -> String {
     }
 
     // Restart Explorer pentru aplicare instantă
-    let _ = Command::new("taskkill").args(&["/f", "/im", "explorer.exe"]).output();
-    let _ = Command::new("explorer.exe").spawn();
+    let _ = StdCommand::new("taskkill").args(&["/f", "/im", "explorer.exe"]).output();
+    let _ = StdCommand::new("explorer.exe").spawn();
 
     message.push_str("🔄 Explorer restarted. Changes applied instantly!");
     message
@@ -159,7 +160,7 @@ pub fn disk_cleanup() -> String {
 }
 
 pub fn clean_temporary_files() -> String {
-    let mut cmd = Command::new("powershell");
+    let mut cmd = StdCommand::new("powershell");
     cmd.args(&[
         "-Command",
         "Remove-Item -Path $env:TEMP\\* -Recurse -Force -ErrorAction SilentlyContinue; \
@@ -521,8 +522,6 @@ pub fn disable_wifi_sense() -> String {
     crate::utils::run_powershell(ps_script)
 }
 
-
-
 /// Disable Windows Consumer Features (prevents automatic Store app/game installs).
 /// Applies: sets HKLM:\SOFTWARE\Policies\Microsoft\Windows\CloudContent\DisableWindowsConsumerFeatures = 1
 /// Requires admin. Returns textual result for log.
@@ -548,6 +547,7 @@ pub fn enable_consumer_features() -> String {
     "#;
     crate::utils::run_powershell(ps_script)
 }
+
 #[allow(dead_code)]
 /// ✅ Enable End Task With Right Click
 pub fn enable_end_task_right_click() -> String {
@@ -1023,7 +1023,7 @@ type SharedOutput = Arc<Mutex<String>>;
 
 /// Rulează o comandă și trimite output-ul în `output_log`
 fn run_command_and_log(cmd: &str, args: &[&str], output_log: &SharedOutput) -> bool {
-    let mut child = Command::new(cmd)
+    let mut child = StdCommand::new(cmd)
         .args(args)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -1055,15 +1055,111 @@ fn run_command_and_log(cmd: &str, args: &[&str], output_log: &SharedOutput) -> b
     status.success()
 }
 
-/// Upgrade all applications via Chocolatey, fallback to Winget
 pub fn upgrade_all_apps_with_log(output_log: SharedOutput) {
-    let success = run_command_and_log("choco", &["upgrade", "all", "-y"], &output_log);
-    if !success {
+    // 1. Verificare instalare winget și chocolatey
+    let winget_installed = check_package_manager_installed("winget", &output_log);
+    let choco_installed = check_package_manager_installed("choco", &output_log);
+
+    // 2 & 3. Instalare/actualizare package managers
+    if !winget_installed {
+        log_message(&output_log, "Installing winget...");
+        install_winget(&output_log);
+    } else {
+        log_message(&output_log, "Checking winget updates...");
+        update_winget(&output_log);
+    }
+
+    if !choco_installed {
+        log_message(&output_log, "Installing Chocolatey...");
+        install_chocolatey(&output_log);
+    } else {
+        log_message(&output_log, "Updating Chocolatey...");
+        run_command_and_log("choco", &["upgrade", "chocolatey", "-y"], &output_log);
+    }
+
+    // 4. Verificare finală și upgrade aplicații
+    let winget_ready = check_package_manager_installed("winget", &output_log);
+    let choco_ready = check_package_manager_installed("choco", &output_log);
+
+    if !winget_ready && !choco_ready {
+        log_message(&output_log, "ERROR: No package managers available!");
+        return;
+    }
+
+    // 5. Upgrade pe fiecare canal disponibil
+    if choco_ready {
+        log_message(&output_log, "\n=== Upgrading apps via Chocolatey ===");
+        run_command_and_log("choco", &["upgrade", "all", "-y"], &output_log);
+    }
+
+    if winget_ready {
+        log_message(&output_log, "\n=== Upgrading apps via Winget ===");
         run_command_and_log("winget", &["upgrade", "--all", "--silent"], &output_log);
+    }
+
+    log_message(&output_log, "\n=== Upgrade process completed ===");
+}
+
+fn check_package_manager_installed(manager: &str, output_log: &SharedOutput) -> bool {
+    let result = StdCommand::new(manager)
+ .arg("--version")
+        .output();
+    
+    match result {
+        Ok(output) => {
+            let installed = output.status.success();
+            if installed {
+                log_message(output_log, &format!("{} is installed", manager));
+            } else {
+                log_message(output_log, &format!("{} not found", manager));
+            }
+            installed
+        }
+        Err(_) => {
+            log_message(output_log, &format!("{} not found", manager));
+            false
+        }
+    }
+}
+
+fn update_winget(output_log: &SharedOutput) {
+    // Winget se actualizează prin App Installer din Microsoft Store
+    // Nu există comandă directă, dar putem verifica versiunea
+    log_message(output_log, "Winget updates automatically via Microsoft Store");
+}
+
+fn install_winget(output_log: &SharedOutput) {
+    log_message(output_log, "Installing winget via App Installer...");
+    // Descarcă și instalează App Installer de pe GitHub
+    let url = "https://github.com/microsoft/winget-cli/releases/latest/download/Microsoft.DesktopAppInstaller_8wekyb3d8bbwe.msixbundle";
+    
+    run_command_and_log(
+        "powershell",
+        &["-Command", &format!("Add-AppxPackage -Path (Invoke-WebRequest -Uri '{}' -OutFile '$env:TEMP\\winget.msixbundle' -PassThru).Path", url)],
+        output_log
+    );
+}
+
+fn install_chocolatey(output_log: &SharedOutput) {
+    log_message(output_log, "Installing Chocolatey...");
+    let install_script = "[System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))";
+    
+    run_command_and_log(
+        "powershell",
+        &["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", install_script],
+        output_log
+    );
+}
+
+fn log_message(output_log: &SharedOutput, message: &str) {
+    if let Ok(mut log) = output_log.lock() {
+        log.push_str(message);
+        log.push_str("\n");
     }
 }
 
 /// Reinstall Winget via Chocolatey
+#[allow(dead_code)]
 pub fn reinstall_winget_with_log(output_log: SharedOutput) {
     run_command_and_log("choco", &["install", "winget", "-y", "--force"], &output_log);
 }
@@ -1169,7 +1265,7 @@ pub fn create_restore_point_live(log: Arc<Mutex<String>>) {
             "#;
 
         // Spawn PowerShell și capture stdout/stderr
-        let mut child = match Command::new("powershell")
+        let mut child = match StdCommand::new("powershell")
             .arg("-NoProfile")
             .arg("-ExecutionPolicy").arg("Bypass")
             .arg("-Command").arg(script)
@@ -1635,97 +1731,17 @@ pub fn run_ooshutup10() -> String {
     crate::utils::run_powershell(ps)
 }
 
-// /// Set Taskbar alignment: Center (true) or Left (false).
-// /// Writes HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Advanced\TaskbarAl
-// /// Requires current user registry access. Returns textual result for logs.
-// pub fn set_taskbar_alignment_center(enabled: bool) -> String {
-//     let value = if enabled { 1 } else { 0 };
-//     let state = if enabled { "Center" } else { "Left" };
-//     let ps = format!(r#"
-// try {{
-//     Write-Host 'Setting Taskbar alignment to: {state}'
-//     $Path = 'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Advanced'
-//     New-Item -Path $Path -Force | Out-Null
-//     Set-ItemProperty -Path $Path -Name 'TaskbarAl' -Value {value} -Type DWord -Force
-//     Write-Output '✅ Taskbar alignment set to {state}. Log off or restart Explorer for full effect.'
-// }} catch {{
-//     Write-Output ('⚠ ERROR: Failed to set Taskbar alignment: ' + $_.Exception.Message)
-// }}
-// "#, value = value, state = state);
-
-//     crate::utils::run_powershell(&ps)
-// }
-
-// /// Convenience wrappers
-// #[allow(dead_code)]
-// pub fn enable_center_taskbar() -> String {
-//     set_taskbar_alignment_center(true)
-// }
-
-// #[allow(dead_code)]
-// pub fn disable_center_taskbar() -> String {
-//     set_taskbar_alignment_center(false)
-// }
-
-// /// Reads HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Advanced\TaskbarAl
-// /// Returns true when value == 1 (center), false otherwise.
-// #[allow(dead_code)]
-// pub fn get_taskbar_alignment() -> bool {
-//     // PowerShell returns '1' or '0' (fallback to 0)
-//     let ps = r#"
-//         try {
-//             $v = Get-ItemPropertyValue -Path 'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Advanced' -Name 'TaskbarAl' -ErrorAction Stop
-//             if ($v -eq 1) { Write-Output '1' } else { Write-Output '0' }
-//         } catch {
-//             Write-Output '0'
-//         }
-//         "#;
-//     let out = crate::utils::run_powershell(ps);
-//     // parse last non-empty line
-//     out.lines().rev().find(|s| !s.trim().is_empty()).unwrap_or("0").trim() == "1"
-// }
-
-// /// Set Taskbar alignment.
-// #[allow(dead_code)]
-// pub fn set_taskbar_alignment(enabled: bool) -> String {
-//     let value = if enabled { 1 } else { 0 };
-//     let state = if enabled { "Center" } else { "Left" };
-
-//     let ps = format!(r#"
-//         try {{
-//             Write-Host 'Setting Taskbar alignment to: {state}'
-//             $Path = 'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Advanced'
-
-//             # First try to set the value directly (no attempt to create key)
-//             try {{
-//                 Set-ItemProperty -Path $Path -Name 'TaskbarAl' -Value {value} -Type DWord -Force -ErrorAction Stop
-//             }} catch {{
-//                 Write-Host 'Set-ItemProperty failed, attempting reg.exe fallback...' -ForegroundColor Yellow
-//                 $regPath = 'HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Advanced'
-//                 reg add "$regPath" /v TaskbarAl /t REG_DWORD /d {value} /f > $null
-//             }}
-
-//             Write-Output '✅ Taskbar alignment set to {state}. Log off or restart Explorer for full effect.'
-//         }} catch {{
-//             Write-Output ('⚠ ERROR: Failed to set Taskbar alignment: ' + $_.Exception.Message)
-//         }}
-//         "#, state = state, value = value);
-
-//     crate::utils::run_powershell(&ps)
-// }
-
-
 /// Reads HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Advanced\TaskbarAl
 /// Returns true when value == 1 (center), false otherwise.
 pub fn get_taskbar_alignment() -> bool {
     let ps = r#"
-try {
-    $v = Get-ItemPropertyValue -Path 'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Advanced' -Name 'TaskbarAl' -ErrorAction Stop
-    if ($v -eq 1) { Write-Output '1' } else { Write-Output '0' }
-} catch {
-    Write-Output '0'
-}
-"#;
+        try {
+            $v = Get-ItemPropertyValue -Path 'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Advanced' -Name 'TaskbarAl' -ErrorAction Stop
+            if ($v -eq 1) { Write-Output '1' } else { Write-Output '0' }
+        } catch {
+            Write-Output '0'
+        }
+        "#;
     let out = crate::utils::run_powershell(ps);
     out.lines().rev().find(|s| !s.trim().is_empty()).unwrap_or("0").trim() == "1"
 }
@@ -1737,27 +1753,308 @@ pub fn set_taskbar_alignment_center(enabled: bool) -> String {
     let state = if enabled { "Center" } else { "Left" };
 
     let ps = format!(r#"
-try {{
-    Write-Host 'Setting Taskbar alignment to: {state}'
-    $Path = 'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Advanced'
+        try {{
+            Write-Host 'Setting Taskbar alignment to: {state}'
+            $Path = 'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Advanced'
 
-    # Try direct PowerShell registry write first (no New-Item)
-    try {{
-        Set-ItemProperty -Path $Path -Name 'TaskbarAl' -Value {value} -Type DWord -Force -ErrorAction Stop
-    }} catch {{
-        Write-Host 'Set-ItemProperty failed, attempting reg.exe fallback...' -ForegroundColor Yellow
-        $regPath = 'HKCU\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced'
-        reg add "$regPath" /v TaskbarAl /t REG_DWORD /d {value} /f > $null
-    }}
+            # Try direct PowerShell registry write first (no New-Item)
+            try {{
+                Set-ItemProperty -Path $Path -Name 'TaskbarAl' -Value {value} -Type DWord -Force -ErrorAction Stop
+            }} catch {{
+                Write-Host 'Set-ItemProperty failed, attempting reg.exe fallback...' -ForegroundColor Yellow
+                $regPath = 'HKCU\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced'
+                reg add "$regPath" /v TaskbarAl /t REG_DWORD /d {value} /f > $null
+            }}
 
-    Write-Output '✅ Taskbar alignment set to {state}. Log off or restart Explorer for full effect.'
-}} catch {{
-    Write-Output ('⚠ ERROR: Failed to set Taskbar alignment: ' + $_.Exception.Message)
-}}
-"#, state = state, value = value);
+            Write-Output '✅ Taskbar alignment set to {state}. Log off or restart Explorer for full effect.'
+        }} catch {{
+            Write-Output ('⚠ ERROR: Failed to set Taskbar alignment: ' + $_.Exception.Message)
+        }}
+        "#, state = state, value = value);
 
     crate::utils::run_powershell(&ps)
 }
 
 pub fn enable_center_taskbar() -> String { set_taskbar_alignment_center(true) }
 pub fn disable_center_taskbar() -> String { set_taskbar_alignment_center(false) }
+
+use std::{fs, env, time::SystemTime};
+
+pub fn show_hidden_files(enabled: bool) -> Result<String, io::Error> {
+    // Scriptul folosește argument pozițional ($args[0]) -> "True" / "False"
+    // Setează Hidden = 1 (show) sau 2 (don't show). Apoi forțează reîmprospătare Explorer.
+    let lines = [
+        r#"# Eoliann: Toggle show hidden files - positional arg: True/False"#,
+        r#"$raw = if ($args.Length -gt 0) { $args[0] } else { 'False' }"#,
+        r#"$IsEnabled = $false"#,
+        r#"if ($raw -eq 'True' -or $raw -eq 'true' -or $raw -eq '$true' -or $raw -eq '1' -or $raw -eq 1) { $IsEnabled = $true }"#,
+        r#""#,
+        r#"function Invoke-ShowHiddenFiles {"#,
+        r#"    Param($Enabled)"#,
+        r#"    try {"#,
+        r#"        # Use correct values: 1 = show hidden, 2 = do not show"#,
+        r#"        if ($Enabled) { Write-Host 'Enabling Hidden Files'; $value = 1 } else { Write-Host 'Disabling Hidden Files'; $value = 2 }"#,
+        r#"        $Path = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced'"#,
+        r#"        Set-ItemProperty -Path $Path -Name Hidden -Value $value -Type DWord -ErrorAction Stop"#,
+        r#"    } catch [System.Security.SecurityException] {"#,
+        r#"        Write-Warning 'Unable to set registry due to a Security Exception'"#,
+        r#"    } catch [System.Management.Automation.ItemNotFoundException] {"#,
+        r#"        Write-Warning $psitem.Exception.ErrorRecord"#,
+        r#"    } catch {"#,
+        r#"        Write-Warning 'Unhandled exception while setting Hidden'"#,
+        r#"        Write-Warning $_.Exception.StackTrace"#,
+        r#"    }"#,
+        r#"}"#,
+        r#""#,
+        r#"Invoke-ShowHiddenFiles $IsEnabled"#,
+        r#""#,
+        r#"# --- Refresh open Explorer windows ---"#,
+        r#"$shell = New-Object -ComObject Shell.Application"#,
+        r#"try { $shell.Windows() | ForEach-Object { try { $_.Refresh() } catch {} } } catch {}"#,
+        r#"try { [System.Runtime.InteropServices.Marshal]::ReleaseComObject($shell) | Out-Null } catch {}"#,
+        r#""#,
+        r#"# --- Notify shell of association/setting change via SHChangeNotify ---"#,
+        r#"$sig = @""#,
+        r#"using System;"#,
+        r#"using System.Runtime.InteropServices;"#,
+        r#"public static class NativeMethods {"#,
+        r#"    [DllImport("shell32.dll")]"#,
+        r#"    public static extern void SHChangeNotify(long wEventId, uint uFlags, IntPtr dwItem1, IntPtr dwItem2);"#,
+        r#"}"#,
+        r#""@"#,
+        r#"try {"#,
+        r#"    Add-Type $sig -ErrorAction SilentlyContinue"#,
+        r#"    # SHCNE_ASSOCCHANGED = 0x08000000, SHCNF_FLUSH = 0x1000"#,
+        r#"    [NativeMethods]::SHChangeNotify(0x08000000, 0x1000, [IntPtr]::Zero, [IntPtr]::Zero)"#,
+        r#"} catch {}"#,
+        r#""#,
+        r#"Write-Output 'DONE'"#,
+    ];
+
+    let script = lines.join("\r\n");
+
+    let now = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis();
+    let tmp_path = env::temp_dir().join(format!("eoliann_show_hidden_{}.ps1", now));
+
+    fs::write(&tmp_path, script)?;
+
+    // debug: useful to inspect generated script if anything fail
+    println!("Script path: {:?}", tmp_path);
+
+    // pass positional string argument (no -Enabled switch)
+    let enabled_arg = if enabled { "True" } else { "False" };
+
+    let output = std::process::Command::new("powershell.exe")
+        .arg("-NoProfile")
+        .arg("-ExecutionPolicy")
+        .arg("Bypass")
+        .arg("-File")
+        .arg(&tmp_path)
+        .arg(enabled_arg) // positional argument -> $args[0] in script
+        .output()?;
+
+    // cleanup temp file
+    let _ = fs::remove_file(&tmp_path);
+
+    let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+
+    if output.status.success() {
+        if !stdout.is_empty() { Ok(stdout) } else { Ok(stderr) }
+    } else {
+        let mut msg = stderr;
+        if msg.is_empty() { msg = stdout; }
+        Err(io::Error::new(io::ErrorKind::Other, msg))
+    }
+}
+
+/// Toggle show/hide file extensions for known file types (HideFileExt).
+pub fn show_file_extensions(show: bool) -> Result<String, std::io::Error> {
+    use std::{env, fs, time::SystemTime};
+    use std::io;
+    use std::process::Command;
+
+    let ps = r#"
+        param([string]$ShowRaw)
+        $Show = $false
+        if ($null -eq $ShowRaw -or [string]::IsNullOrWhiteSpace($ShowRaw)) {
+            $Show = $true
+        } else {
+            $s = $ShowRaw.Trim()
+            if ($s -in @('True','true','1','Yes','yes')) { $Show = $true } else { $Show = $false }
+        }
+        try {
+            $value = if ($Show) { 0 } else { 1 }
+            $Path = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced'
+            Set-ItemProperty -Path $Path -Name HideFileExt -Value $value -ErrorAction Stop
+            try {
+                $shell = New-Object -ComObject Shell.Application
+                $shell.Windows() | ForEach-Object { try { $_.Refresh() } catch {} }
+                [Runtime.InteropServices.Marshal]::ReleaseComObject($shell) | Out-Null
+            } catch {}
+            try {
+                $sig = @"
+        using System;
+        using System.Runtime.InteropServices;
+        public static class Native {
+            [DllImport("shell32.dll")]
+            public static extern void SHChangeNotify(int wEventId, uint uFlags, IntPtr dwItem1, IntPtr dwItem2);
+        }
+        "@
+                Add-Type $sig -ErrorAction SilentlyContinue
+                [Native]::SHChangeNotify(0x8000000, 0x0000, [IntPtr]::Zero, [IntPtr]::Zero)
+            } catch {}
+            Write-Output ("OK: HideFileExt set to " + $value)
+        } catch [System.UnauthorizedAccessException] {
+            Write-Output ("ERROR: Permission denied - " + $_.Exception.Message)
+            exit 2
+        } catch {
+            Write-Output ("ERROR: " + $_.Exception.Message)
+            exit 1
+        }
+        "#;
+
+    // write temporary script
+    let now = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis();
+    let tmp = env::temp_dir().join(format!("eoliann_show_ext_{}.ps1", now));
+    fs::write(&tmp, ps)?;
+
+    let arg = if show { "True" } else { "False" };
+
+    let try_exec = |exe: &str| -> Result<(bool, String, String), io::Error> {
+        let output = Command::new(exe)
+            .arg("-NoProfile")
+            .arg("-ExecutionPolicy")
+            .arg("Bypass")
+            .arg("-File")
+            .arg(&tmp)
+            .arg(arg)
+            .output()?;
+        let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+        Ok((output.status.success(), stdout, stderr))
+    };
+
+    let res = match try_exec("powershell") {
+        Ok((true, out, _)) if !out.is_empty() => Ok(out),
+        Ok((true, out, err)) if out.is_empty() && !err.is_empty() => Ok(err),
+        Ok((true, out, _)) => Ok(if out.is_empty() { "OK".to_string() } else { out }),
+        Ok((false, _, err)) if !err.is_empty() => Err(io::Error::new(io::ErrorKind::Other, err)),
+        Ok((false, out, _)) if !out.is_empty() => Err(io::Error::new(io::ErrorKind::Other, out)),
+        Ok((false, _, _)) => {
+            // try pwsh fallback
+            match try_exec("pwsh") {
+                Ok((true, out, _)) => Ok(if out.is_empty() { "OK".to_string() } else { out }),
+                Ok((false, _, err2)) => Err(io::Error::new(io::ErrorKind::Other, format!("powershell failed and pwsh failed: {}", err2))),
+                Err(e2) => Err(io::Error::new(io::ErrorKind::Other, format!("powershell failed and pwsh spawn error: {}", e2))),
+            }
+        }
+        Err(e) => {
+            // powershell spawn error, try pwsh
+            match try_exec("pwsh") {
+                Ok((true, out, _)) => Ok(if out.is_empty() { "OK".to_string() } else { out }),
+                Ok((false, _, err2)) => Err(io::Error::new(io::ErrorKind::Other, format!("powershell spawn error: {}; pwsh failed: {}", e, err2))),
+                Err(e2) => Err(io::Error::new(io::ErrorKind::Other, format!("powershell spawn error: {}; pwsh spawn error: {}", e, e2))),
+            }
+        }
+    };
+
+    let _ = fs::remove_file(&tmp);
+    res
+}
+
+/// Reset Windows Update. Runs a PowerShell script that attempts to repair Windows Update.
+/// If `aggressive` is true the script will take additional, potentially slow or risky steps.
+pub fn start_reset_windows_update(aggressive: bool, tx: std::sync::mpsc::Sender<String>) -> Result<(), String> {
+    // script PowerShell mai verbos care emite PROG:... la etape importante
+    let script_lines = vec![
+        r#"function Write-Log([string]$m) { Write-Output (\"[WUF] \" + (Get-Date -Format 'yyyy-MM-dd HH:mm:ss') + \" - \" + $m) }"#,
+        r#"$isAdmin = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)"#,
+        r#"if (-not $isAdmin) { Write-Log 'NOT_ELEVATED'; Write-Output 'PROG:0:NOT_ELEVATED'; exit 2 }"#,
+        r#"param([bool]$AggressiveFromCLI)"#,
+        r#"Write-Log 'Starting Reset Windows Update...'; Write-Output 'PROG:1:Starting Reset Windows Update'"#,
+        r#"if ($AggressiveFromCLI) { Write-Output 'PROG:2:Aggressive mode enabled' } else { Write-Output 'PROG:2:Non-aggressive mode' }"#,
+        r#"Write-Output 'PROG:5:Stopping services...'"#,
+        r#"foreach ($svc in @('BITS','wuauserv','appidsvc','cryptsvc')) { Write-Output ('PROG:7:Stopping ' + $svc); try { Stop-Service -Name $svc -Force -ErrorAction Stop; Write-Output ('PROG:9:' + $svc + ' stopped') } catch { Write-Output ('PROG:9:' + $svc + ' stop failed: ' + $_) } }"#,
+        r#"Write-Output 'PROG:12:Removing QMGR data files...'; try { Remove-Item -Path \"$env:allusersprofile\\Application Data\\Microsoft\\Network\\Downloader\\qmgr*.dat\" -ErrorAction Stop; Write-Output 'PROG:15:QMGR removed' } catch { Write-Output ('PROG:15:QMGR remove error: ' + $_) }"#,
+        r#"if ($AggressiveFromCLI) { Write-Output 'PROG:20:Renaming DataStore and Catroot2 (aggressive)'; try { Rename-Item -Path \"$env:systemroot\\SoftwareDistribution\\DataStore\" -NewName 'DataStore.bak' -ErrorAction Stop; Write-Output 'PROG:25:DataStore renamed' } catch { Write-Output ('PROG:25:DataStore rename: ' + $_) } ; try { Rename-Item -Path \"$env:systemroot\\System32\\Catroot2\" -NewName 'catroot2.bak' -ErrorAction Stop; Write-Output 'PROG:28:catroot2 renamed' } catch { Write-Output ('PROG:28:catroot2 rename: ' + $_) } }"#,
+        r#"Write-Output 'PROG:30:Renaming Download folder'; try { Rename-Item -Path \"$env:systemroot\\SoftwareDistribution\\Download\" -NewName 'Download.bak' -ErrorAction Stop; Write-Output 'PROG:35:Download renamed' } catch { Write-Output ('PROG:35:Download rename: ' + $_) }"#,
+        r#"Write-Output 'PROG:38:Removing WindowsUpdate.log'; try { Remove-Item -Path \"$env:systemroot\\WindowsUpdate.log\" -ErrorAction Stop; Write-Output 'PROG:40:WindowsUpdate.log removed' } catch { Write-Output ('PROG:40:WindowsUpdate.log remove: ' + $_) }"#,
+        r#"Write-Output 'PROG:45:Registering DLLs (may be slow)'; $old=Get-Location; Set-Location $env:systemroot\\system32; $DLLs = @('atl.dll','urlmon.dll','mshtml.dll','shdocvw.dll','browseui.dll','jscript.dll','vbscript.dll','scrrun.dll','msxml.dll','msxml3.dll','msxml6.dll'); $i=0; foreach($dll in $DLLs){ $i++; $p = 45 + [int](40 * ($i / $DLLs.Count)); Write-Output ('PROG:' + $p + ':regsvr32 ' + $dll); try { & regsvr32.exe /s $dll } catch { Write-Output ('PROG:' + $p + ':regsvr32 error ' + $dll + ' -> ' + $_) } } ; Set-Location $old; Write-Output 'PROG:85:DLL register done'"#,
+        r#"if (Test-Path 'HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\WindowsUpdate') { Write-Output 'PROG:86:Removing WSUS client settings'; foreach($v in @('AccountDomainSid','PingID','SusClientId')) { try { & REG DELETE \"HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\WindowsUpdate\" /v $v /f } catch { Write-Output ('PROG:87:REG delete ' + $v + ' error: ' + $_) } } }"#,
+        r#"Write-Output 'PROG:90:Resetting WinSock and IP stack'; try { & netsh winsock reset } catch { Write-Output ('PROG:90:netsh winsock error: ' + $_) } ; try { & netsh winhttp reset proxy } catch { Write-Output ('PROG:92:netsh winhttp error: ' + $_) } ; try { & netsh int ip reset } catch { Write-Output ('PROG:94:netsh int ip error: ' + $_) }"#,
+        r#"Write-Output 'PROG:96:Removing BITS jobs'; try {
+            $bitsJobs = Get-BitsTransfer -ErrorAction SilentlyContinue
+            if ($bitsJobs -and $bitsJobs.Count -gt 0) {
+                foreach ($job in $bitsJobs) {
+                    try {
+                        Remove-BitsTransfer -BitsJob $job -ErrorAction SilentlyContinue
+                        Write-Output ("PROG:96:Removed BITS job: " + ($job.JobId -as [string]))
+                    } catch {
+                        Write-Output ("PROG:96:Remove-BitsTransfer error: " + $_.ToString())
+                    }
+                }
+            } else {
+                Write-Output "PROG:96:No BITS jobs found"
+            }
+        } catch {
+            Write-Output ("PROG:96:Get-BitsTransfer error: " + $_.ToString())
+        }"#,
+        r#"Write-Output 'PROG:98:Starting services'; Try { Get-Service BITS | Set-Service -StartupType Manual -PassThru | Start-Service } Catch { Write-Output ('PROG:98:BITS start error: ' + $_) } ; Try { Get-Service wuauserv | Set-Service -StartupType Manual -PassThru | Start-Service } Catch { Write-Output ('PROG:99:wuauserv start error: ' + $_) }"#,
+        r#"Write-Output 'PROG:100:Forcing Update detection'; Try { (New-Object -ComObject Microsoft.Update.AutoUpdate).DetectNow() } Catch { Write-Output ('PROG:100:DetectNow error: ' + $_) }"#,
+        r#"Write-Output 'PROG:100:Completed Reset Windows Update'; Write-Output 'DONE'"#,
+    ];
+
+    let script = script_lines.join("\r\n");
+    let now = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).map_err(|e| format!("time err: {}", e))?.as_millis();
+    let tmp = env::temp_dir().join(format!("eoliann_reset_wu_{}.ps1", now));
+
+    fs::write(&tmp, script).map_err(|e| format!("Eroare la scriere script: {}", e))?;
+
+    let aggressive_arg = if aggressive { "True" } else { "False" };
+
+    let mut child = StdCommand::new("powershell.exe")
+        .arg("-NoProfile")
+        .arg("-ExecutionPolicy")
+        .arg("Bypass")
+        .arg("-File")
+        .arg(&tmp)
+        .arg("-AggressiveFromCLI")
+        .arg(aggressive_arg)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|e| format!("Eroare la spawn powershell: {}", e))?;
+
+    // read stdout
+    if let Some(out) = child.stdout.take() {
+        let tx_clone = tx.clone();
+        thread::spawn(move || {
+            let reader = BufReader::new(out);
+            for line in reader.lines().flatten() {
+                let _ = tx_clone.send(line);
+            }
+        });
+    }
+
+    // read stderr
+    if let Some(err) = child.stderr.take() {
+        let tx_clone = tx.clone();
+        thread::spawn(move || {
+            let reader = BufReader::new(err);
+            for line in reader.lines().flatten() {
+                let _ = tx_clone.send(format!("ERR: {}", line));
+            }
+        });
+    }
+
+    // wait for process to finish
+    let status = child.wait().map_err(|e| format!("Wait error: {}", e))?;
+
+    // final message
+    let _ = tx.send(format!("PROCESS_EXIT:{}", status.code().unwrap_or(-1)));
+    // cleanup
+    let _ = fs::remove_file(&tmp);
+    Ok(())
+}
+

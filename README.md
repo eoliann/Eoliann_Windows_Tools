@@ -28,7 +28,7 @@ Now install it on your system!
 
 ### INFO
 <img width="1402" height="932" alt="EWT_info_update" src="https://github.com/user-attachments/assets/ee3a0082-3255-4a33-9985-97faf3795297" />
-<img width="1402" height="946" alt="EWT_info" src="https://github.com/user-attachments/assets/cf814e1b-409e-4cb6-9574-eecfad2dbbe4" />
+<img width="1402" height="932" alt="info-1 1 6" src="https://github.com/user-attachments/assets/2c9c5547-1b69-407d-bf4b-a69e9f1275c8" />
 
 - `whoami` → displays the current user
 - `ipconfig` → display network settings
@@ -36,7 +36,7 @@ Now install it on your system!
 - `tasklist` → active processes
 
 ### TOOLS
-<img width="1920" height="1032" alt="EWT_tools" src="https://github.com/user-attachments/assets/3146d072-50b7-44f2-9b37-c99ad2539716" />
+<img width="1754" height="932" alt="tools-1 1 6" src="https://github.com/user-attachments/assets/4caa7544-0a58-43aa-b568-42044a3f0ad9" />
 
 #### Context menu
 - `Toggle Context Menu` → instantly switch between the **Win11 ↔ Classic** context menu (with Explorer restart)
@@ -46,6 +46,7 @@ Now install it on your system!
 - `Clean Temporary Files` → launches temporary file cleanup
 - `Network Reset` → completely reset the network (Winsock + IP)
 - `Verify System Integrity (SFC + DSIM)` → checks whether the system integrity is correct and, if not, repairs corrupted files
+- `Reset Windows Update` → Attempts to repair Windows Update. Aggressive mode runs chkdsk, SFC and DISM and may take a long time.
 #### Essential Tweaks
 - `Disable ConsumerFeatures` → prevents automatic installation of Store apps/games for the signed-in user
 - `Enable ConsumerFeatures` → restores policy to allow Store consumer features 
@@ -62,6 +63,8 @@ Now install it on your system!
 - `Enable Activity History` → restores Activity History policies to allow activity collection
 - `Disable Storage Sense` → prevents Storage Sense from automatically deleting temporary files for the current user
 - `Enable Storage Sense` → restores Storage Sense automatic cleanup for the current user
+- `Show/Hide Hidden Files` → Toggles visibility of hidden files and folders in Explorer.
+- `Show File Extensions` → Toggle showing file extensions for known file types.
 #### Advanced Tweaks
 - `Adobe Network Block` → reduce user interruptions by selectively blocking connections to Adobe’s activation and telemetry servers. Credit: Ruddernation-Designs
 - `Adobe Debloat` → manages Adobe Services, Adobe Desktop Service, and Acrobat Updates
@@ -91,6 +94,7 @@ Now install it on your system!
 <img width="1402" height="932" alt="EWT_install_4" src="https://github.com/user-attachments/assets/ed990efd-4c0d-4bdf-ab64-8e361ef8ddd3" />
 <img width="1402" height="932" alt="EWT_install_5" src="https://github.com/user-attachments/assets/527c9273-22db-4479-bb74-dafee9799530" />
 <img width="1402" height="932" alt="EWT_install_6" src="https://github.com/user-attachments/assets/e0eca63a-9952-450c-a77f-76c3be858257" />
+<img width="1402" height="1027" alt="install-1 1 6" src="https://github.com/user-attachments/assets/83c8507d-98c6-48ea-a2d3-172ed6593961" />
 
 - `Install selections, Uninstall selections, Update selections, Clear selections, Upgrade All Applications, Reinstall winget & search field to filter apps`
 - `Browsers`
@@ -104,7 +108,7 @@ Now install it on your system!
 - `Utilities`
   
 ### WINDOWS APP REMOVAL
-<img width="1402" height="987" alt="EWT_remove_winapp" src="https://github.com/user-attachments/assets/d9869dc3-07fd-4fad-a501-e8b02ffc3d30" />
+<img width="1402" height="1027" alt="winappremoval-1 1 6" src="https://github.com/user-attachments/assets/93aeb49d-42e9-48e7-980a-3a840534c6f5" />
 
 - `Communication` → remove default applications that come with Windows installation, such as: Outlook for Windows, Skype, Teams, GroupMe, To-Do, Your Phone, CommsPhone, Messaging, Mail & Calendar, and others.
 - `Media & Creativity` → removes default applications that come with Windows installation, such as: Climpchamp, Camera, MS Paint, 3D Builder, 3D Viewer, Print 3D, Mixed Reality Portal
@@ -114,7 +118,7 @@ Now install it on your system!
 - `System & Misc` → remove default applications that come with Windows installation, such as: People, Maps, Wallet, Get Started, Feedback Hub, Alarms & Clock, OneConnect, Windows Phone, Voice Recorder
 
 ### SETTINGS
-<img width="1402" height="932" alt="1 0 9_settings" src="https://github.com/user-attachments/assets/58f7c75c-dc01-4428-ab1d-68b27524ed28" />
+<img width="1402" height="1027" alt="settings-1 1 6" src="https://github.com/user-attachments/assets/c1d1435d-feec-496b-9bdc-dc452940ca7d" />
 
 - `Switch to Light Mode / Switch to Dark Mode` → switch between Windows Light and Dark themes
 - `Display Current alignment` → Display Current alignment of taskbar elements (Center or Left)

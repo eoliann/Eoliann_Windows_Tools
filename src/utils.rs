@@ -79,11 +79,11 @@ pub fn run_powershell(script: &str) -> String {
 }
 
 use reqwest::blocking::Client;
-use serde::Deserialize;
+use serde_json::Value;
 #[allow(unused_imports)]
 use semver::Version;
 
-#[derive(Deserialize, Debug)]
+#[derive(Debug)]
 pub struct GithubRelease {
     pub tag_name: String,
     #[allow(dead_code)]
@@ -101,8 +101,17 @@ pub fn check_latest_version() -> Option<GithubRelease> {
         .send()
         .ok()?;
 
-    let release: GithubRelease = resp.json().ok()?;
-    Some(release)
+    let text = resp.text().ok()?;
+    let v: Value = serde_json::from_str(&text).ok()?;
+
+    let tag_name = v.get("tag_name")?.as_str()?.to_string();
+    let html_url = v
+        .get("html_url")
+        .and_then(|s| s.as_str())
+        .unwrap_or_default()
+        .to_string();
+
+    Some(GithubRelease { tag_name, html_url })
 }
 
 /// Compară versiunea curentă cu ultima versiune.

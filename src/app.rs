@@ -253,8 +253,7 @@ impl eframe::App for App {
                                 show_hidden_state: false,
                                 show_file_ext_state: false,
                                 pending_reset_rx: None,
-                                reset_in_progress: false,
-                                last_progress: 0.0,
+                                reset_in_progress: false, // This field exists in ToolsState
                                 reset_aggressive: false,
                                 last_message: String::new(),
                             });

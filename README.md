@@ -6,6 +6,15 @@
 [![Downloads latest](https://img.shields.io/github/downloads/eoliann/Eoliann_Windows_Tools/latest/total?style=flat-square)](https://github.com/eoliann/Eoliann_Windows_Tools/releases/latest/download/eoliann_windows_tools_w11.exe)
 
 
+![OS](https://badgen.net/badge/icon/windows?icon=windows&label=OS)
+![Lang](https://badgen.net/static/Lang/Rust/orange)
+![Stars](https://badgen.net/github/stars/eoliann/Eoliann_Windows_Tools)
+![Watchers](https://badgen.net/github/watchers/eoliann/Eoliann_Windows_Tools)
+[![Releases](https://badgen.net/github/releases/eoliann/Eoliann_Windows_Tools)](https://github.com/eoliann/Eoliann_Windows_Tools/releases)
+![Last Release](https://badgen.net/github/tag/eoliann/Eoliann_Windows_Tools)
+[![Downloads latest](https://badgen.net/github/assets-dl/eoliann/wup-web)](https://github.com/eoliann/Eoliann_Windows_Tools/releases/latest/download/eoliann_windows_tools_w11.exe)
+[![Donate](https://badgen.net/static/Donate/PayPal/orange)](https://www.paypal.com/donate/?hosted_button_id=U9XAX3XBTU67G)
+[![Donate](https://badgen.net/static/Donate/Revolut/f2a)](http://revolut.me/adriannm9)
 
 
 
@@ -27,8 +36,12 @@ Now install it on your system!
 ## 🚀 Features
 
 ### INFO
-<img width="1402" height="932" alt="EWT_info_update" src="https://github.com/user-attachments/assets/ee3a0082-3255-4a33-9985-97faf3795297" />
-<img width="1402" height="946" alt="EWT_info" src="https://github.com/user-attachments/assets/cf814e1b-409e-4cb6-9574-eecfad2dbbe4" />
+<img width="1402" height="932" alt="info-1 1 7" src="https://github.com/user-attachments/assets/f6500efb-81aa-4084-baaa-520c9608f7b7" />
+
+#### Update to new version
+![update-version](https://github.com/user-attachments/assets/f9713e60-c36f-4e04-8f6d-1961197db0fc)
+
+
 
 - `whoami` → displays the current user
 - `ipconfig` → display network settings
@@ -36,7 +49,7 @@ Now install it on your system!
 - `tasklist` → active processes
 
 ### TOOLS
-<img width="1920" height="1032" alt="EWT_tools" src="https://github.com/user-attachments/assets/3146d072-50b7-44f2-9b37-c99ad2539716" />
+<img width="1920" height="1032" alt="tools-1 1 7" src="https://github.com/user-attachments/assets/c4996723-0ae6-4f13-bda1-9459fd6fd23a" />
 
 #### Context menu
 - `Toggle Context Menu` → instantly switch between the **Win11 ↔ Classic** context menu (with Explorer restart)
@@ -62,6 +75,8 @@ Now install it on your system!
 - `Enable Activity History` → restores Activity History policies to allow activity collection
 - `Disable Storage Sense` → prevents Storage Sense from automatically deleting temporary files for the current user
 - `Enable Storage Sense` → restores Storage Sense automatic cleanup for the current user
+- `Show/Hide Hidden Files` → Toggles visibility of hidden files and folders in Explorer.
+- `Show File Extensions` → Toggle showing file extensions for known file types.
 #### Advanced Tweaks
 - `Adobe Network Block` → reduce user interruptions by selectively blocking connections to Adobe’s activation and telemetry servers. Credit: Ruddernation-Designs
 - `Adobe Debloat` → manages Adobe Services, Adobe Desktop Service, and Acrobat Updates
@@ -85,12 +100,14 @@ Now install it on your system!
 - `Disable Monitor Timeout` → prevents the monitor from turning off automatically
 
 ### INSTALL
-<img width="1402" height="987" alt="EWT_install" src="https://github.com/user-attachments/assets/92dd36bc-35c8-4242-8613-2506daa263e7" />
-<img width="1402" height="932" alt="EWT_install_2" src="https://github.com/user-attachments/assets/d4f47a68-8650-4338-b873-e61c44349f25" />
-<img width="1402" height="932" alt="EWT_install_3" src="https://github.com/user-attachments/assets/b059bb25-24a0-4825-a377-e6a78177f8e4" />
-<img width="1402" height="932" alt="EWT_install_4" src="https://github.com/user-attachments/assets/ed990efd-4c0d-4bdf-ab64-8e361ef8ddd3" />
-<img width="1402" height="932" alt="EWT_install_5" src="https://github.com/user-attachments/assets/527c9273-22db-4479-bb74-dafee9799530" />
-<img width="1402" height="932" alt="EWT_install_6" src="https://github.com/user-attachments/assets/e0eca63a-9952-450c-a77f-76c3be858257" />
+<img width="1402" height="932" alt="install-1 1 7" src="https://github.com/user-attachments/assets/cf22aef0-6b88-4817-a0e5-845e2f372e44" />
+
+#### Install application
+![install-app](https://github.com/user-attachments/assets/1d50fdc2-eea6-4b72-863f-e3e7f44a330f)
+
+
+#### Uninstall installed application
+![uninstall-app](https://github.com/user-attachments/assets/55bccd07-4b97-4c57-bca0-858f9cf31e0b)
 
 - `Install selections, Uninstall selections, Update selections, Clear selections, Upgrade All Applications, Reinstall winget & search field to filter apps`
 - `Browsers`
@@ -104,7 +121,7 @@ Now install it on your system!
 - `Utilities`
   
 ### WINDOWS APP REMOVAL
-<img width="1402" height="987" alt="EWT_remove_winapp" src="https://github.com/user-attachments/assets/d9869dc3-07fd-4fad-a501-e8b02ffc3d30" />
+<img width="1402" height="932" alt="winapp_removal-1 1 7" src="https://github.com/user-attachments/assets/51d66122-3305-49d9-92b4-ba28d7dbc0e5" />
 
 - `Communication` → remove default applications that come with Windows installation, such as: Outlook for Windows, Skype, Teams, GroupMe, To-Do, Your Phone, CommsPhone, Messaging, Mail & Calendar, and others.
 - `Media & Creativity` → removes default applications that come with Windows installation, such as: Climpchamp, Camera, MS Paint, 3D Builder, 3D Viewer, Print 3D, Mixed Reality Portal
@@ -114,7 +131,7 @@ Now install it on your system!
 - `System & Misc` → remove default applications that come with Windows installation, such as: People, Maps, Wallet, Get Started, Feedback Hub, Alarms & Clock, OneConnect, Windows Phone, Voice Recorder
 
 ### SETTINGS
-<img width="1402" height="932" alt="1 0 9_settings" src="https://github.com/user-attachments/assets/58f7c75c-dc01-4428-ab1d-68b27524ed28" />
+<img width="1402" height="932" alt="settings-1 1 7" src="https://github.com/user-attachments/assets/cf0fea07-5ae4-4eed-8b27-4e516d5af705" />
 
 - `Switch to Light Mode / Switch to Dark Mode` → switch between Windows Light and Dark themes
 - `Display Current alignment` → Display Current alignment of taskbar elements (Center or Left)

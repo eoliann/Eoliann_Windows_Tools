@@ -51,7 +51,8 @@ enum Page {
 
 pub struct App {
     pub latest_release: Option<crate::utils::GithubRelease>,
-    pub update_available: bool,
+    pub update_available: bool,      // rămâne sursa de adevăr pentru notificări
+    pub show_update_window: bool,    // control vizibilitate popup update (separat)
     page: Page,
     log: Arc<Mutex<String>>,
     show_popup: bool,
@@ -63,6 +64,7 @@ impl Default for App {
         Self {
             latest_release: None,
             update_available: false,
+            show_update_window: false,
             page: Page::Info,
             log: Arc::new(Mutex::new(String::new())),
             show_popup: false,
@@ -88,6 +90,7 @@ impl App {
         Self {
             latest_release,
             update_available,
+            show_update_window: update_available, // afișăm popup inițial doar dacă există update
             ..Self::default()
         }
     }
@@ -106,21 +109,24 @@ impl App {
         ui.label(format!("Version: {}", env!("CARGO_PKG_VERSION")));
 
         // show update info if available (uses latest_release and update_available)
-        // show update info if available (simple inline indicator + open button)
         if self.update_available {
             ui.horizontal(|ui| {
                 ui.colored_label(Color32::from_rgb(0, 255, 140), "⬆ Update available");
                 if ui.small_button("Open").clicked() {
+                    // păstrăm comportamentul de a deschide GitHub; dacă vrei popup în loc, schimbă aici
                     if let Some(release) = &self.latest_release {
                         let _ = webbrowser::open(release.html_url.as_str());
                     } else {
                         let _ = webbrowser::open("https://github.com/eoliann/");
                     }
                 }
+                // opțiune: buton pentru a deschide popup explicit
+                if ui.small_button("Details").clicked() {
+                    self.show_update_window = true;
+                }
             });
             ui.add_space(6.0);
         }
-
 
         ui.add_space(10.0);
         ui.separator();
@@ -192,8 +198,8 @@ impl eframe::App for App {
             });
         });
 
-                // --- Update popup (foloseste ctx) ---
-        if self.update_available {
+        // --- Update popup (folosește flag separat show_update_window) ---
+        if self.show_update_window {
             egui::Window::new("Update Available")
                 .collapsible(false)
                 .resizable(false)
@@ -210,7 +216,8 @@ impl eframe::App for App {
                         }
                     }
                     if ui.button("Close").clicked() {
-                        self.update_available = false;
+                        // FIX: închidem doar popup-ul, nu ascundem notificările globale
+                        self.show_update_window = false;
                     }
                 });
         }
@@ -262,7 +269,6 @@ impl eframe::App for App {
                         Page::WinAppRemoval => {
                             winapp_removal::show_winapp_removal(ui, &self.log, &mut self.show_popup, &mut self.popup_message);
                         }
-                        // Page::Info => { info::show_info(ui, &self.log); }
                         Page::Info => {
                             info::show_info(ui, &self.log, self.update_available, self.latest_release.as_ref());
                         }
@@ -273,24 +279,7 @@ impl eframe::App for App {
                 });
         });
 
-        // popup / update windows etc. (rămân neschimbate)
-        // if self.show_popup {
-        //     egui::Window::new("Confirm / Log")
-        //         .collapsible(false)
-        //         .resizable(true)
-        //         .default_size([600.0, 400.0])
-        //         .show(ctx, |ui| {
-        //             ui.label(&self.popup_message);
-        //             egui::ScrollArea::vertical().show(ui, |ui| {
-        //                 let text = { self.log.lock().unwrap().clone() };
-        //                 ui.label(egui::RichText::new(text).monospace());
-        //             });
-        //             ui.horizontal(|ui| {
-        //                 if ui.button("Close").clicked() { self.show_popup = false; }
-        //                 if ui.button("Clear Log").clicked() { self.clear_log(); }
-        //             });
-        //         });
-        // }
+        // popup / update windows etc.
         if self.show_popup {
             egui::Window::new("Confirm / Log")
                 .collapsible(false)
@@ -319,7 +308,5 @@ impl eframe::App for App {
                     });
                 });
         }
-
-        // update window (unchanged)...
     }
 }

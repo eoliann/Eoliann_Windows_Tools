@@ -520,7 +520,7 @@ pub fn show_tools(
                 ui.vertical(|ui| {
                     ui.colored_label(egui::Color32::RED, "Prevents Storage Sense from automatically deleting temporary files for the current user.");
                     ui.label("• Modifică HKCU:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\StorageSense\\Parameters\\StoragePolicy -> '01' = 0");
-                    ui.colored_label(egui::Color32::YELLOW, "ℹ Afectează doar utilizatorul curent (HKCU). Restart nu este strict necesar, dar unele aplicații pot observa schimbarea după reconectare.");
+                    ui.colored_label(egui::Color32::YELLOW, "ℹ Affects only the current user (HKCU). Restarting is not strictly necessary, but some applications may notice the change after reconnecting.");
                     ui.hyperlink("https://christitustech.github.io/Winutil/dev/tweaks/Essential-Tweaks/Storage");
                 });
             });

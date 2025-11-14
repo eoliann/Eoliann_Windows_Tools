@@ -6,19 +6,10 @@
 [![Downloads latest](https://img.shields.io/github/downloads/eoliann/Eoliann_Windows_Tools/latest/total?style=flat-square)](https://github.com/eoliann/Eoliann_Windows_Tools/releases/latest/download/eoliann_windows_tools_w11.exe)
 [![Donate](https://img.shields.io/badge/Donate-PayPal-blue)](https://www.paypal.com/donate/?hosted_button_id=U9XAX3XBTU67G)
 [![Donate](https://img.shields.io/badge/Donate-Revolut-8A2BE2)](http://revolut.me/adriannm9)
+![OS](https://img.shields.io/badge/OS-Windows-blue)
+![Lang](https://img.shields.io/badge/Lang-Rust-magenta)
 ![Followers](https://img.shields.io/github/followers/eoliann?color=green)
 ![Watchers](https://img.shields.io/github/watchers/eoliann/wup-web)
-
-
-![OS](https://badgen.net/badge/icon/windows?icon=windows&label=OS)
-![Lang](https://badgen.net/static/Lang/Rust/orange)
-![Stars](https://badgen.net/github/stars/eoliann/Eoliann_Windows_Tools)
-![Watchers](https://badgen.net/github/watchers/eoliann/Eoliann_Windows_Tools)
-[![Releases](https://badgen.net/github/releases/eoliann/Eoliann_Windows_Tools)](https://github.com/eoliann/Eoliann_Windows_Tools/releases)
-![Last Release](https://badgen.net/github/tag/eoliann/Eoliann_Windows_Tools)
-[![Downloads latest](https://badgen.net/github/assets-dl/eoliann/wup-web)](https://github.com/eoliann/Eoliann_Windows_Tools/releases/latest/download/eoliann_windows_tools_w11.exe)
-[![Donate](https://badgen.net/static/Donate/PayPal/orange)](https://www.paypal.com/donate/?hosted_button_id=U9XAX3XBTU67G)
-[![Donate](https://badgen.net/static/Donate/Revolut/f2a)](http://revolut.me/adriannm9)
 
 
 

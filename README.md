@@ -1,9 +1,9 @@
 ![Followers](https://img.shields.io/github/followers/eoliann?style=plastic&color=green)
 ![Watchers](https://img.shields.io/github/watchers/eoliann/wup-web?style=plastic)
 ![Stars](https://img.shields.io/github/stars/eoliann/Eoliann_Windows_Tools?style=plastic)
-![Last Commit](https://img.shields.io/github/last-commit/eoliann/Eoliann_Windows_Tools?style=plastic)
 
 ![Release Date](https://img.shields.io/github/release-date/eoliann/Eoliann_Windows_Tools?style=plastic)
+![Last Commit](https://img.shields.io/github/last-commit/eoliann/Eoliann_Windows_Tools?style=plastic)
 
 ![Total Downloads](https://img.shields.io/github/downloads/eoliann/Eoliann_Windows_Tools/total?style=plastic)
 ![](https://img.shields.io/github/downloads/eoliann/Eoliann_Windows_Tools/latest/eoliann_windows_tools_w11.exe?displayAssetName=true&style=plastic&color=green)

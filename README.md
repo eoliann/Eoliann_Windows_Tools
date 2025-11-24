@@ -160,7 +160,7 @@ cd Eoliann_Windows_Tools
 
 ---
 
-## 🛠 Bug-uri i erori / Bugs and Errors
+## 🛠 Bugs and Errors
 - If you discover any bugs or errors, please send them to my channel at **[Discord](https://discord.com/channels/977086560782663680/1416056622069055580)**
 - Documentation <a href="https://discord.com/channels/977086560782663680/1416056737047253156" target="_blank"><img src="https://img.shields.io/badge/documentation-available-blue?logo=readthedocs" alt="Documentation"/></a>
 

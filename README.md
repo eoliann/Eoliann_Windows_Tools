@@ -1,11 +1,21 @@
-![Stars](https://img.shields.io/github/stars/eoliann/Eoliann_Windows_Tools?style=flat-square)
-![Last Commit](https://img.shields.io/github/last-commit/eoliann/Eoliann_Windows_Tools?style=flat-square)
-[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE.md)
-![Release Date](https://img.shields.io/github/release-date/eoliann/Eoliann_Windows_Tools?style=flat-square)
-![Total Downloads](https://img.shields.io/github/downloads/eoliann/Eoliann_Windows_Tools/total?style=flat-square)
-[![Downloads latest](https://img.shields.io/github/downloads/eoliann/Eoliann_Windows_Tools/latest/total?style=flat-square)](https://github.com/eoliann/Eoliann_Windows_Tools/releases/latest/download/eoliann_windows_tools_w11.exe)
+![Followers](https://img.shields.io/github/followers/eoliann?style=plastic&color=green)
+![Watchers](https://img.shields.io/github/watchers/eoliann/wup-web?style=plastic)
+![Stars](https://img.shields.io/github/stars/eoliann/Eoliann_Windows_Tools?style=plastic)
 
+![Release Date](https://img.shields.io/github/release-date/eoliann/Eoliann_Windows_Tools?style=plastic)
+![Last Commit](https://img.shields.io/github/last-commit/eoliann/Eoliann_Windows_Tools?style=plastic)
 
+![Total Downloads](https://img.shields.io/github/downloads/eoliann/Eoliann_Windows_Tools/total?style=plastic)
+![](https://img.shields.io/github/downloads/eoliann/Eoliann_Windows_Tools/latest/eoliann_windows_tools_w11.exe?displayAssetName=true&style=plastic&color=green)
+![](https://img.shields.io/github/downloads/eoliann/Eoliann_Windows_Tools/latest/Eoliann_Windows_Tools_Installer.exe?displayAssetName=true&style=plastic&color=red)
+[![Downloads latest](https://img.shields.io/github/downloads/eoliann/Eoliann_Windows_Tools/latest/total?style=plastic)](https://github.com/eoliann/Eoliann_Windows_Tools/releases/latest/download/eoliann_windows_tools_w11.exe)
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg?style=plastic)](LICENSE.md)
+![OS](https://img.shields.io/badge/OS-Windows-blue?style=plastic)
+![Lang](https://img.shields.io/badge/Lang-Rust-magenta?style=plastic)
+
+[![Donate](https://img.shields.io/badge/Donate-PayPal-blue?style=plastic)](https://www.paypal.com/donate/?hosted_button_id=U9XAX3XBTU67G?style=plastic)
+[![Donate](https://img.shields.io/badge/Donate-Revolut-8A2BE2?style=plastic)](http://revolut.me/adriannm9?style=plastic)
 
 
 
@@ -27,8 +37,12 @@ Now install it on your system!
 ## 🚀 Features
 
 ### INFO
-<img width="1402" height="932" alt="EWT_info_update" src="https://github.com/user-attachments/assets/ee3a0082-3255-4a33-9985-97faf3795297" />
-<img width="1402" height="946" alt="EWT_info" src="https://github.com/user-attachments/assets/cf814e1b-409e-4cb6-9574-eecfad2dbbe4" />
+<img width="1402" height="932" alt="info-1 1 7" src="https://github.com/user-attachments/assets/f6500efb-81aa-4084-baaa-520c9608f7b7" />
+
+#### Update to new version
+![update-version](https://github.com/user-attachments/assets/f9713e60-c36f-4e04-8f6d-1961197db0fc)
+
+
 
 - `whoami` → displays the current user
 - `ipconfig` → display network settings
@@ -36,7 +50,7 @@ Now install it on your system!
 - `tasklist` → active processes
 
 ### TOOLS
-<img width="1920" height="1032" alt="EWT_tools" src="https://github.com/user-attachments/assets/3146d072-50b7-44f2-9b37-c99ad2539716" />
+<img width="1920" height="1032" alt="tools-1 1 7" src="https://github.com/user-attachments/assets/c4996723-0ae6-4f13-bda1-9459fd6fd23a" />
 
 #### Context menu
 - `Toggle Context Menu` → instantly switch between the **Win11 ↔ Classic** context menu (with Explorer restart)
@@ -62,6 +76,8 @@ Now install it on your system!
 - `Enable Activity History` → restores Activity History policies to allow activity collection
 - `Disable Storage Sense` → prevents Storage Sense from automatically deleting temporary files for the current user
 - `Enable Storage Sense` → restores Storage Sense automatic cleanup for the current user
+- `Show/Hide Hidden Files` → Toggles visibility of hidden files and folders in Explorer.
+- `Show File Extensions` → Toggle showing file extensions for known file types.
 #### Advanced Tweaks
 - `Adobe Network Block` → reduce user interruptions by selectively blocking connections to Adobe’s activation and telemetry servers. Credit: Ruddernation-Designs
 - `Adobe Debloat` → manages Adobe Services, Adobe Desktop Service, and Acrobat Updates
@@ -85,12 +101,14 @@ Now install it on your system!
 - `Disable Monitor Timeout` → prevents the monitor from turning off automatically
 
 ### INSTALL
-<img width="1402" height="987" alt="EWT_install" src="https://github.com/user-attachments/assets/92dd36bc-35c8-4242-8613-2506daa263e7" />
-<img width="1402" height="932" alt="EWT_install_2" src="https://github.com/user-attachments/assets/d4f47a68-8650-4338-b873-e61c44349f25" />
-<img width="1402" height="932" alt="EWT_install_3" src="https://github.com/user-attachments/assets/b059bb25-24a0-4825-a377-e6a78177f8e4" />
-<img width="1402" height="932" alt="EWT_install_4" src="https://github.com/user-attachments/assets/ed990efd-4c0d-4bdf-ab64-8e361ef8ddd3" />
-<img width="1402" height="932" alt="EWT_install_5" src="https://github.com/user-attachments/assets/527c9273-22db-4479-bb74-dafee9799530" />
-<img width="1402" height="932" alt="EWT_install_6" src="https://github.com/user-attachments/assets/e0eca63a-9952-450c-a77f-76c3be858257" />
+<img width="1402" height="932" alt="install-1 1 7" src="https://github.com/user-attachments/assets/cf22aef0-6b88-4817-a0e5-845e2f372e44" />
+
+#### Install application
+![install-app](https://github.com/user-attachments/assets/1d50fdc2-eea6-4b72-863f-e3e7f44a330f)
+
+
+#### Uninstall installed application
+![uninstall-app](https://github.com/user-attachments/assets/55bccd07-4b97-4c57-bca0-858f9cf31e0b)
 
 - `Install selections, Uninstall selections, Update selections, Clear selections, Upgrade All Applications, Reinstall winget & search field to filter apps`
 - `Browsers`
@@ -104,7 +122,7 @@ Now install it on your system!
 - `Utilities`
   
 ### WINDOWS APP REMOVAL
-<img width="1402" height="987" alt="EWT_remove_winapp" src="https://github.com/user-attachments/assets/d9869dc3-07fd-4fad-a501-e8b02ffc3d30" />
+<img width="1402" height="932" alt="winapp_removal-1 1 7" src="https://github.com/user-attachments/assets/51d66122-3305-49d9-92b4-ba28d7dbc0e5" />
 
 - `Communication` → remove default applications that come with Windows installation, such as: Outlook for Windows, Skype, Teams, GroupMe, To-Do, Your Phone, CommsPhone, Messaging, Mail & Calendar, and others.
 - `Media & Creativity` → removes default applications that come with Windows installation, such as: Climpchamp, Camera, MS Paint, 3D Builder, 3D Viewer, Print 3D, Mixed Reality Portal
@@ -114,7 +132,7 @@ Now install it on your system!
 - `System & Misc` → remove default applications that come with Windows installation, such as: People, Maps, Wallet, Get Started, Feedback Hub, Alarms & Clock, OneConnect, Windows Phone, Voice Recorder
 
 ### SETTINGS
-<img width="1402" height="932" alt="1 0 9_settings" src="https://github.com/user-attachments/assets/58f7c75c-dc01-4428-ab1d-68b27524ed28" />
+<img width="1402" height="932" alt="settings-1 1 7" src="https://github.com/user-attachments/assets/cf0fea07-5ae4-4eed-8b27-4e516d5af705" />
 
 - `Switch to Light Mode / Switch to Dark Mode` → switch between Windows Light and Dark themes
 - `Display Current alignment` → Display Current alignment of taskbar elements (Center or Left)
@@ -142,7 +160,7 @@ cd Eoliann_Windows_Tools
 
 ---
 
-## 🛠 Bug-uri i erori / Bugs and Errors
+## 🛠 Bugs and Errors
 - If you discover any bugs or errors, please send them to my channel at **[Discord](https://discord.com/channels/977086560782663680/1416056622069055580)**
 - Documentation <a href="https://discord.com/channels/977086560782663680/1416056737047253156" target="_blank"><img src="https://img.shields.io/badge/documentation-available-blue?logo=readthedocs" alt="Documentation"/></a>
 

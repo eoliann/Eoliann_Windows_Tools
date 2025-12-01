@@ -3,7 +3,7 @@ use std::sync::{Arc, Mutex};
 use eframe::egui;
 use egui::{Color32, RichText, Vec2};
 
-use crate::tabs::{info, tools, install, winapp_removal, settings};
+use crate::tabs::{info, tools, install, winapp_removal, customize_preferences, settings};
 
 // ---------------- THEME (verde fluorescent) ----------------
 fn apply_neon_theme(ctx: &egui::Context) {
@@ -46,6 +46,7 @@ enum Page {
     Tools,
     Install,
     WinAppRemoval,
+    CustomizePreferences,
     Settings,
 }
 
@@ -57,6 +58,36 @@ pub struct App {
     log: Arc<Mutex<String>>,
     show_popup: bool,
     popup_message: String,
+
+    // stare pentru Customize Preferences (persistată în App)
+    pub start_with_windows: bool,
+    pub enable_tooltips: bool,
+    pub auto_check_updates: bool,
+
+    // stare pentru Customize Preferences (persistată în App)
+    pub mouse_accel_enabled: bool,
+    pub mouse_prefs_loaded: bool,
+    pub numlock_enabled: bool,
+    pub numlock_prefs_loaded: bool,
+    pub taskbar_search_enabled: bool,
+    pub taskbar_search_prefs_loaded: bool,
+    pub snap_enabled: bool,
+    pub snap_prefs_loaded: bool,
+    pub sticky_enabled: bool,
+    pub sticky_prefs_loaded: bool,
+    pub taskview_enabled: bool,
+    pub taskview_prefs_loaded: bool,
+    // taskbar widgets
+    pub taskbar_widgets_enabled: bool,
+    pub taskbar_widgets_prefs_loaded: bool,
+
+    // verbose logon (system / HKLM)
+    pub verbose_logon_enabled: bool,
+    pub verbose_logon_prefs_loaded: bool,
+
+    // bitlocker
+    pub bitlocker_protection_on: bool,
+    pub bitlocker_prefs_loaded: bool,
 }
 
 impl Default for App {
@@ -69,9 +100,36 @@ impl Default for App {
             log: Arc::new(Mutex::new(String::new())),
             show_popup: false,
             popup_message: String::new(),
+
+            // inițializări noi:
+            start_with_windows: false,
+            enable_tooltips: true,
+            auto_check_updates: true,
+            mouse_accel_enabled: false,
+            mouse_prefs_loaded: false,
+            numlock_enabled: false,
+            numlock_prefs_loaded: false,
+            taskbar_search_enabled: false,
+            taskbar_search_prefs_loaded: false,
+            snap_enabled: false,
+            snap_prefs_loaded: false,
+            sticky_enabled: false,
+            sticky_prefs_loaded: false,
+            taskview_enabled: false,
+            taskview_prefs_loaded: false,
+            taskbar_widgets_enabled: false,
+            taskbar_widgets_prefs_loaded: false,
+
+            verbose_logon_enabled: false,
+            verbose_logon_prefs_loaded: false,
+
+            bitlocker_protection_on: false,
+            bitlocker_prefs_loaded: false,
+
         }
     }
 }
+
 
 impl App {
     pub fn new() -> Self {
@@ -152,6 +210,9 @@ impl App {
         }
         if btn(ui, "WinApp Removal", self.page == Page::WinAppRemoval).clicked() {
             self.page = Page::WinAppRemoval;
+        }
+        if btn(ui, "Customize Preferences", self.page == Page::CustomizePreferences).clicked() {
+            self.page = Page::CustomizePreferences;
         }
         if btn(ui, "Settings", self.page == Page::Settings).clicked() {
             self.page = Page::Settings;
@@ -268,6 +329,35 @@ impl eframe::App for App {
                         Page::Install => { install::show_install(ui, &self.log); }
                         Page::WinAppRemoval => {
                             winapp_removal::show_winapp_removal(ui, &self.log, &mut self.show_popup, &mut self.popup_message);
+                        }
+                        Page::CustomizePreferences => {
+                            customize_preferences::show_customize_preferences(
+                                ui,
+                                &self.log,
+                                &mut self.show_popup,
+                                &mut self.popup_message,
+                                &mut self.start_with_windows,
+                                &mut self.enable_tooltips,
+                                &mut self.auto_check_updates,
+                                &mut self.mouse_accel_enabled,
+                                &mut self.mouse_prefs_loaded,
+                                &mut self.numlock_enabled,
+                                &mut self.numlock_prefs_loaded,
+                                &mut self.taskbar_search_enabled,
+                                &mut self.taskbar_search_prefs_loaded,
+                                &mut self.taskbar_widgets_enabled,
+                                &mut self.taskbar_widgets_prefs_loaded,
+                                &mut self.snap_enabled,
+                                &mut self.snap_prefs_loaded,
+                                &mut self.sticky_enabled,
+                                &mut self.sticky_prefs_loaded,
+                                &mut self.taskview_enabled,
+                                &mut self.taskview_prefs_loaded,
+                                &mut self.verbose_logon_enabled,
+                                &mut self.verbose_logon_prefs_loaded,
+                                &mut self.bitlocker_protection_on,
+                                &mut self.bitlocker_prefs_loaded,
+                            );
                         }
                         Page::Info => {
                             info::show_info(ui, &self.log, self.update_available, self.latest_release.as_ref());

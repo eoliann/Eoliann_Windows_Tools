@@ -14,7 +14,7 @@ windows_subsystem = "windows"
 # UI Framework
 eframe = "0.32"
 egui = "0.32"
-serde = { version = "1.0", features = ["derive"] }
+serde = { version = "1", features = ["derive"] }
 serde_json = "1.0"
 dirs = "4.0"
 webbrowser = "0.8"

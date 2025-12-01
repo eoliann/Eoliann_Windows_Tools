@@ -3,7 +3,7 @@ use std::sync::{Arc, Mutex};
 use eframe::egui;
 use egui::{Color32, RichText, Vec2};
 
-use crate::tabs::{info, tools, install, winapp_removal, settings};
+use crate::tabs::{info, tools, install, winapp_removal, customize_preferences, settings};
 
 // ---------------- THEME (verde fluorescent) ----------------
 fn apply_neon_theme(ctx: &egui::Context) {
@@ -46,16 +46,50 @@ enum Page {
     Tools,
     Install,
     WinAppRemoval,
+    CustomizePreferences,
     Settings,
 }
 
 pub struct App {
     pub latest_release: Option<crate::utils::GithubRelease>,
-    pub update_available: bool,
+    pub update_available: bool,      // rămâne sursa de adevăr pentru notificări
+    pub show_update_window: bool,    // control vizibilitate popup update (separat)
     page: Page,
     log: Arc<Mutex<String>>,
     show_popup: bool,
     popup_message: String,
+
+    // stare pentru Customize Preferences (persistată în App)
+    pub start_with_windows: bool,
+    pub enable_tooltips: bool,
+    pub auto_check_updates: bool,
+
+    // stare pentru Customize Preferences (persistată în App)
+    pub mouse_accel_enabled: bool,
+    pub mouse_prefs_loaded: bool,
+    pub numlock_enabled: bool,
+    pub numlock_prefs_loaded: bool,
+    pub taskbar_search_enabled: bool,
+    pub taskbar_search_prefs_loaded: bool,
+    pub snap_enabled: bool,
+    pub snap_prefs_loaded: bool,
+    pub sticky_enabled: bool,
+    pub sticky_prefs_loaded: bool,
+    pub taskview_enabled: bool,
+    pub taskview_prefs_loaded: bool,
+    // taskbar widgets
+    pub taskbar_widgets_enabled: bool,
+    pub taskbar_widgets_prefs_loaded: bool,
+
+    // verbose logon (system / HKLM)
+    pub verbose_logon_enabled: bool,
+    pub verbose_logon_prefs_loaded: bool,
+
+    // bitlocker
+    pub bitlocker_protection_on: bool,
+    pub bitlocker_prefs_loaded: bool,
+
+    pub general_prefs_loaded: bool,
 }
 
 impl Default for App {
@@ -63,13 +97,42 @@ impl Default for App {
         Self {
             latest_release: None,
             update_available: false,
+            show_update_window: false,
             page: Page::Info,
             log: Arc::new(Mutex::new(String::new())),
             show_popup: false,
             popup_message: String::new(),
+
+            // inițializări noi:
+            start_with_windows: false,
+            enable_tooltips: true,
+            auto_check_updates: true,
+            mouse_accel_enabled: false,
+            mouse_prefs_loaded: false,
+            numlock_enabled: false,
+            numlock_prefs_loaded: false,
+            taskbar_search_enabled: false,
+            taskbar_search_prefs_loaded: false,
+            snap_enabled: false,
+            snap_prefs_loaded: false,
+            sticky_enabled: false,
+            sticky_prefs_loaded: false,
+            taskview_enabled: false,
+            taskview_prefs_loaded: false,
+            taskbar_widgets_enabled: false,
+            taskbar_widgets_prefs_loaded: false,
+
+            verbose_logon_enabled: false,
+            verbose_logon_prefs_loaded: false,
+
+            bitlocker_protection_on: false,
+            bitlocker_prefs_loaded: false,
+
+            general_prefs_loaded: false,
         }
     }
 }
+
 
 impl App {
     pub fn new() -> Self {
@@ -88,6 +151,7 @@ impl App {
         Self {
             latest_release,
             update_available,
+            show_update_window: update_available, // afișăm popup inițial doar dacă există update
             ..Self::default()
         }
     }
@@ -106,21 +170,24 @@ impl App {
         ui.label(format!("Version: {}", env!("CARGO_PKG_VERSION")));
 
         // show update info if available (uses latest_release and update_available)
-        // show update info if available (simple inline indicator + open button)
         if self.update_available {
             ui.horizontal(|ui| {
                 ui.colored_label(Color32::from_rgb(0, 255, 140), "⬆ Update available");
                 if ui.small_button("Open").clicked() {
+                    // păstrăm comportamentul de a deschide GitHub; dacă vrei popup în loc, schimbă aici
                     if let Some(release) = &self.latest_release {
                         let _ = webbrowser::open(release.html_url.as_str());
                     } else {
                         let _ = webbrowser::open("https://github.com/eoliann/");
                     }
                 }
+                // opțiune: buton pentru a deschide popup explicit
+                if ui.small_button("Details").clicked() {
+                    self.show_update_window = true;
+                }
             });
             ui.add_space(6.0);
         }
-
 
         ui.add_space(10.0);
         ui.separator();
@@ -146,6 +213,9 @@ impl App {
         }
         if btn(ui, "WinApp Removal", self.page == Page::WinAppRemoval).clicked() {
             self.page = Page::WinAppRemoval;
+        }
+        if btn(ui, "Customize Preferences", self.page == Page::CustomizePreferences).clicked() {
+            self.page = Page::CustomizePreferences;
         }
         if btn(ui, "Settings", self.page == Page::Settings).clicked() {
             self.page = Page::Settings;
@@ -192,8 +262,8 @@ impl eframe::App for App {
             });
         });
 
-                // --- Update popup (foloseste ctx) ---
-        if self.update_available {
+        // --- Update popup (folosește flag separat show_update_window) ---
+        if self.show_update_window {
             egui::Window::new("Update Available")
                 .collapsible(false)
                 .resizable(false)
@@ -210,7 +280,8 @@ impl eframe::App for App {
                         }
                     }
                     if ui.button("Close").clicked() {
-                        self.update_available = false;
+                        // FIX: închidem doar popup-ul, nu ascundem notificările globale
+                        self.show_update_window = false;
                     }
                 });
         }
@@ -262,7 +333,36 @@ impl eframe::App for App {
                         Page::WinAppRemoval => {
                             winapp_removal::show_winapp_removal(ui, &self.log, &mut self.show_popup, &mut self.popup_message);
                         }
-                        // Page::Info => { info::show_info(ui, &self.log); }
+                        Page::CustomizePreferences => {
+                            customize_preferences::show_customize_preferences(
+                                ui,
+                                &self.log,
+                                &mut self.show_popup,
+                                &mut self.popup_message,
+                                &mut self.start_with_windows,
+                                &mut self.enable_tooltips,
+                                &mut self.auto_check_updates,
+                                &mut self.general_prefs_loaded,
+                                &mut self.mouse_accel_enabled,
+                                &mut self.mouse_prefs_loaded,
+                                &mut self.numlock_enabled,
+                                &mut self.numlock_prefs_loaded,
+                                &mut self.taskbar_search_enabled,
+                                &mut self.taskbar_search_prefs_loaded,
+                                &mut self.taskbar_widgets_enabled,
+                                &mut self.taskbar_widgets_prefs_loaded,
+                                &mut self.snap_enabled,
+                                &mut self.snap_prefs_loaded,
+                                &mut self.sticky_enabled,
+                                &mut self.sticky_prefs_loaded,
+                                &mut self.taskview_enabled,
+                                &mut self.taskview_prefs_loaded,
+                                &mut self.verbose_logon_enabled,
+                                &mut self.verbose_logon_prefs_loaded,
+                                &mut self.bitlocker_protection_on,
+                                &mut self.bitlocker_prefs_loaded,
+                            );
+                        }
                         Page::Info => {
                             info::show_info(ui, &self.log, self.update_available, self.latest_release.as_ref());
                         }
@@ -273,24 +373,7 @@ impl eframe::App for App {
                 });
         });
 
-        // popup / update windows etc. (rămân neschimbate)
-        // if self.show_popup {
-        //     egui::Window::new("Confirm / Log")
-        //         .collapsible(false)
-        //         .resizable(true)
-        //         .default_size([600.0, 400.0])
-        //         .show(ctx, |ui| {
-        //             ui.label(&self.popup_message);
-        //             egui::ScrollArea::vertical().show(ui, |ui| {
-        //                 let text = { self.log.lock().unwrap().clone() };
-        //                 ui.label(egui::RichText::new(text).monospace());
-        //             });
-        //             ui.horizontal(|ui| {
-        //                 if ui.button("Close").clicked() { self.show_popup = false; }
-        //                 if ui.button("Clear Log").clicked() { self.clear_log(); }
-        //             });
-        //         });
-        // }
+        // popup / update windows etc.
         if self.show_popup {
             egui::Window::new("Confirm / Log")
                 .collapsible(false)
@@ -319,7 +402,5 @@ impl eframe::App for App {
                     });
                 });
         }
-
-        // update window (unchanged)...
     }
 }

@@ -943,85 +943,150 @@ pub fn set_dns(provider: &str) -> String {
 }
 
 fn run_dns(primary: &str, secondary: &str) -> String {
-    let mut output = String::new();
+    let ps = format!(r#"
+        $ErrorActionPreference = 'Stop'
 
-    // Get all network adapter names
-    let get_interfaces_cmd = "Get-NetAdapter | Select-Object -ExpandProperty Name";
-    let interfaces_output = run_command(&format!("powershell -Command \"{}\"", get_interfaces_cmd));
+        # Admin check
+        $isAdmin = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole(
+            [Security.Principal.WindowsBuiltInRole]::Administrator)
+        if (-not $isAdmin) {{
+            Write-Output 'ERROR: Administrator privileges required.'
+            exit 1
+        }}
 
-    let interfaces: Vec<&str> = interfaces_output
-        .lines()
-        .filter(|s| !s.trim().is_empty())
-        .collect();
+        $primary = '{primary}'
+        $secondary = '{secondary}'
 
-    if interfaces.is_empty() {
-        return "❌ No network adapters found.".to_string();
-    }
+        # Get adapters that are Up
+        $adapters = Get-NetAdapter -ErrorAction SilentlyContinue | Where-Object {{ $_.Status -eq 'Up' }} | Select-Object -ExpandProperty Name -ErrorAction SilentlyContinue
 
-    for iface in interfaces {
-        // Set primary DNS
-        let set_primary_cmd = format!(
-            "netsh interface ip set dns name=\"{}\" static {}",
-            iface, primary
-        );
-        let res_primary = run_command(&set_primary_cmd);
-        output.push_str(&format!("Setting primary DNS for '{}' to {}: {}\n", iface, primary, res_primary.trim()));
+        if (-not $adapters) {{
+            Write-Output 'INFO: No network adapters found to update.'
+            exit 0
+        }}
 
-        // Set secondary DNS
-        let set_secondary_cmd = format!(
-            "netsh interface ip add dns name=\"{}\" {} index=2",
-            iface, secondary
-        );
-        let res_secondary = run_command(&set_secondary_cmd);
-        output.push_str(&format!("Setting secondary DNS for '{}' to {}: {}\n", iface, secondary, res_secondary.trim()));
-    }
+        # If Set-DnsClientServerAddress exists, try multiple approaches (compatible)
+        if (Get-Command -Name Set-DnsClientServerAddress -ErrorAction SilentlyContinue) {{
+            $servers = @($primary, $secondary)
 
-    // Flush DNS cache
-    let flush_dns_cmd = "ipconfig /flushdns";
-    let res_flush = run_command(flush_dns_cmd);
-    output.push_str(&format!("Flushing DNS cache: {}\n", res_flush.trim()));
+            # 1) Try single-call for all adapters without AddressFamily (most compatible)
+            try {{
+                Set-DnsClientServerAddress -InterfaceAlias $adapters -ServerAddresses $servers -ErrorAction Stop
+                try {{ Clear-DnsClientCache -ErrorAction SilentlyContinue }} catch {{ ipconfig /flushdns | Out-Null }}
+                Write-Output ('SUCCESS: DNS set on ' + ($adapters -join ', '))
+                exit 0
+            }} catch {{
+                # 2) Try per-adapter call (some older builds require per-adapter calls)
+                $errors = @()
+                foreach ($a in $adapters) {{
+                    try {{
+                        Set-DnsClientServerAddress -InterfaceAlias $a -ServerAddresses $servers -ErrorAction Stop
+                    }} catch {{
+                        $errors += ("$a -> " + $_.Exception.Message)
+                    }}
+                }}
+                if ($errors.Count -eq 0) {{
+                    try {{ Clear-DnsClientCache -ErrorAction SilentlyContinue }} catch {{ ipconfig /flushdns | Out-Null }}
+                    Write-Output ('SUCCESS: DNS set per-adapter on ' + ($adapters -join ', '))
+                    exit 0
+                }} else {{
+                    # Fall through to netsh fallback
+                    Write-Output ('WARNING: Set-DnsClientServerAddress attempts failed: ' + ($errors -join '; '))
+                }}
+            }}
+        }}
 
-    output
+        # Fallback: netsh per adapter (very compatible)
+        $errors = @()
+        foreach ($a in $adapters) {{
+            try {{
+                netsh interface ip set dns name="$a" source=static addr=$primary register=primary
+                netsh interface ip add dns name="$a" addr=$secondary index=2
+            }} catch {{
+                $errors += ("$a -> " + $_.Exception.Message)
+            }}
+        }}
+
+        try {{ ipconfig /flushdns | Out-Null }} catch {{}}
+
+        if ($errors.Count -gt 0) {{
+            Write-Output ('ERROR: Some adapters failed: ' + ($errors -join '; '))
+            exit 1
+        }} else {{
+            Write-Output ('SUCCESS: DNS set (netsh fallback) on ' + ($adapters -join ', '))
+            exit 0
+        }}
+        "#,
+        primary = primary,
+        secondary = secondary
+    );
+
+    crate::utils::run_powershell(&ps)
 }
 
 fn reset_dns() -> String {
-    let iface_output = std::process::Command::new("cmd")
-        .args(["/C", "netsh interface show interface"])
-        .output();
+    let ps = r#"
+        $ErrorActionPreference = 'Stop'
+        $isAdmin = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole(
+            [Security.Principal.WindowsBuiltInRole]::Administrator)
+        if (-not $isAdmin) {
+            Write-Output 'ERROR: Administrator privileges required.'
+            exit 1
+        }
 
-    let iface_name = match iface_output {
-        Ok(output) => {
-            let stdout = String::from_utf8_lossy(&output.stdout);
-            if let Some(line) = stdout.lines().find(|l| l.contains("Connected")) {
-                line.split_whitespace().last().unwrap_or("Ethernet").to_string()
-            } else {
-                "Ethernet".to_string()
+        $adapters = Get-NetAdapter -ErrorAction SilentlyContinue | Where-Object { $_.Status -eq 'Up' } | Select-Object -ExpandProperty Name -ErrorAction SilentlyContinue
+        if (-not $adapters) {
+            Write-Output 'INFO: No adapters found to update.'
+            exit 0
+        }
+
+        # Try Reset with Set-DnsClientServerAddress if available
+        if (Get-Command -Name Set-DnsClientServerAddress -ErrorAction SilentlyContinue) {
+            try {
+                Set-DnsClientServerAddress -InterfaceAlias $adapters -Reset -ErrorAction Stop
+                try { Clear-DnsClientCache -ErrorAction SilentlyContinue } catch { ipconfig /flushdns | Out-Null }
+                Write-Output ('SUCCESS: DNS reset to Automatic (DHCP) on ' + ($adapters -join ', '))
+                exit 0
+            } catch {
+                # try per-adapter reset
+                $errors = @()
+                foreach ($a in $adapters) {
+                    try {
+                        Set-DnsClientServerAddress -InterfaceAlias $a -Reset -ErrorAction Stop
+                    } catch {
+                        $errors += ("$a -> " + $_.Exception.Message)
+                    }
+                }
+                if ($errors.Count -eq 0) {
+                    try { Clear-DnsClientCache -ErrorAction SilentlyContinue } catch { ipconfig /flushdns | Out-Null }
+                    Write-Output ('SUCCESS: DNS reset per-adapter to DHCP on ' + ($adapters -join ', '))
+                    exit 0
+                } else {
+                    Write-Output ('WARNING: Reset via Set-DnsClientServerAddress failed: ' + ($errors -join '; '))
+                }
             }
         }
-        Err(_) => "Ethernet".to_string(),
-    };
 
-    let cmd = format!(
-        "netsh interface ip set dns name=\"{iface}\" dhcp",
-        iface = iface_name
-    );
-
-    match std::process::Command::new("cmd")
-        .args(["/C", &cmd])
-        .output()
-    {
-        Ok(output) => {
-            if output.status.success() {
-                format!("✅ DNS reset to Automatic (DHCP) on {iface_name}")
-            } else {
-                format!(
-                    "❌ Failed to reset DNS: {}",
-                    String::from_utf8_lossy(&output.stderr)
-                )
+        # Fallback to netsh
+        $errors = @()
+        foreach ($a in $adapters) {
+            try {
+                netsh interface ip set dns name="$a" source=dhcp
+            } catch {
+                $errors += ("$a -> " + $_.Exception.Message)
             }
         }
-        Err(e) => format!("❌ Error running command: {e}"),
-    }
+        try { ipconfig /flushdns | Out-Null } catch {}
+        if ($errors.Count -gt 0) {
+            Write-Output ('ERROR: Some adapters failed to reset: ' + ($errors -join '; '))
+            exit 1
+        } else {
+            Write-Output ('SUCCESS: DNS reset to Automatic (DHCP) on ' + ($adapters -join ', '))
+            exit 0
+        }
+        "#;
+
+    crate::utils::run_powershell(ps)
 }
 
 use std::io::Read;
@@ -2065,3 +2130,125 @@ pub fn start_reset_windows_update(aggressive: bool, tx: std::sync::mpsc::Sender<
     Ok(())
 }
 
+pub fn brave_debloat() -> String {
+    #[cfg(target_os = "windows")]
+    {
+        // Script PowerShell: creează cheia de politici și setează valorile DWord cerute.
+        let script = r#"
+            $path = 'HKLM:\SOFTWARE\Policies\BraveSoftware\Brave'
+            if (-not (Test-Path $path)) {
+                New-Item -Path $path -Force | Out-Null
+            }
+            Try {
+                New-ItemProperty -Path $path -Name BraveRewardsDisabled -PropertyType DWord -Value 1 -Force | Out-Null
+                New-ItemProperty -Path $path -Name BraveWalletDisabled  -PropertyType DWord -Value 1 -Force | Out-Null
+                New-ItemProperty -Path $path -Name BraveVPNDisabled     -PropertyType DWord -Value 1 -Force | Out-Null
+                New-ItemProperty -Path $path -Name BraveAIChatEnabled   -PropertyType DWord -Value 0 -Force | Out-Null
+                Write-Output 'SUCCESS: Brave policies applied (BraveRewardsDisabled=1, BraveWalletDisabled=1, BraveVPNDisabled=1, BraveAIChatEnabled=0).'
+            } Catch {
+                Write-Error ("Failed to apply Brave policies: " + $_.Exception.Message)
+                exit 1
+            }
+            "#;
+
+        let out = std::process::Command::new("powershell")
+            .args(&["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", script])
+            // dacă vrei să previi deschiderea unei ferestre console pe Windows GUI builds,
+            // folosește .creation_flags(CREATE_NO_WINDOW) dacă acel constant/flag e definit în fișierul tău.
+            .output();
+
+        match out {
+            Ok(o) => {
+                if o.status.success() {
+                    let s = String::from_utf8_lossy(&o.stdout).to_string();
+                    // Normalizează output-ul (dacă e gol, returnează un succes generic)
+                    if s.trim().is_empty() {
+                        "SUCCESS: Brave policies applied.".to_string()
+                    } else {
+                        s
+                    }
+                } else {
+                    let err = String::from_utf8_lossy(&o.stderr).to_string();
+                    if err.trim().is_empty() {
+                        format!("ERROR: PowerShell exited with code {:?}.", o.status.code())
+                    } else {
+                        format!("ERROR: {}", err.trim())
+                    }
+                }
+            }
+            Err(e) => format!("ERROR: Failed to spawn PowerShell: {}", e),
+        }
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        "ERROR: brave_debloat is supported only on Windows.".to_string()
+    }
+}
+
+/// WPFTweaks Edge Debloat (config-driven)
+pub fn wpftweaks_edge_debloat() -> String {
+    let ps = r#"
+        Write-Host 'Applying WPFTweaks Edge Debloat...'
+
+        # Ensure parent keys exist
+        New-Item -Path 'HKLM:\SOFTWARE\Policies\Microsoft\EdgeUpdate' -Force | Out-Null
+        New-Item -Path 'HKLM:\SOFTWARE\Policies\Microsoft\Edge' -Force | Out-Null
+
+        # EdgeUpdate
+        Set-ItemProperty -Path 'HKLM:\SOFTWARE\Policies\Microsoft\EdgeUpdate' -Name 'CreateDesktopShortcutDefault' -Value 0 -Type DWord -Force
+
+        # Edge policies (telemetry, recommendations, shopping, widgets, etc.)
+        Set-ItemProperty -Path 'HKLM:\SOFTWARE\Policies\Microsoft\Edge' -Name 'PersonalizationReportingEnabled' -Value 0 -Type DWord -Force
+        Set-ItemProperty -Path 'HKLM:\SOFTWARE\Policies\Microsoft\Edge' -Name 'ShowRecommendationsEnabled' -Value 0 -Type DWord -Force
+        Set-ItemProperty -Path 'HKLM:\SOFTWARE\Policies\Microsoft\Edge' -Name 'HideFirstRunExperience' -Value 1 -Type DWord -Force
+        Set-ItemProperty -Path 'HKLM:\SOFTWARE\Policies\Microsoft\Edge' -Name 'UserFeedbackAllowed' -Value 0 -Type DWord -Force
+        Set-ItemProperty -Path 'HKLM:\SOFTWARE\Policies\Microsoft\Edge' -Name 'ConfigureDoNotTrack' -Value 1 -Type DWord -Force
+        Set-ItemProperty -Path 'HKLM:\SOFTWARE\Policies\Microsoft\Edge' -Name 'AlternateErrorPagesEnabled' -Value 0 -Type DWord -Force
+        Set-ItemProperty -Path 'HKLM:\SOFTWARE\Policies\Microsoft\Edge' -Name 'EdgeCollectionsEnabled' -Value 0 -Type DWord -Force
+        Set-ItemProperty -Path 'HKLM:\SOFTWARE\Policies\Microsoft\Edge' -Name 'EdgeShoppingAssistantEnabled' -Value 0 -Type DWord -Force
+        Set-ItemProperty -Path 'HKLM:\SOFTWARE\Policies\Microsoft\Edge' -Name 'MicrosoftEdgeInsiderPromotionEnabled' -Value 0 -Type DWord -Force
+        Set-ItemProperty -Path 'HKLM:\SOFTWARE\Policies\Microsoft\Edge' -Name 'ShowMicrosoftRewards' -Value 0 -Type DWord -Force
+        Set-ItemProperty -Path 'HKLM:\SOFTWARE\Policies\Microsoft\Edge' -Name 'WebWidgetAllowed' -Value 0 -Type DWord -Force
+        Set-ItemProperty -Path 'HKLM:\SOFTWARE\Policies\Microsoft\Edge' -Name 'DiagnosticData' -Value 0 -Type DWord -Force
+        Set-ItemProperty -Path 'HKLM:\SOFTWARE\Policies\Microsoft\Edge' -Name 'EdgeAssetDeliveryServiceEnabled' -Value 0 -Type DWord -Force
+        Set-ItemProperty -Path 'HKLM:\SOFTWARE\Policies\Microsoft\Edge' -Name 'CryptoWalletEnabled' -Value 0 -Type DWord -Force
+        Set-ItemProperty -Path 'HKLM:\SOFTWARE\Policies\Microsoft\Edge' -Name 'WalletDonationEnabled' -Value 0 -Type DWord -Force
+
+        Write-Output 'SUCCESS: WPFTweaks Edge Debloat applied (registry entries set).'
+        "#;
+
+    crate::utils::run_powershell(ps)
+}
+
+/// WPFTweaks: Disable Edge (DisallowRun / policy)
+pub fn wpftweaks_disable_edge() -> String {
+    let ps = r#"
+        Write-Host 'Applying WPFTweaks Disable Edge...'
+
+        # Ensure parent policy keys exist
+        New-Item -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Policies\Explorer' -Force | Out-Null
+        New-Item -Path 'HKLM:\Software\Microsoft\Windows\CurrentVersion\Policies\Explorer' -Force | Out-Null
+
+        # Ensure DisallowRun subkey exists under HKCU
+        New-Item -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Policies\Explorer\DisallowRun' -Force | Out-Null
+
+        # Add string value to block msedge.exe via DisallowRun list (name: DisableEdge, value: msedge.exe)
+        Try {
+            New-ItemProperty -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Policies\Explorer\DisallowRun' -Name 'DisableEdge' -PropertyType String -Value 'msedge.exe' -Force | Out-Null
+        } Catch {
+            Write-Warning ("Failed to set HKCU DisallowRun entry: " + $_.Exception.Message)
+        }
+
+        # Enable DisallowRun policy under HKLM (DWord = 1)
+        Try {
+            Set-ItemProperty -Path 'HKLM:\Software\Microsoft\Windows\CurrentVersion\Policies\Explorer' -Name 'DisallowRun' -Value 1 -Type DWord -Force
+        } Catch {
+            Write-Warning ("Failed to set HKLM DisallowRun policy: " + $_.Exception.Message)
+        }
+
+        Write-Output 'SUCCESS: WPFTweaks Disable Edge applied (DisallowRun entries set).'
+        "#;
+
+    crate::utils::run_powershell(ps)
+}

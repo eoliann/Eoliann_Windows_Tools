@@ -1,12 +1,8 @@
 // src/tabs/customize_preferences.rs
 //
-// Rewritten file: same UI and behavior, but all console launches (reg, powershell, rundll32, manage-bde)
-// are executed via a helper that hides the console window on Windows (CREATE_NO_WINDOW + PowerShell -WindowStyle Hidden).
-// Fallback for Taskbar Widgets uses .reg + elevated regedit (UAC cannot be hidden).
-//
-// Notes:
-// - This file is Windows-first. On non-windows targets, run_hidden returns an error and registry ops will fail gracefully.
-// - Keeps persistence to preferences.json as before.
+// Customize preferences UI + Windows tweaks.
+// - Removed all "Start with Windows" / Startup shortcut functionality.
+// - Rest of behavior unchanged: registry helpers, persistence, Windows Update auto-check, tooltips flag, features.
 
 use std::sync::{Arc, Mutex};
 use eframe::egui::{self, RichText};
@@ -37,34 +33,26 @@ fn run_hidden(cmd: &str, args: &[&str]) -> Result<Output, String> {
 }
 
 fn reg_query_value(path: &str, value_name: &str) -> Option<String> {
-    // Use reg.exe but hidden
     let args = ["query", path, "/v", value_name];
     let out = run_hidden("reg", &args).ok()?;
-    if !out.status.success() {
-        return None;
-    }
+    if !out.status.success() { return None; }
     let s = String::from_utf8_lossy(&out.stdout).to_string();
     for line in s.lines() {
         if line.trim_start().starts_with(value_name) {
             let parts: Vec<&str> = line.split_whitespace().collect();
-            if let Some(v) = parts.last() {
-                return Some(v.to_string());
-            }
+            if let Some(v) = parts.last() { return Some(v.to_string()); }
         }
     }
     None
 }
 
 //////////////////////////////////////////////////////////////////
-// Persistence: preferences file (JSON)
+// Preferences persistence
 //////////////////////////////////////////////////////////////////
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct PrefsFile {
-    pub start_with_windows: bool,
     pub enable_tooltips: bool,
     pub auto_check_updates: bool,
-
-    // features state (persisted after Save / Apply Features)
     pub mouse_accel_enabled: bool,
     pub numlock_enabled: bool,
     pub taskbar_search_enabled: bool,
@@ -79,7 +67,6 @@ pub struct PrefsFile {
 impl Default for PrefsFile {
     fn default() -> Self {
         Self {
-            start_with_windows: false,
             enable_tooltips: true,
             auto_check_updates: true,
             mouse_accel_enabled: false,
@@ -102,7 +89,6 @@ fn prefs_path() -> PathBuf {
         p.push("preferences.json");
         p
     } else {
-        // fallback to current dir
         let mut p = PathBuf::from(".");
         p.push("preferences.json");
         p
@@ -112,28 +98,22 @@ fn prefs_path() -> PathBuf {
 fn load_prefs() -> PrefsFile {
     let path = prefs_path();
     match fs::read_to_string(&path) {
-        Ok(s) => match serde_json::from_str::<PrefsFile>(&s) {
-            Ok(p) => p,
-            Err(_) => PrefsFile::default(),
-        },
+        Ok(s) => serde_json::from_str::<PrefsFile>(&s).unwrap_or_default(),
         Err(_) => PrefsFile::default(),
     }
 }
 
 fn save_prefs(p: &PrefsFile) -> io::Result<()> {
     let path = prefs_path();
-    if let Some(dir) = path.parent() {
-        fs::create_dir_all(dir)?;
-    }
+    if let Some(dir) = path.parent() { fs::create_dir_all(dir)?; }
     let s = serde_json::to_string_pretty(p).map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
     fs::write(path, s)
 }
 
 //////////////////////////////////////////////////////////////////
-// Registry helpers + feature apply/read (re-used from earlier)
+// Registry helpers (unchanged behavior)
 //////////////////////////////////////////////////////////////////
 
-// MOUSE ACCELERATION
 fn read_mouse_accel_from_registry() -> Option<bool> {
     reg_query_value(r#"HKCU\Control Panel\Mouse"#, "MouseSpeed")
         .and_then(|v| v.parse::<i32>().ok().map(|n| n > 0))
@@ -155,18 +135,13 @@ fn set_mouse_accel_in_registry(enabled: bool) -> Result<String, String> {
     Ok(combined)
 }
 
-// NUMLOCK
 fn read_numlock_from_registry() -> Option<bool> {
     if let Some(v) = reg_query_value(r#"HKCU\Control Panel\Keyboard"#, "InitialKeyboardIndicators") {
-        if let Ok(n) = v.parse::<i32>() {
-            return Some(n != 0);
-        }
+        if let Ok(n) = v.parse::<i32>() { return Some(n != 0); }
         return Some(v != "0".to_string());
     }
     if let Some(v) = reg_query_value(r#"HKU\.DEFAULT\Control Panel\Keyboard"#, "InitialKeyboardIndicators") {
-        if let Ok(n) = v.parse::<i32>() {
-            return Some(n != 0);
-        }
+        if let Ok(n) = v.parse::<i32>() { return Some(n != 0); }
         return Some(v != "0".to_string());
     }
     None
@@ -191,7 +166,6 @@ fn set_numlock_in_registry(enabled: bool) -> Result<String, String> {
     Ok(combined)
 }
 
-// TASKBAR SEARCH
 fn read_taskbar_search_from_registry() -> Option<bool> {
     reg_query_value(r#"HKCU\Software\Microsoft\Windows\CurrentVersion\Search\"#, "SearchboxTaskbarMode")
         .and_then(|v| v.parse::<i32>().ok().map(|n| n != 0))
@@ -211,37 +185,24 @@ fn set_taskbar_search_in_registry(enabled: bool) -> Result<String, String> {
         "/f",
     ];
     let out = run_hidden("reg", &args).map_err(|e| format!("failed to spawn reg: {}", e))?;
-    if !out.status.success() {
-        Err(format!("{}", String::from_utf8_lossy(&out.stderr)))
-    } else {
-        Ok(String::from_utf8_lossy(&out.stdout).to_string())
-    }
+    if !out.status.success() { Err(format!("{}", String::from_utf8_lossy(&out.stderr))) }
+    else { Ok(String::from_utf8_lossy(&out.stdout).to_string()) }
 }
 
-// TASKBAR WIDGETS
 fn read_taskbar_widgets_from_registry() -> Option<bool> {
     reg_query_value(r#"HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced"#, "TaskbarDa")
         .and_then(|v| v.parse::<i32>().ok().map(|n| n != 0))
 }
 
 fn set_taskbar_widgets_in_registry(enabled: bool) -> Result<String, String> {
-    // First attempt: use reg.exe (fast, hidden when possible)
     let value = if enabled { "1" } else { "0" };
     let args = ["add", r#"HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced"#, "/v", "TaskbarDa", "/t", "REG_DWORD", "/d", value, "/f"];
     let out = run_hidden("reg", &args).map_err(|e| format!("failed to spawn reg: {}", e))?;
+    if out.status.success() { return Ok(String::from_utf8_lossy(&out.stdout).to_string()); }
 
-    if out.status.success() {
-        return Ok(String::from_utf8_lossy(&out.stdout).to_string());
-    }
-
-    // If reg.exe failed, inspect stderr. If it's an access denied error, try fallback via .reg + regedit elevated.
     let stderr = String::from_utf8_lossy(&out.stderr).to_string();
-    if !stderr.to_lowercase().contains("access is denied") {
-        // Not the access-denied case we expect — return original error
-        return Err(stderr);
-    }
+    if !stderr.to_lowercase().contains("access is denied") { return Err(stderr); }
 
-    // Fallback: write .reg and import with regedit elevated (UAC unavoidable)
     let dw: u32 = if enabled { 1 } else { 0 };
     let hex = format!("{:08x}", dw);
     let reg_text = format!(
@@ -253,43 +214,22 @@ fn set_taskbar_widgets_in_registry(enabled: bool) -> Result<String, String> {
     let ts = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_millis();
     tmp.push(format!("ewt_taskbar_widgets_{}.reg", ts));
 
-    if let Err(e) = fs::write(&tmp, reg_text) {
-        return Err(format!("Failed to write temporary .reg file: {}", e));
-    }
+    if let Err(e) = fs::write(&tmp, reg_text) { return Err(format!("Failed to write temporary .reg file: {}", e)); }
 
-    // Use PowerShell Start-Process to launch regedit elevated and wait
-    // Command: powershell -NoProfile -NonInteractive -WindowStyle Hidden -Command "Start-Process regedit.exe -ArgumentList '/s','C:\path\to\file.reg' -Verb runas -Wait"
-    let ps_cmd = format!(
-        "Start-Process regedit.exe -ArgumentList '/s','{}' -Verb runas -Wait",
-        tmp.display()
-    );
-
-    let ps_args = [
-        "-NoProfile",
-        "-NonInteractive",
-        "-WindowStyle",
-        "Hidden",
-        "-Command",
-        &ps_cmd,
-    ];
+    let ps_cmd = format!("Start-Process regedit.exe -ArgumentList '/s','{}' -Verb runas -Wait", tmp.display());
+    let ps_args = ["-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command", &ps_cmd];
     let ps_out = run_hidden("powershell", &ps_args).map_err(|e| format!("failed to spawn PowerShell for regedit fallback: {}", e))?;
-
     if !ps_out.status.success() {
         let ps_stderr = String::from_utf8_lossy(&ps_out.stderr).to_string();
         let _ = fs::remove_file(&tmp);
         return Err(format!("Failed to import .reg via elevated regedit: {}\nps_err: {}", stderr, ps_stderr));
     }
 
-    // best-effort: refresh per-user system params (may not always work)
     let _ = run_hidden("rundll32.exe", &["user32.dll,UpdatePerUserSystemParameters"]);
-
-    // cleanup temp file (best-effort)
     let _ = fs::remove_file(&tmp);
-
     Ok(format!("Imported .reg via regedit (fallback)."))
 }
 
-// SNAP WINDOW
 fn read_snap_from_registry() -> Option<bool> {
     reg_query_value(r#"HKCU\Control Panel\Desktop"#, "WindowArrangementActive")
         .and_then(|v| v.parse::<i32>().ok().map(|n| n != 0))
@@ -299,14 +239,10 @@ fn set_snap_in_registry(enabled: bool) -> Result<String, String> {
     let value = if enabled { "1" } else { "0" };
     let args = ["add", r#"HKCU\Control Panel\Desktop"#, "/v", "WindowArrangementActive", "/t", "REG_SZ", "/d", value, "/f"];
     let out = run_hidden("reg", &args).map_err(|e| format!("failed to spawn reg: {}", e))?;
-    if !out.status.success() {
-        Err(format!("{}", String::from_utf8_lossy(&out.stderr)))
-    } else {
-        Ok(String::from_utf8_lossy(&out.stdout).to_string())
-    }
+    if !out.status.success() { Err(format!("{}", String::from_utf8_lossy(&out.stderr))) }
+    else { Ok(String::from_utf8_lossy(&out.stdout).to_string()) }
 }
 
-// STICKY KEYS
 fn read_sticky_from_registry() -> Option<bool> {
     reg_query_value(r#"HKCU\Control Panel\Accessibility\StickyKeys"#, "Flags")
         .and_then(|v| v.parse::<i32>().ok().map(|n| n == 510))
@@ -316,14 +252,10 @@ fn set_sticky_in_registry(enabled: bool) -> Result<String, String> {
     let value = if enabled { "510" } else { "58" };
     let args = ["add", r#"HKCU\Control Panel\Accessibility\StickyKeys"#, "/v", "Flags", "/t", "REG_SZ", "/d", value, "/f"];
     let out = run_hidden("reg", &args).map_err(|e| format!("failed to spawn reg: {}", e))?;
-    if !out.status.success() {
-        Err(format!("{}", String::from_utf8_lossy(&out.stderr)))
-    } else {
-        Ok(String::from_utf8_lossy(&out.stdout).to_string())
-    }
+    if !out.status.success() { Err(format!("{}", String::from_utf8_lossy(&out.stderr))) }
+    else { Ok(String::from_utf8_lossy(&out.stdout).to_string()) }
 }
 
-// TASK VIEW
 fn read_taskview_from_registry() -> Option<bool> {
     reg_query_value(r#"HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced"#, "ShowTaskViewButton")
         .and_then(|v| v.parse::<i32>().ok().map(|n| n != 0))
@@ -333,14 +265,10 @@ fn set_taskview_in_registry(enabled: bool) -> Result<String, String> {
     let value = if enabled { "1" } else { "0" };
     let args = ["add", r#"HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced"#, "/v", "ShowTaskViewButton", "/t", "REG_DWORD", "/d", value, "/f"];
     let out = run_hidden("reg", &args).map_err(|e| format!("failed to spawn reg: {}", e))?;
-    if !out.status.success() {
-        Err(format!("{}", String::from_utf8_lossy(&out.stderr)))
-    } else {
-        Ok(String::from_utf8_lossy(&out.stdout).to_string())
-    }
+    if !out.status.success() { Err(format!("{}", String::from_utf8_lossy(&out.stderr))) }
+    else { Ok(String::from_utf8_lossy(&out.stdout).to_string()) }
 }
 
-// VERBOSE LOGON (HKLM)
 fn read_verbose_logon_from_registry() -> Option<bool> {
     reg_query_value(r#"HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System"#, "VerboseStatus")
         .and_then(|v| v.parse::<i32>().ok().map(|n| n != 0))
@@ -350,14 +278,10 @@ fn set_verbose_logon_in_registry(enabled: bool) -> Result<String, String> {
     let value = if enabled { "1" } else { "0" };
     let args = ["add", r#"HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System"#, "/v", "VerboseStatus", "/t", "REG_DWORD", "/d", value, "/f"];
     let out = run_hidden("reg", &args).map_err(|e| format!("failed to spawn reg: {}", e))?;
-    if !out.status.success() {
-        Err(format!("{}", String::from_utf8_lossy(&out.stderr)))
-    } else {
-        Ok(String::from_utf8_lossy(&out.stdout).to_string())
-    }
+    if !out.status.success() { Err(format!("{}", String::from_utf8_lossy(&out.stderr))) }
+    else { Ok(String::from_utf8_lossy(&out.stdout).to_string()) }
 }
 
-// BITLOCKER
 fn read_bitlocker_protection_status() -> Option<bool> {
     let out = run_hidden("manage-bde", &["-status", "C:"]).ok()?;
     if !out.status.success() { return None; }
@@ -375,43 +299,50 @@ fn read_bitlocker_protection_status() -> Option<bool> {
 fn set_bitlocker_protection(enable: bool) -> Result<String, String> {
     let cmd = if enable { vec!["-on", "C:"] } else { vec!["-off", "C:"] };
     let out = run_hidden("manage-bde", &cmd.iter().map(|s| *s).collect::<Vec<&str>>()).map_err(|e| format!("failed to spawn manage-bde: {}", e))?;
-    if !out.status.success() {
-        Err(format!("{}", String::from_utf8_lossy(&out.stderr)))
-    } else {
-        Ok(String::from_utf8_lossy(&out.stdout).to_string())
-    }
+    if !out.status.success() { Err(format!("{}", String::from_utf8_lossy(&out.stderr))) }
+    else { Ok(String::from_utf8_lossy(&out.stdout).to_string()) }
 }
 
 //////////////////////////////////////////////////////////////////
-// Startup helper: add/remove Run key for current executable
+// Windows Update auto-check + tooltips flag
 //////////////////////////////////////////////////////////////////
-fn set_startup_enabled(enabled: bool) -> Result<String, String> {
-    let key = r#"HKCU\Software\Microsoft\Windows\CurrentVersion\Run"#;
-    let name = "EoliannWindowsTools";
+
+fn set_auto_check_windows_updates(enabled: bool) -> Result<String, String> {
+    let task_name = "Eoliann_EWT_CheckWindowsUpdate";
     if enabled {
-        let exe = std::env::current_exe().map_err(|e| format!("current_exe error: {}", e))?;
-        let exe_s = exe.to_string_lossy();
-        let args = ["add", key, "/v", name, "/t", "REG_SZ", "/d", exe_s.as_ref(), "/f"];
-        let out = run_hidden("reg", &args).map_err(|e| format!("failed to spawn reg: {}", e))?;
+        let args = [
+            "/Create", "/SC", "DAILY", "/TN", task_name,
+            "/TR", "cmd /c UsoClient StartScan", "/RL", "HIGHEST", "/RU", "SYSTEM", "/F",
+        ];
+        let out = run_hidden("schtasks", &args).map_err(|e| format!("failed to spawn schtasks: {}", e))?;
+        if !out.status.success() { return Err(format!("schtasks create failed: {}", String::from_utf8_lossy(&out.stderr))); }
+        Ok(format!("Scheduled task created: {}", task_name))
+    } else {
+        let args = ["/Delete", "/TN", task_name, "/F"];
+        let out = run_hidden("schtasks", &args).map_err(|e| format!("failed to spawn schtasks: {}", e))?;
         if !out.status.success() {
-            Err(format!("{}", String::from_utf8_lossy(&out.stderr)))
+            let stderr = String::from_utf8_lossy(&out.stderr).to_string();
+            if stderr.to_lowercase().contains("the system cannot find") { return Ok("Scheduled task not present (nothing to delete)".to_string()); }
+            return Err(format!("schtasks delete failed: {}", stderr));
+        }
+        Ok(format!("Scheduled task removed: {}", task_name))
+    }
+}
+
+fn apply_enable_tooltips_flag(enabled: bool) -> Result<String, String> {
+    if let Some(mut cfg) = dirs::config_dir() {
+        cfg.push("Eoliann_Windows_Tools");
+        fs::create_dir_all(&cfg).map_err(|e| format!("Failed to create config dir: {}", e))?;
+        cfg.push("tooltips_enabled");
+        if enabled {
+            fs::write(&cfg, "1").map_err(|e| format!("Failed to write tooltip flag: {}", e))?;
+            Ok(format!("Tooltip flag written: {}", cfg.display()))
         } else {
-            Ok(String::from_utf8_lossy(&out.stdout).to_string())
+            if cfg.exists() { fs::remove_file(&cfg).map_err(|e| format!("Failed to remove tooltip flag: {}", e))?; }
+            Ok(format!("Tooltip flag removed: {}", cfg.display()))
         }
     } else {
-        let args = ["delete", key, "/v", name, "/f"];
-        let out = run_hidden("reg", &args).map_err(|e| format!("failed to spawn reg: {}", e))?;
-        if !out.status.success() {
-            // deletion fails when key missing - ignore that as OK
-            let stderr = String::from_utf8_lossy(&out.stderr).to_string();
-            if stderr.contains("The system was unable to find the specified registry value") {
-                Ok(stderr)
-            } else {
-                Err(stderr)
-            }
-        } else {
-            Ok(String::from_utf8_lossy(&out.stdout).to_string())
-        }
+        Err("Could not resolve config directory".to_string())
     }
 }
 
@@ -423,10 +354,9 @@ pub fn show_customize_preferences(
     log: &Arc<Mutex<String>>,
     show_popup: &mut bool,
     popup_message: &mut String,
-    start_with_windows: &mut bool,
     enable_tooltips: &mut bool,
     auto_check_updates: &mut bool,
-    general_prefs_loaded: &mut bool, // <- new: load saved general prefs once
+    general_prefs_loaded: &mut bool,
     mouse_accel_enabled: &mut bool,
     mouse_prefs_loaded: &mut bool,
     numlock_enabled: &mut bool,
@@ -446,14 +376,11 @@ pub fn show_customize_preferences(
     bitlocker_protection_on: &mut bool,
     bitlocker_prefs_loaded: &mut bool,
 ) {
-    // On first entry: load saved prefs and populate fields (general + feature booleans)
     if !*general_prefs_loaded {
         let p = load_prefs();
-        *start_with_windows = p.start_with_windows;
         *enable_tooltips = p.enable_tooltips;
         *auto_check_updates = p.auto_check_updates;
 
-        // prefill feature toggles from persisted file; registry reading still runs as fallback for more authoritative system state
         *mouse_accel_enabled = p.mouse_accel_enabled;
         *numlock_enabled = p.numlock_enabled;
         *taskbar_search_enabled = p.taskbar_search_enabled;
@@ -464,13 +391,10 @@ pub fn show_customize_preferences(
         *verbose_logon_enabled = p.verbose_logon_enabled;
         *bitlocker_protection_on = p.bitlocker_protection_on;
 
-        if let Ok(mut lg) = log.lock() {
-            lg.push_str("Loaded preferences from disk.\n");
-        }
+        if let Ok(mut lg) = log.lock() { lg.push_str("Loaded preferences from disk.\n"); }
         *general_prefs_loaded = true;
     }
 
-    // General Preferences
     egui::CollapsingHeader::new("General Preferences")
         .default_open(true)
         .show(ui, |ui| {
@@ -478,16 +402,13 @@ pub fn show_customize_preferences(
                 ui.label(RichText::new("General Preferences").heading());
                 ui.add_space(6.0);
 
-                ui.checkbox(start_with_windows, "Start with Windows");
                 ui.checkbox(enable_tooltips, "Enable advanced tooltips");
-                ui.checkbox(auto_check_updates, "Auto-check for updates");
+                ui.checkbox(auto_check_updates, "Auto-check for updates (Windows Update)");
 
                 ui.add_space(8.0);
                 ui.horizontal(|ui| {
                     if ui.button("Save General Preferences").clicked() {
-                        // save to disk and apply Start with Windows
                         let prefs = PrefsFile {
-                            start_with_windows: *start_with_windows,
                             enable_tooltips: *enable_tooltips,
                             auto_check_updates: *auto_check_updates,
                             mouse_accel_enabled: *mouse_accel_enabled,
@@ -500,35 +421,36 @@ pub fn show_customize_preferences(
                             verbose_logon_enabled: *verbose_logon_enabled,
                             bitlocker_protection_on: *bitlocker_protection_on,
                         };
+
                         if let Err(e) = save_prefs(&prefs) {
                             if let Ok(mut lg) = log.lock() { lg.push_str(&format!("Failed to save prefs: {}\n", e)); }
                             *show_popup = true;
                             *popup_message = format!("Failed to save preferences: {}", e);
                         } else {
                             if let Ok(mut lg) = log.lock() { lg.push_str("General preferences saved to disk.\n"); }
-                            // apply Start with Windows
-                            match set_startup_enabled(*start_with_windows) {
-                                Ok(_) => {
-                                    if let Ok(mut lg) = log.lock() { lg.push_str(&format!("Startup entry set: {}\n", start_with_windows)); }
-                                    *show_popup = true;
-                                    *popup_message = "General preferences saved.".to_string();
-                                }
+
+                            // apply tooltips flag (best-effort)
+                            if let Err(err) = apply_enable_tooltips_flag(*enable_tooltips) {
+                                if let Ok(mut lg) = log.lock() { lg.push_str(&format!("Failed to persist tooltips flag: {}\n", err)); }
+                            }
+
+                            // configure Windows Update auto-check (best-effort)
+                            match set_auto_check_windows_updates(*auto_check_updates) {
+                                Ok(msg) => { if let Ok(mut lg) = log.lock() { lg.push_str(&format!("Auto-check for Windows Updates configured: {}\n", msg)); } }
                                 Err(err) => {
-                                    if let Ok(mut lg) = log.lock() { lg.push_str(&format!("Failed to set startup: {}\n", err)); }
+                                    if let Ok(mut lg) = log.lock() { lg.push_str(&format!("Failed to configure Windows Update auto-check: {}\n", err)); }
                                     *show_popup = true;
-                                    *popup_message = format!("Saved but failed to set startup: {}", err);
+                                    *popup_message = format!("Saved but failed to configure Windows Update auto-check: {}", err);
+                                    return;
                                 }
                             }
                         }
                     }
 
                     if ui.button("Reset General Defaults").clicked() {
-                        *start_with_windows = false;
                         *enable_tooltips = true;
                         *auto_check_updates = true;
-                        if let Ok(mut lg) = log.lock() {
-                            lg.push_str("General preferences reset to defaults (not yet saved).\n");
-                        }
+                        if let Ok(mut lg) = log.lock() { lg.push_str("General preferences reset to defaults (not yet saved).\n"); }
                     }
                 });
             });
@@ -536,7 +458,7 @@ pub fn show_customize_preferences(
 
     ui.add_space(6.0);
 
-    // Features (subsecțiune) - behavior unchanged except: after successful Apply we persist file
+    // Features section (unchanged behavior; persists on Apply)
     egui::CollapsingHeader::new("Features")
         .default_open(true)
         .show(ui, |ui| {
@@ -544,7 +466,6 @@ pub fn show_customize_preferences(
                 ui.label(RichText::new("Features / Tweaks").heading());
                 ui.add_space(6.0);
 
-                // mouse (registry read as authoritative fallback)
                 if !*mouse_prefs_loaded {
                     if let Some(val) = read_mouse_accel_from_registry() {
                         *mouse_accel_enabled = val;
@@ -555,7 +476,6 @@ pub fn show_customize_preferences(
                 ui.horizontal(|ui| { ui.label("Mouse Acceleration"); ui.checkbox(mouse_accel_enabled, ""); });
                 ui.add_space(8.0);
 
-                // numlock
                 if !*numlock_prefs_loaded {
                     if let Some(val) = read_numlock_from_registry() {
                         *numlock_enabled = val;
@@ -566,7 +486,6 @@ pub fn show_customize_preferences(
                 ui.horizontal(|ui| { ui.label("NumLock on startup"); ui.checkbox(numlock_enabled, ""); });
                 ui.add_space(8.0);
 
-                // taskbar search
                 if !*taskbar_search_prefs_loaded {
                     if let Some(val) = read_taskbar_search_from_registry() {
                         *taskbar_search_enabled = val;
@@ -577,7 +496,6 @@ pub fn show_customize_preferences(
                 ui.horizontal(|ui| { ui.label("Taskbar Search Button"); ui.checkbox(taskbar_search_enabled, ""); });
                 ui.add_space(8.0);
 
-                // taskbar widgets
                 if !*taskbar_widgets_prefs_loaded {
                     if let Some(val) = read_taskbar_widgets_from_registry() {
                         *taskbar_widgets_enabled = val;
@@ -588,7 +506,6 @@ pub fn show_customize_preferences(
                 ui.horizontal(|ui| { ui.label("Taskbar Widgets"); ui.checkbox(taskbar_widgets_enabled, ""); });
                 ui.add_space(8.0);
 
-                // snap
                 if !*snap_prefs_loaded {
                     if let Some(val) = read_snap_from_registry() {
                         *snap_enabled = val;
@@ -599,7 +516,6 @@ pub fn show_customize_preferences(
                 ui.horizontal(|ui| { ui.label("Snap Windows on startup"); ui.checkbox(snap_enabled, ""); });
                 ui.add_space(8.0);
 
-                // sticky
                 if !*sticky_prefs_loaded {
                     if let Some(val) = read_sticky_from_registry() {
                         *sticky_enabled = val;
@@ -610,7 +526,6 @@ pub fn show_customize_preferences(
                 ui.horizontal(|ui| { ui.label("Sticky Keys on startup"); ui.checkbox(sticky_enabled, ""); });
                 ui.add_space(8.0);
 
-                // taskview
                 if !*taskview_prefs_loaded {
                     if let Some(val) = read_taskview_from_registry() {
                         *taskview_enabled = val;
@@ -621,7 +536,6 @@ pub fn show_customize_preferences(
                 ui.horizontal(|ui| { ui.label("Task View button"); ui.checkbox(taskview_enabled, ""); });
                 ui.add_space(8.0);
 
-                // verbose logon (HKLM)
                 if !*verbose_logon_prefs_loaded {
                     if let Some(val) = read_verbose_logon_from_registry() {
                         *verbose_logon_enabled = val;
@@ -632,7 +546,6 @@ pub fn show_customize_preferences(
                 ui.horizontal(|ui| { ui.label("Verbose Logon Messages (system)"); ui.checkbox(verbose_logon_enabled, ""); });
                 ui.add_space(8.0);
 
-                // bitlocker
                 if !*bitlocker_prefs_loaded {
                     if let Some(val) = read_bitlocker_protection_status() {
                         *bitlocker_protection_on = val;
@@ -648,7 +561,6 @@ pub fn show_customize_preferences(
 
                 ui.add_space(12.0);
                 if ui.button("Save / Apply Features").clicked() {
-                    // Apply each feature; if any fails, show popup with error and abort (previous behavior)
                     if let Err(err) = set_mouse_accel_in_registry(*mouse_accel_enabled) {
                         if let Ok(mut lg) = log.lock() { lg.push_str(&format!("Failed to apply mouse accel: {}\n", err)); }
                         *show_popup = true; *popup_message = format!("Failed to apply mouse accel: {}", err); return;
@@ -686,9 +598,7 @@ pub fn show_customize_preferences(
                         *show_popup = true; *popup_message = format!("Failed to change BitLocker: {}", err); return;
                     }
 
-                    // if all succeeded, persist entire preferences state
                     let prefs = PrefsFile {
-                        start_with_windows: *start_with_windows,
                         enable_tooltips: *enable_tooltips,
                         auto_check_updates: *auto_check_updates,
                         mouse_accel_enabled: *mouse_accel_enabled,

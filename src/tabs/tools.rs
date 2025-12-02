@@ -657,6 +657,73 @@ pub fn show_tools(
                 }
             }
 
+            // Debloat Brave
+            let resp = ui.add_enabled(!global_busy, egui::Button::new("🔒 Debloat Brave"));
+            resp.clone().on_hover_ui(|ui| {
+                ui.vertical(|ui| {
+                    ui.colored_label(egui::Color32::from_rgb(57, 255, 20), "Apply policies to Brave to disable unwanted features");
+                    ui.label("• Disable Brave Rewards, Brave Wallet, and Brave VPN");
+                    ui.label("• Disable Brave AI chat");
+                    ui.colored_label(egui::Color32::YELLOW, "⚠ Requires Administrator for registry writes");
+                });
+            });
+            if resp.clicked() {
+                if let Some(guard) = commands::try_start_global_op("Debloat Brave", log) {
+                    let log_clone = log.clone();
+                    thread::spawn(move || {
+                        let _guard = guard;
+                        let result = crate::commands::brave_debloat();
+                        let mut lg = log_clone.lock().unwrap();
+                        if lg.is_empty() { *lg = result; } else { *lg = format!("{}\n{}", lg, result); }
+                    });
+                }
+            }
+
+            // WPFTweaks Edge Debloat (insert after Debloat Brave)
+            let resp = ui.add_enabled(!global_busy, egui::Button::new("🔧 WPFTweaks Edge Debloat"));
+            resp.clone().on_hover_ui(|ui| {
+                ui.vertical(|ui| {
+                    ui.colored_label(egui::Color32::from_rgb(255, 165, 0), "Edge Debloat (WPFTweaks)");
+                    ui.label("• Disables telemetry, recommendations, shopping assistant, widgets and other Edge annoyances.");
+                    ui.label("• Applies HKLM Policies under Microsoft\\Edge and EdgeUpdate.");
+                    ui.colored_label(egui::Color32::YELLOW, "⚠ Requires Administrator. Restart or logoff may be required.");
+                    ui.hyperlink("https://winutil.christitus.com/dev/tweaks/essential-tweaks/edgedebloat");
+                });
+            });
+            if resp.clicked() {
+                if let Some(guard) = commands::try_start_global_op("WPFTweaks Edge Debloat", log) {
+                    let log_clone = log.clone();
+                    thread::spawn(move || {
+                        let _guard = guard;
+                        let result = crate::commands::wpftweaks_edge_debloat();
+                        let mut lg = log_clone.lock().unwrap();
+                        if lg.is_empty() { *lg = result; } else { *lg = format!("{}\n{}", lg, result); }
+                    });
+                }
+            }
+
+            // WPFTweaks: Disable Edge (insert after WPFTweaks Edge Debloat)
+            let resp = ui.add_enabled(!global_busy, egui::Button::new("⛔ Disable Edge"));
+            resp.clone().on_hover_ui(|ui| {
+                ui.vertical(|ui| {
+                    ui.colored_label(egui::Color32::from_rgb(255, 100, 100), "Disables Microsoft Edge via registry (DisallowRun)");
+                    ui.label("• Adds DisallowRun entry to block msedge.exe for current user");
+                    ui.label("• Enables DisallowRun policy under HKLM (DisallowRun = 1)");
+                    ui.colored_label(egui::Color32::YELLOW, "⚠ Requires Administrator. May require logoff / restart of explorer.");
+                });
+            });
+            if resp.clicked() {
+                if let Some(guard) = commands::try_start_global_op("WPFTweaks Disable Edge", log) {
+                    let log_clone = log.clone();
+                    thread::spawn(move || {
+                        let _guard = guard;
+                        let result = crate::commands::wpftweaks_disable_edge();
+                        let mut lg = log_clone.lock().unwrap();
+                        if lg.is_empty() { *lg = result; } else { *lg = format!("{}\n{}", lg, result); }
+                    });
+                }
+            }
+
             let resp = ui.add_enabled(!global_busy, egui::Button::new("🚫 Disable Microsoft Copilot"));
             resp.clone().on_hover_ui(|ui| {
                 ui.vertical(|ui| {

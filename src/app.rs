@@ -60,7 +60,7 @@ pub struct App {
     popup_message: String,
 
     // stare pentru Customize Preferences (persistată în App)
-    pub start_with_windows: bool,
+    // pub start_with_windows: bool,
     pub enable_tooltips: bool,
     pub auto_check_updates: bool,
 
@@ -104,7 +104,7 @@ impl Default for App {
             popup_message: String::new(),
 
             // inițializări noi:
-            start_with_windows: false,
+            // start_with_windows: false,
             enable_tooltips: true,
             auto_check_updates: true,
             mouse_accel_enabled: false,
@@ -339,7 +339,7 @@ impl eframe::App for App {
                                 &self.log,
                                 &mut self.show_popup,
                                 &mut self.popup_message,
-                                &mut self.start_with_windows,
+                                // &mut self.start_with_windows,
                                 &mut self.enable_tooltips,
                                 &mut self.auto_check_updates,
                                 &mut self.general_prefs_loaded,

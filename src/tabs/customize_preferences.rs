@@ -1,17 +1,45 @@
 // src/tabs/customize_preferences.rs
-use std::process::Command;
+//
+// Rewritten file: same UI and behavior, but all console launches (reg, powershell, rundll32, manage-bde)
+// are executed via a helper that hides the console window on Windows (CREATE_NO_WINDOW + PowerShell -WindowStyle Hidden).
+// Fallback for Taskbar Widgets uses .reg + elevated regedit (UAC cannot be hidden).
+//
+// Notes:
+// - This file is Windows-first. On non-windows targets, run_hidden returns an error and registry ops will fail gracefully.
+// - Keeps persistence to preferences.json as before.
+
 use std::sync::{Arc, Mutex};
 use eframe::egui::{self, RichText};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use dirs;
-use std::{fs, io};
+use std::{fs, io, env, time::{SystemTime, UNIX_EPOCH}};
+
+#[cfg(target_os = "windows")]
+use std::os::windows::process::CommandExt;
+use std::process::Output;
+
+const CREATE_NO_WINDOW: u32 = 0x08000000;
+
+fn run_hidden(cmd: &str, args: &[&str]) -> Result<Output, String> {
+    #[cfg(target_os = "windows")]
+    {
+        std::process::Command::new(cmd)
+            .args(args)
+            .creation_flags(CREATE_NO_WINDOW)
+            .output()
+            .map_err(|e| format!("failed to spawn {}: {}", cmd, e))
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        Err(format!("{} is not supported on this platform", cmd))
+    }
+}
 
 fn reg_query_value(path: &str, value_name: &str) -> Option<String> {
-    let out = Command::new("reg")
-        .args(&["query", path, "/v", value_name])
-        .output()
-        .ok()?;
+    // Use reg.exe but hidden
+    let args = ["query", path, "/v", value_name];
+    let out = run_hidden("reg", &args).ok()?;
     if !out.status.success() {
         return None;
     }
@@ -116,10 +144,8 @@ fn set_mouse_accel_in_registry(enabled: bool) -> Result<String, String> {
     let mut combined = String::new();
     let props = [("MouseSpeed", ms), ("MouseThreshold1", t1), ("MouseThreshold2", t2)];
     for (name, val) in props.iter() {
-        let out = Command::new("reg")
-            .args(&["add", r#"HKCU\Control Panel\Mouse"#, "/v", name, "/t", "REG_SZ", "/d", val, "/f"])
-            .output()
-            .map_err(|e| format!("failed to spawn reg: {}", e))?;
+        let args = ["add", r#"HKCU\Control Panel\Mouse"#, "/v", name, "/t", "REG_SZ", "/d", val, "/f"];
+        let out = run_hidden("reg", &args).map_err(|e| format!("failed to spawn reg: {}", e))?;
         if !out.status.success() {
             combined.push_str(&format!("{}: err: {}\n", name, String::from_utf8_lossy(&out.stderr)));
         } else {
@@ -154,10 +180,8 @@ fn set_numlock_in_registry(enabled: bool) -> Result<String, String> {
         (r#"HKU\.DEFAULT\Control Panel\Keyboard"#, "InitialKeyboardIndicators"),
     ];
     for (path, name) in targets.iter() {
-        let out = Command::new("reg")
-            .args(&["add", path, "/v", name, "/t", "REG_SZ", "/d", value, "/f"])
-            .output()
-            .map_err(|e| format!("failed to spawn reg: {}", e))?;
+        let args = ["add", path, "/v", name, "/t", "REG_SZ", "/d", value, "/f"];
+        let out = run_hidden("reg", &args).map_err(|e| format!("failed to spawn reg: {}", e))?;
         if !out.status.success() {
             combined.push_str(&format!("{}: err: {}\n", path, String::from_utf8_lossy(&out.stderr)));
         } else {
@@ -175,20 +199,18 @@ fn read_taskbar_search_from_registry() -> Option<bool> {
 
 fn set_taskbar_search_in_registry(enabled: bool) -> Result<String, String> {
     let value = if enabled { "1" } else { "0" };
-    let out = Command::new("reg")
-        .args(&[
-            "add",
-            r#"HKCU\Software\Microsoft\Windows\CurrentVersion\Search\"#,
-            "/v",
-            "SearchboxTaskbarMode",
-            "/t",
-            "REG_DWORD",
-            "/d",
-            value,
-            "/f",
-        ])
-        .output()
-        .map_err(|e| format!("failed to spawn reg: {}", e))?;
+    let args = [
+        "add",
+        r#"HKCU\Software\Microsoft\Windows\CurrentVersion\Search\"#,
+        "/v",
+        "SearchboxTaskbarMode",
+        "/t",
+        "REG_DWORD",
+        "/d",
+        value,
+        "/f",
+    ];
+    let out = run_hidden("reg", &args).map_err(|e| format!("failed to spawn reg: {}", e))?;
     if !out.status.success() {
         Err(format!("{}", String::from_utf8_lossy(&out.stderr)))
     } else {
@@ -203,16 +225,68 @@ fn read_taskbar_widgets_from_registry() -> Option<bool> {
 }
 
 fn set_taskbar_widgets_in_registry(enabled: bool) -> Result<String, String> {
+    // First attempt: use reg.exe (fast, hidden when possible)
     let value = if enabled { "1" } else { "0" };
-    let out = Command::new("reg")
-        .args(&["add", r#"HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced"#, "/v", "TaskbarDa", "/t", "REG_DWORD", "/d", value, "/f"])
-        .output()
-        .map_err(|e| format!("failed to spawn reg: {}", e))?;
-    if !out.status.success() {
-        Err(format!("{}", String::from_utf8_lossy(&out.stderr)))
-    } else {
-        Ok(String::from_utf8_lossy(&out.stdout).to_string())
+    let args = ["add", r#"HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced"#, "/v", "TaskbarDa", "/t", "REG_DWORD", "/d", value, "/f"];
+    let out = run_hidden("reg", &args).map_err(|e| format!("failed to spawn reg: {}", e))?;
+
+    if out.status.success() {
+        return Ok(String::from_utf8_lossy(&out.stdout).to_string());
     }
+
+    // If reg.exe failed, inspect stderr. If it's an access denied error, try fallback via .reg + regedit elevated.
+    let stderr = String::from_utf8_lossy(&out.stderr).to_string();
+    if !stderr.to_lowercase().contains("access is denied") {
+        // Not the access-denied case we expect — return original error
+        return Err(stderr);
+    }
+
+    // Fallback: write .reg and import with regedit elevated (UAC unavoidable)
+    let dw: u32 = if enabled { 1 } else { 0 };
+    let hex = format!("{:08x}", dw);
+    let reg_text = format!(
+        "Windows Registry Editor Version 5.00\r\n\r\n[HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced]\r\n\"TaskbarDa\"=dword:{}\r\n",
+        hex
+    );
+
+    let mut tmp = env::temp_dir();
+    let ts = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_millis();
+    tmp.push(format!("ewt_taskbar_widgets_{}.reg", ts));
+
+    if let Err(e) = fs::write(&tmp, reg_text) {
+        return Err(format!("Failed to write temporary .reg file: {}", e));
+    }
+
+    // Use PowerShell Start-Process to launch regedit elevated and wait
+    // Command: powershell -NoProfile -NonInteractive -WindowStyle Hidden -Command "Start-Process regedit.exe -ArgumentList '/s','C:\path\to\file.reg' -Verb runas -Wait"
+    let ps_cmd = format!(
+        "Start-Process regedit.exe -ArgumentList '/s','{}' -Verb runas -Wait",
+        tmp.display()
+    );
+
+    let ps_args = [
+        "-NoProfile",
+        "-NonInteractive",
+        "-WindowStyle",
+        "Hidden",
+        "-Command",
+        &ps_cmd,
+    ];
+    let ps_out = run_hidden("powershell", &ps_args).map_err(|e| format!("failed to spawn PowerShell for regedit fallback: {}", e))?;
+
+    if !ps_out.status.success() {
+        let ps_stderr = String::from_utf8_lossy(&ps_out.stderr).to_string();
+        let _ = fs::remove_file(&tmp);
+        return Err(format!("Failed to import .reg via elevated regedit: {}\nps_err: {}", stderr, ps_stderr));
+    }
+
+    // best-effort: refresh per-user system params (may not always work)
+    let _ = run_hidden("rundll32.exe", &["user32.dll,UpdatePerUserSystemParameters"]);
+
+    // cleanup temp file (best-effort)
+    let _ = fs::remove_file(&tmp);
+
+    Ok(format!("Imported .reg via regedit (fallback)."))
 }
 
 // SNAP WINDOW
@@ -223,10 +297,8 @@ fn read_snap_from_registry() -> Option<bool> {
 
 fn set_snap_in_registry(enabled: bool) -> Result<String, String> {
     let value = if enabled { "1" } else { "0" };
-    let out = Command::new("reg")
-        .args(&["add", r#"HKCU\Control Panel\Desktop"#, "/v", "WindowArrangementActive", "/t", "REG_SZ", "/d", value, "/f"])
-        .output()
-        .map_err(|e| format!("failed to spawn reg: {}", e))?;
+    let args = ["add", r#"HKCU\Control Panel\Desktop"#, "/v", "WindowArrangementActive", "/t", "REG_SZ", "/d", value, "/f"];
+    let out = run_hidden("reg", &args).map_err(|e| format!("failed to spawn reg: {}", e))?;
     if !out.status.success() {
         Err(format!("{}", String::from_utf8_lossy(&out.stderr)))
     } else {
@@ -242,10 +314,8 @@ fn read_sticky_from_registry() -> Option<bool> {
 
 fn set_sticky_in_registry(enabled: bool) -> Result<String, String> {
     let value = if enabled { "510" } else { "58" };
-    let out = Command::new("reg")
-        .args(&["add", r#"HKCU\Control Panel\Accessibility\StickyKeys"#, "/v", "Flags", "/t", "REG_SZ", "/d", value, "/f"])
-        .output()
-        .map_err(|e| format!("failed to spawn reg: {}", e))?;
+    let args = ["add", r#"HKCU\Control Panel\Accessibility\StickyKeys"#, "/v", "Flags", "/t", "REG_SZ", "/d", value, "/f"];
+    let out = run_hidden("reg", &args).map_err(|e| format!("failed to spawn reg: {}", e))?;
     if !out.status.success() {
         Err(format!("{}", String::from_utf8_lossy(&out.stderr)))
     } else {
@@ -261,10 +331,8 @@ fn read_taskview_from_registry() -> Option<bool> {
 
 fn set_taskview_in_registry(enabled: bool) -> Result<String, String> {
     let value = if enabled { "1" } else { "0" };
-    let out = Command::new("reg")
-        .args(&["add", r#"HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced"#, "/v", "ShowTaskViewButton", "/t", "REG_DWORD", "/d", value, "/f"])
-        .output()
-        .map_err(|e| format!("failed to spawn reg: {}", e))?;
+    let args = ["add", r#"HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced"#, "/v", "ShowTaskViewButton", "/t", "REG_DWORD", "/d", value, "/f"];
+    let out = run_hidden("reg", &args).map_err(|e| format!("failed to spawn reg: {}", e))?;
     if !out.status.success() {
         Err(format!("{}", String::from_utf8_lossy(&out.stderr)))
     } else {
@@ -280,10 +348,8 @@ fn read_verbose_logon_from_registry() -> Option<bool> {
 
 fn set_verbose_logon_in_registry(enabled: bool) -> Result<String, String> {
     let value = if enabled { "1" } else { "0" };
-    let out = Command::new("reg")
-        .args(&["add", r#"HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System"#, "/v", "VerboseStatus", "/t", "REG_DWORD", "/d", value, "/f"])
-        .output()
-        .map_err(|e| format!("failed to spawn reg: {}", e))?;
+    let args = ["add", r#"HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System"#, "/v", "VerboseStatus", "/t", "REG_DWORD", "/d", value, "/f"];
+    let out = run_hidden("reg", &args).map_err(|e| format!("failed to spawn reg: {}", e))?;
     if !out.status.success() {
         Err(format!("{}", String::from_utf8_lossy(&out.stderr)))
     } else {
@@ -293,7 +359,7 @@ fn set_verbose_logon_in_registry(enabled: bool) -> Result<String, String> {
 
 // BITLOCKER
 fn read_bitlocker_protection_status() -> Option<bool> {
-    let out = Command::new("manage-bde").args(&["-status", "C:"]).output().ok()?;
+    let out = run_hidden("manage-bde", &["-status", "C:"]).ok()?;
     if !out.status.success() { return None; }
     let s = String::from_utf8_lossy(&out.stdout).to_string();
     for line in s.lines() {
@@ -308,7 +374,7 @@ fn read_bitlocker_protection_status() -> Option<bool> {
 
 fn set_bitlocker_protection(enable: bool) -> Result<String, String> {
     let cmd = if enable { vec!["-on", "C:"] } else { vec!["-off", "C:"] };
-    let out = Command::new("manage-bde").args(&cmd).output().map_err(|e| format!("failed to spawn manage-bde: {}", e))?;
+    let out = run_hidden("manage-bde", &cmd.iter().map(|s| *s).collect::<Vec<&str>>()).map_err(|e| format!("failed to spawn manage-bde: {}", e))?;
     if !out.status.success() {
         Err(format!("{}", String::from_utf8_lossy(&out.stderr)))
     } else {
@@ -325,20 +391,16 @@ fn set_startup_enabled(enabled: bool) -> Result<String, String> {
     if enabled {
         let exe = std::env::current_exe().map_err(|e| format!("current_exe error: {}", e))?;
         let exe_s = exe.to_string_lossy();
-        let out = Command::new("reg")
-            .args(&["add", key, "/v", name, "/t", "REG_SZ", "/d", exe_s.as_ref(), "/f"])
-            .output()
-            .map_err(|e| format!("failed to spawn reg: {}", e))?;
+        let args = ["add", key, "/v", name, "/t", "REG_SZ", "/d", exe_s.as_ref(), "/f"];
+        let out = run_hidden("reg", &args).map_err(|e| format!("failed to spawn reg: {}", e))?;
         if !out.status.success() {
             Err(format!("{}", String::from_utf8_lossy(&out.stderr)))
         } else {
             Ok(String::from_utf8_lossy(&out.stdout).to_string())
         }
     } else {
-        let out = Command::new("reg")
-            .args(&["delete", key, "/v", name, "/f"])
-            .output()
-            .map_err(|e| format!("failed to spawn reg: {}", e))?;
+        let args = ["delete", key, "/v", name, "/f"];
+        let out = run_hidden("reg", &args).map_err(|e| format!("failed to spawn reg: {}", e))?;
         if !out.status.success() {
             // deletion fails when key missing - ignore that as OK
             let stderr = String::from_utf8_lossy(&out.stderr).to_string();

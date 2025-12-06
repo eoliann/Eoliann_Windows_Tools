@@ -42,7 +42,7 @@ Now install it on your system!
 ### INFO
 <img width="1402" height="1104" alt="Info-1 2 0" src="https://github.com/user-attachments/assets/3ef5d6a1-4b5b-416d-82c8-5a11490ad3d1" />
 
-- `whoami` → displays the current user![Uploading Info-1.2.0.png…]()
+- `whoami` → displays the current user
 - `ipconfig` → display network settings
 - `systeminfo` → system details
 - `tasklist` → active processes

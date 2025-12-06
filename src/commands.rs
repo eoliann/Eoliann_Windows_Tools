@@ -2252,3 +2252,287 @@ pub fn wpftweaks_disable_edge() -> String {
 
     crate::utils::run_powershell(ps)
 }
+
+
+
+
+
+
+// // --- REQUIREMENTS: keep only one set of these imports at the top of the file ---
+// use winreg::enums::*;
+// use winreg::RegKey;
+
+// // --- Explorer Tabs overrides (single copy only) ---
+// const EXPLORER_TABS_IDS: &[u32] = &[37634385u32, 39145991u32, 36354489u32];
+// const OVERRIDES_BASE_PATH: &str = r"SYSTEM\CurrentControlSet\Control\FeatureManagement\Overrides\4";
+
+// fn write_override_for_feature(feature_id: u32, enabled: bool) -> Result<String, String> {
+//     let enabled_state: u32 = if enabled { 2 } else { 1 };
+//     let enabled_state_opts: u32 = if enabled { 0 } else { 1 };
+
+//     let hklm = RegKey::predef(HKEY_LOCAL_MACHINE);
+//     let key_path = format!(r"{}\{}", OVERRIDES_BASE_PATH, feature_id);
+
+//     let (key, _disp) = hklm
+//         .create_subkey_with_flags(&key_path, KEY_WRITE | KEY_WOW64_64KEY)
+//         .map_err(|e| format!("Failed to open/create registry key {}: {}", key_path, e))?;
+
+//     key.set_value("EnabledState", &enabled_state)
+//         .map_err(|e| format!("Failed to set EnabledState: {}", e))?;
+//     key.set_value("EnabledStateOptions", &enabled_state_opts)
+//         .map_err(|e| format!("Failed to set EnabledStateOptions: {}", e))?;
+
+//     // best-effort optional values
+//     let _ = key.set_value("Variant", &0u32);
+//     let _ = key.set_value("VariantPayload", &0u32);
+//     let _ = key.set_value("VariantPayloadKind", &0u32);
+
+//     Ok(format!("Feature {} -> registry updated (EnabledState={})", feature_id, enabled_state))
+// }
+
+// pub fn enable_explorer_tabs() -> Result<String, String> {
+//     let mut out = String::new();
+//     for &id in EXPLORER_TABS_IDS {
+//         match write_override_for_feature(id, true) {
+//             Ok(s) => out.push_str(&format!("OK: {}\n", s)),
+//             Err(e) => out.push_str(&format!("ERR: feature {} -> {}\n", id, e)),
+//         }
+//     }
+//     out.push_str("Notă: este posibil să fie necesar restart Explorer / reboot pentru aplicare.\n");
+//     Ok(out)
+// }
+
+// pub fn disable_explorer_tabs() -> Result<String, String> {
+//     let mut out = String::new();
+//     for &id in EXPLORER_TABS_IDS {
+//         match write_override_for_feature(id, false) {
+//             Ok(s) => out.push_str(&format!("OK: {}\n", s)),
+//             Err(e) => out.push_str(&format!("ERR: feature {} -> {}\n", id, e)),
+//         }
+//     }
+//     out.push_str("Notă: este posibil să fie necesar restart Explorer / reboot pentru aplicare.\n");
+//     Ok(out)
+// }
+
+// pub fn remove_explorer_tabs_overrides() -> Result<String, String> {
+//     let hklm = RegKey::predef(HKEY_LOCAL_MACHINE);
+//     let mut out = String::new();
+//     for &id in EXPLORER_TABS_IDS {
+//         let key_path = format!(r"{}\{}", OVERRIDES_BASE_PATH, id);
+//         match hklm.delete_subkey_all(&key_path) {
+//             Ok(_) => out.push_str(&format!("Removed override key for {}\n", id)),
+//             Err(e) => out.push_str(&format!("Failed to remove {}: {}\n", id, e)),
+//         }
+//     }
+//     out.push_str("Notă: unele modificări pot fi restabilite de Task Scheduler; reboot recomandat.\n");
+//     Ok(out)
+// }
+
+// // --- Helper: read EnabledState if present ---
+// fn read_enabled_state_for_feature(feature_id: u32) -> Option<u32> {
+//     let hklm = RegKey::predef(HKEY_LOCAL_MACHINE);
+//     let key_path = format!(r"{}\{}", OVERRIDES_BASE_PATH, feature_id);
+//     match hklm.open_subkey_with_flags(&key_path, KEY_READ | KEY_WOW64_64KEY) {
+//         Ok(k) => k.get_value::<u32, _>("EnabledState").ok(),
+//         Err(_) => None,
+//     }
+// }
+
+// /// Toggle wrapper expected by UI: detect current majority state and invert it.
+// pub fn toggle_explorer_tabs() -> Result<String, String> {
+//     let mut enabled_count = 0usize;
+//     let mut known_count = 0usize;
+//     for &id in EXPLORER_TABS_IDS {
+//         if let Some(v) = read_enabled_state_for_feature(id) {
+//             known_count += 1;
+//             if v == 2 { enabled_count += 1; }
+//         }
+//     }
+
+//     // Decide: if majority of known overrides are enabled => disable; else enable.
+//     let should_disable = if known_count == 0 {
+//         // no overrides present -> assume features are disabled by default -> enable
+//         false
+//     } else {
+//         enabled_count * 2 >= known_count
+//     };
+
+//     if should_disable {
+//         disable_explorer_tabs()
+//     } else {
+//         enable_explorer_tabs()
+//     }
+// }
+
+
+
+use std::process::Command;
+// use std::thread;
+use std::time::Duration;
+use winreg::enums::*;
+use winreg::RegKey;
+
+// Explorer Tabs ids and base path (keep only one copy in the file)
+const EXPLORER_TABS_IDS: &[u32] = &[37634385u32, 39145991u32, 36354489u32];
+const OVERRIDES_BASE_PATH: &str = r"SYSTEM\CurrentControlSet\Control\FeatureManagement\Overrides\4";
+
+fn write_override_for_feature(feature_id: u32, enabled: bool) -> Result<String, String> {
+    let enabled_state: u32 = if enabled { 2 } else { 1 };
+    let enabled_state_opts: u32 = if enabled { 0 } else { 1 };
+
+    let hklm = RegKey::predef(HKEY_LOCAL_MACHINE);
+    let key_path = format!(r"{}\{}", OVERRIDES_BASE_PATH, feature_id);
+
+    let (key, _disp) = hklm
+        .create_subkey_with_flags(&key_path, KEY_WRITE | KEY_WOW64_64KEY)
+        .map_err(|e| format!("Failed to open/create registry key {}: {}", key_path, e))?;
+
+    key.set_value("EnabledState", &enabled_state)
+        .map_err(|e| format!("Failed to set EnabledState: {}", e))?;
+    key.set_value("EnabledStateOptions", &enabled_state_opts)
+        .map_err(|e| format!("Failed to set EnabledStateOptions: {}", e))?;
+
+    // best-effort optional values
+    let _ = key.set_value("Variant", &0u32);
+    let _ = key.set_value("VariantPayload", &0u32);
+    let _ = key.set_value("VariantPayloadKind", &0u32);
+
+    Ok(format!("Feature {} -> registry updated (EnabledState={})", feature_id, enabled_state))
+}
+
+/// Attempt to restart Explorer (best-effort). Returns a short status string.
+fn restart_explorer() -> Result<String, String> {
+    // Kill current explorer processes (best-effort)
+    match Command::new("taskkill").args(&["/f", "/im", "explorer.exe"]).output() {
+        Ok(o) => {
+            // ignore exit code; continue to start explorer
+            let _ = o;
+        }
+        Err(e) => {
+            // non-fatal, but report
+            return Err(format!("Failed to run taskkill for explorer: {}", e));
+        }
+    }
+
+    // small pause to allow processes to terminate
+    thread::sleep(Duration::from_millis(350));
+
+    // Start a new explorer instance
+    match Command::new("explorer.exe").spawn() {
+        Ok(_ch) => Ok("Explorer restarted (taskkill + explorer start).".to_string()),
+        Err(e) => Err(format!("Failed to start explorer.exe: {}", e)),
+    }
+}
+
+pub fn enable_explorer_tabs() -> Result<String, String> {
+    let mut out = String::new();
+    let mut any_err = false;
+
+    for &id in EXPLORER_TABS_IDS {
+        match write_override_for_feature(id, true) {
+            Ok(s) => out.push_str(&format!("OK: {}\n", s)),
+            Err(e) => {
+                any_err = true;
+                out.push_str(&format!("ERR: feature {} -> {}\n", id, e));
+            }
+        }
+    }
+
+    out.push_str("Note: Explorer may need to be restarted or the system rebooted for changes to take effect.\n");
+
+    // Try to restart Explorer automatically (best-effort). Append status to output.
+    match restart_explorer() {
+        Ok(msg) => out.push_str(&format!("{}\n", msg)),
+        Err(err) => out.push_str(&format!("Warning: automatic Explorer restart failed: {}\n", err)),
+    }
+
+    if any_err { Err(out) } else { Ok(out) }
+}
+
+pub fn disable_explorer_tabs() -> Result<String, String> {
+    let mut out = String::new();
+    let mut any_err = false;
+
+    for &id in EXPLORER_TABS_IDS {
+        match write_override_for_feature(id, false) {
+            Ok(s) => out.push_str(&format!("OK: {}\n", s)),
+            Err(e) => {
+                any_err = true;
+                out.push_str(&format!("ERR: feature {} -> {}\n", id, e));
+            }
+        }
+    }
+
+    out.push_str("Note: Explorer may need to be restarted or the system rebooted for changes to take effect.\n");
+
+    // Try to restart Explorer automatically (best-effort). Append status to output.
+    match restart_explorer() {
+        Ok(msg) => out.push_str(&format!("{}\n", msg)),
+        Err(err) => out.push_str(&format!("Warning: automatic Explorer restart failed: {}\n", err)),
+    }
+
+    if any_err { Err(out) } else { Ok(out) }
+}
+
+pub fn remove_explorer_tabs_overrides() -> Result<String, String> {
+    let hklm = RegKey::predef(HKEY_LOCAL_MACHINE);
+    let mut out = String::new();
+    let mut any_err = false;
+
+    for &id in EXPLORER_TABS_IDS {
+        let key_path = format!(r"{}\{}", OVERRIDES_BASE_PATH, id);
+        match hklm.delete_subkey_all(&key_path) {
+            Ok(_) => out.push_str(&format!("Removed override key for {}\n", id)),
+            Err(e) => {
+                any_err = true;
+                out.push_str(&format!("Failed to remove {}: {}\n", id, e));
+            }
+        }
+    }
+
+    out.push_str("Note: some changes may be restored by Task Scheduler / management agents; reboot recommended.\n");
+
+    // Try to restart Explorer automatically (best-effort). Append status to output.
+    match restart_explorer() {
+        Ok(msg) => out.push_str(&format!("{}\n", msg)),
+        Err(err) => out.push_str(&format!("Warning: automatic Explorer restart failed: {}\n", err)),
+    }
+
+    if any_err { Err(out) } else { Ok(out) }
+}
+
+// Helper: read EnabledState if present
+fn read_enabled_state_for_feature(feature_id: u32) -> Option<u32> {
+    let hklm = RegKey::predef(HKEY_LOCAL_MACHINE);
+    let key_path = format!(r"{}\{}", OVERRIDES_BASE_PATH, feature_id);
+    match hklm.open_subkey_with_flags(&key_path, KEY_READ | KEY_WOW64_64KEY) {
+        Ok(k) => k.get_value::<u32, _>("EnabledState").ok(),
+        Err(_) => None,
+    }
+}
+
+/// Toggle wrapper expected by UI: detect current majority state and invert it.
+pub fn toggle_explorer_tabs() -> Result<String, String> {
+    let mut enabled_count = 0usize;
+    let mut known_count = 0usize;
+    for &id in EXPLORER_TABS_IDS {
+        if let Some(v) = read_enabled_state_for_feature(id) {
+            known_count += 1;
+            if v == 2 { enabled_count += 1; }
+        }
+    }
+
+    // Decide: if majority of known overrides are enabled => disable; else enable.
+    let should_disable = if known_count == 0 {
+        // no overrides present -> assume features are disabled by default -> enable
+        false
+    } else {
+        enabled_count * 2 >= known_count
+    };
+
+    if should_disable {
+        disable_explorer_tabs()
+    } else {
+        enable_explorer_tabs()
+    }
+}

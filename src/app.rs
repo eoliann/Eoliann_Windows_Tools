@@ -1,11 +1,13 @@
 use std::sync::{Arc, Mutex};
+use std::collections::HashMap;
 
 use eframe::egui;
+use crate::tabs::info::InfoState;
 use egui::{Color32, RichText, Vec2};
 
 use crate::tabs::{info, tools, install, winapp_removal, customize_preferences, settings};
+use eframe::egui::TextureHandle;
 
-// ---------------- THEME (verde fluorescent) ----------------
 fn apply_neon_theme(ctx: &egui::Context) {
     let mut style = (*ctx.style()).clone();
 
@@ -52,19 +54,17 @@ enum Page {
 
 pub struct App {
     pub latest_release: Option<crate::utils::GithubRelease>,
-    pub update_available: bool,      // rămâne sursa de adevăr pentru notificări
-    pub show_update_window: bool,    // control vizibilitate popup update (separat)
+    pub update_available: bool,
+    pub show_update_window: bool,
     page: Page,
     log: Arc<Mutex<String>>,
     show_popup: bool,
     popup_message: String,
 
-    // stare pentru Customize Preferences (persistată în App)
-    // pub start_with_windows: bool,
+    // prefs
     pub enable_tooltips: bool,
     pub auto_check_updates: bool,
 
-    // stare pentru Customize Preferences (persistată în App)
     pub mouse_accel_enabled: bool,
     pub mouse_prefs_loaded: bool,
     pub numlock_enabled: bool,
@@ -77,17 +77,20 @@ pub struct App {
     pub sticky_prefs_loaded: bool,
     pub taskview_enabled: bool,
     pub taskview_prefs_loaded: bool,
-    // taskbar widgets
     pub taskbar_widgets_enabled: bool,
     pub taskbar_widgets_prefs_loaded: bool,
 
-    // verbose logon (system / HKLM)
     pub verbose_logon_enabled: bool,
     pub verbose_logon_prefs_loaded: bool,
 
-    // bitlocker
     pub bitlocker_protection_on: bool,
     pub bitlocker_prefs_loaded: bool,
+
+    // Info tab state
+    pub info_state: Arc<Mutex<InfoState>>,
+
+    // Icons: textures loaded lazily at first `update` call
+    pub icons: HashMap<String, TextureHandle>,
 
     pub general_prefs_loaded: bool,
 }
@@ -102,9 +105,6 @@ impl Default for App {
             log: Arc::new(Mutex::new(String::new())),
             show_popup: false,
             popup_message: String::new(),
-
-            // inițializări noi:
-            // start_with_windows: false,
             enable_tooltips: true,
             auto_check_updates: true,
             mouse_accel_enabled: false,
@@ -121,18 +121,16 @@ impl Default for App {
             taskview_prefs_loaded: false,
             taskbar_widgets_enabled: false,
             taskbar_widgets_prefs_loaded: false,
-
             verbose_logon_enabled: false,
             verbose_logon_prefs_loaded: false,
-
             bitlocker_protection_on: false,
             bitlocker_prefs_loaded: false,
-
+            info_state: Arc::new(Mutex::new(InfoState::new())),
+            icons: HashMap::new(),
             general_prefs_loaded: false,
         }
     }
 }
-
 
 impl App {
     pub fn new() -> Self {
@@ -151,7 +149,8 @@ impl App {
         Self {
             latest_release,
             update_available,
-            show_update_window: update_available, // afișăm popup inițial doar dacă există update
+            show_update_window: update_available,
+            info_state: Arc::new(Mutex::new(InfoState::new())),
             ..Self::default()
         }
     }
@@ -162,6 +161,37 @@ impl App {
         }
     }
 
+    /// Ensure icons are loaded into `self.icons`. Called from `update` once `ctx` is available.
+    fn ensure_icons_loaded(&mut self, ctx: &egui::Context) {
+        if !self.icons.is_empty() {
+            return;
+        }
+
+        // helper defined below (load_png_from_bytes)
+        macro_rules! try_insert {
+            ($key:expr, $bytes:expr) => {
+                if let Some(tx) = load_png_from_bytes(ctx, $key, $bytes) {
+                    self.icons.insert($key.to_string(), tx);
+                } else {
+                    eprintln!("Failed to load icon: {}", $key);
+                }
+            };
+        }
+
+        // Paths are relative to src/, so include_bytes!("../assets/icons/...")
+        try_insert!("windows", include_bytes!("../assets/icons/windows.png") as &'static [u8]);
+        try_insert!("system", include_bytes!("../assets/icons/system.png") as &'static [u8]);
+        try_insert!("processor", include_bytes!("../assets/icons/processor.png") as &'static [u8]);
+        try_insert!("memory", include_bytes!("../assets/icons/memory.png") as &'static [u8]);
+        try_insert!("storage", include_bytes!("../assets/icons/storage.png") as &'static [u8]);
+        try_insert!("graphics", include_bytes!("../assets/icons/graphics.png") as &'static [u8]);
+        try_insert!("apps", include_bytes!("../assets/icons/apps.png") as &'static [u8]);
+        try_insert!("processes", include_bytes!("../assets/icons/processes.png") as &'static [u8]);
+        try_insert!("services", include_bytes!("../assets/icons/services.png") as &'static [u8]);
+        try_insert!("network", include_bytes!("../assets/icons/network.png") as &'static [u8]);
+        try_insert!("performance", include_bytes!("../assets/icons/performance.png") as &'static [u8]);
+    }
+
     // -------------- SIDEBAR --------------
     fn sidebar(&mut self, ui: &mut egui::Ui) {
         ui.add_space(6.0);
@@ -169,19 +199,16 @@ impl App {
         ui.add_space(10.0);
         ui.label(format!("Version: {}", env!("CARGO_PKG_VERSION")));
 
-        // show update info if available (uses latest_release and update_available)
         if self.update_available {
             ui.horizontal(|ui| {
                 ui.colored_label(Color32::from_rgb(0, 255, 140), "⬆ Update available");
                 if ui.small_button("Open").clicked() {
-                    // păstrăm comportamentul de a deschide GitHub; dacă vrei popup în loc, schimbă aici
                     if let Some(release) = &self.latest_release {
                         let _ = webbrowser::open(release.html_url.as_str());
                     } else {
                         let _ = webbrowser::open("https://github.com/eoliann/");
                     }
                 }
-                // opțiune: buton pentru a deschide popup explicit
                 if ui.small_button("Details").clicked() {
                     self.show_update_window = true;
                 }
@@ -225,7 +252,7 @@ impl App {
             ui.separator();
 
             let button_style = egui::RichText::new("💖 Donate")
-                .color(egui::Color32::from_rgb(57, 255, 20)) // verde neon
+                .color(egui::Color32::from_rgb(57, 255, 20))
                 .strong();
 
             if ui.button(button_style).clicked() {
@@ -244,7 +271,7 @@ impl App {
 
         egui::ScrollArea::vertical()
             .auto_shrink([false; 2])
-            .stick_to_bottom(true) // 🔥 stă lipit jos
+            .stick_to_bottom(true)
             .show(ui, |ui| {
                 ui.label(egui::RichText::new(text).monospace());
             });
@@ -255,14 +282,15 @@ impl eframe::App for App {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         apply_neon_theme(ctx);
 
-        // Sidebar (lăsăm neschimbat)
+        // Ensure icons are loaded once ctx is available
+        self.ensure_icons_loaded(ctx);
+
         egui::SidePanel::left("side_panel").show(ctx, |ui| {
             egui::ScrollArea::vertical().auto_shrink([false; 2]).show(ui, |ui| {
                 self.sidebar(ui);
             });
         });
 
-        // --- Update popup (folosește flag separat show_update_window) ---
         if self.show_update_window {
             egui::Window::new("Update Available")
                 .collapsible(false)
@@ -280,13 +308,11 @@ impl eframe::App for App {
                         }
                     }
                     if ui.button("Close").clicked() {
-                        // FIX: închidem doar popup-ul, nu ascundem notificările globale
                         self.show_update_window = false;
                     }
                 });
         }
 
-        // === 1) Bottom panel FIRST (rezervă spațiul) ===
         egui::TopBottomPanel::bottom("log_bottom_panel")
             .resizable(true)
             .default_height(220.0)
@@ -306,14 +332,12 @@ impl eframe::App for App {
                 });
 
                 egui::Frame::group(ui.style()).show(ui, |ui| {
-                    // reutilizăm log_view care conține ScrollArea + stick_to_bottom
                     self.log_view(ui);
                 });
             });
 
-        // === 2) Central panel AFTER bottom (va primi doar spațiul rămas) ===
         egui::CentralPanel::default().show(ctx, |ui| {
-            let avail_h = ui.available_height(); // acum corect — după bottom panel
+            let avail_h = ui.available_height();
             egui::ScrollArea::vertical()
                 .auto_shrink([false; 2])
                 .max_height(avail_h)
@@ -324,7 +348,7 @@ impl eframe::App for App {
                                 show_hidden_state: false,
                                 show_file_ext_state: false,
                                 pending_reset_rx: None,
-                                reset_in_progress: false, // This field exists in ToolsState
+                                reset_in_progress: false,
                                 reset_aggressive: false,
                                 last_message: String::new(),
                             });
@@ -339,7 +363,6 @@ impl eframe::App for App {
                                 &self.log,
                                 &mut self.show_popup,
                                 &mut self.popup_message,
-                                // &mut self.start_with_windows,
                                 &mut self.enable_tooltips,
                                 &mut self.auto_check_updates,
                                 &mut self.general_prefs_loaded,
@@ -364,7 +387,7 @@ impl eframe::App for App {
                             );
                         }
                         Page::Info => {
-                            info::show_info(ui, &self.log, self.update_available, self.latest_release.as_ref());
+                            info::show_info(ui, &self.log, self.update_available, self.latest_release.as_ref(), &self.info_state, &self.icons);
                         }
                         Page::Settings => { settings::show_settings(ui, &self.log); }
                     }
@@ -373,7 +396,6 @@ impl eframe::App for App {
                 });
         });
 
-        // popup / update windows etc.
         if self.show_popup {
             egui::Window::new("Confirm / Log")
                 .collapsible(false)
@@ -382,8 +404,7 @@ impl eframe::App for App {
                 .show(ctx, |ui| {
                     ui.vertical(|ui| {
                         ui.label(&self.popup_message);
-                        
-                        // ScrollArea cu înălțime limitată - lasă spațiu pentru butoane
+
                         egui::ScrollArea::vertical()
                             .max_height(ui.available_height() - 50.0)
                             .stick_to_bottom(true)
@@ -391,16 +412,40 @@ impl eframe::App for App {
                                 let text = { self.log.lock().unwrap().clone() };
                                 ui.label(egui::RichText::new(text).monospace());
                             });
-                        
+
                         ui.add_space(10.0);
-                        
-                        // Butoanele rămân întotdeauna vizibile jos
+
                         ui.horizontal(|ui| {
                             if ui.button("Close").clicked() { self.show_popup = false; }
                             if ui.button("Clear Log").clicked() { self.clear_log(); }
                         });
                     });
                 });
+        }
+    }
+}
+
+// top of file
+use image;
+
+// ---- helper: load PNG bytes (include_bytes!) into an egui texture ----
+fn load_png_from_bytes(
+    ctx: &egui::Context,
+    name: &str,
+    bytes: &'static [u8],
+) -> Option<egui::TextureHandle> {
+    match image::load_from_memory(bytes) {
+        Ok(img) => {
+            let img = img.to_rgba8();
+            let (w, h) = (img.width() as usize, img.height() as usize);
+            let pixels = img.into_vec(); // RGBA u8
+            let color_image = egui::ColorImage::from_rgba_unmultiplied([w, h], &pixels);
+            let options = egui::TextureOptions::LINEAR;
+            Some(ctx.load_texture(name.to_owned(), color_image, options))
+        }
+        Err(err) => {
+            eprintln!("load_png_from_bytes failed for {}: {}", name, err);
+            None
         }
     }
 }

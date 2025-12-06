@@ -1,4 +1,6 @@
-// tools.rs (adaptat să folosească GLOBAL_OP_RUNNING / try_start_global_op)
+// src/tabs/tools.rs
+// Adaptare corectă a fișierului `tools.rs` — folosește direct rezultatele funcțiilor din `commands`
+// (nu mai convertim generic Result<> -> String deoarece majoritatea funcțiilor returnează String).
 use eframe::egui;
 use std::sync::{Arc, Mutex};
 use std::thread;
@@ -25,17 +27,14 @@ fn wait_for_live_completion(log: &Arc<Mutex<String>>, timeout_secs: u64) -> bool
     }
 }
 
-
 #[allow(dead_code)]
 pub struct ToolsState {
     pub show_hidden_state: bool,
     pub show_file_ext_state: bool,
-    // în struct ToolsState (sau struct-ul tău de stare)
     pub pending_reset_rx: Option<std::sync::mpsc::Receiver<String>>,
     pub reset_in_progress: bool,
     pub reset_aggressive: bool,
-    pub last_message: String, // dacă nu îl ai deja
-
+    pub last_message: String,
 }
 
 impl Default for ToolsState {
@@ -47,20 +46,18 @@ impl Default for ToolsState {
             last_message: String::new(),
             show_hidden_state: false,
             show_file_ext_state: false,
-            // --- IMPORTANT: dacă ai alte câmpuri în struct, inițializează-le explicit aici
-            // sau folosește struct update syntax după ce păstrezi valorile existente.
         }
     }
 }
 
-
-
+/// UI principal pentru tab-ul Tools.
+/// Observație: apelurile la funcțiile care streamează (.._live) rămân neschimbate.
 pub fn show_tools(
     ui: &mut egui::Ui,
     log: &Arc<Mutex<String>>,
     _show_popup: &mut bool,
     _popup_message: &mut String,
-    app_state: &mut ToolsState, // Add app_state as a mutable reference
+    app_state: &mut ToolsState,
 ) {
     ui.heading("🛠 Windows Tools");
     ui.add_space(6.0);
@@ -87,14 +84,14 @@ pub fn show_tools(
                 );
             });
         });
-        if resp.clicked() { // `resp` is not moved here, it's a copy of the Response struct
+        if resp.clicked() {
             if let Some(guard) = commands::try_start_global_op("Toggle context menu", log) {
                 let log_clone = log.clone();
                 thread::spawn(move || {
                     let _guard = guard;
-                    let out = commands::toggle_context_menu();
+                    let result = commands::toggle_context_menu();
                     let mut lg = log_clone.lock().unwrap();
-                    if lg.is_empty() { *lg = out; } else { *lg = format!("{}\n{}", lg, out); }
+                    if lg.is_empty() { *lg = result; } else { *lg = format!("{}\n{}", lg, result); }
                 });
             }
         }
@@ -207,16 +204,13 @@ pub fn show_tools(
                 if let Some(guard) = commands::try_start_global_op("System Integrity Check (SFC+DISM)", log) {
                     let log_clone = log.clone();
                     thread::spawn(move || {
-                        // păstrăm guard și apelăm funcția live care streamează în log
                         let _guard = guard;
                         commands::verify_system_integrity_live(log_clone.clone());
-                        // așteptăm finalul (cautăm SUCCESS: / ERROR:)
                         let completed = wait_for_live_completion(&log_clone, 3600); // timeout 1h
                         if !completed {
                             let mut lg = log_clone.lock().unwrap();
                             *lg = format!("{}\nERROR: System integrity check did not finish within timeout.", lg);
                         }
-                        // când thread-ul se termină, guard e droppuit și GLOBAL_OP_RUNNING = false
                     });
                 }
             }
@@ -228,7 +222,6 @@ pub fn show_tools(
     // ---- Essential Tweaks ----
     ui.group(|ui| {
         ui.label("Essential Tweaks");
-        
         ui.horizontal_wrapped(|ui| {
             // Disable ConsumerFeatures
             let resp = ui.add_enabled(!global_busy, egui::Button::new("🛡 Disable ConsumerFeatures"));
@@ -244,7 +237,7 @@ pub fn show_tools(
                     let log_clone = log.clone();
                     thread::spawn(move || {
                         let _guard = guard;
-                        let result = crate::commands::disable_consumer_features();
+                        let result = commands::disable_consumer_features();
                         let mut lg = log_clone.lock().unwrap();
                         if lg.is_empty() { *lg = result; } else { *lg = format!("{}\n{}", lg, result); }
                     });
@@ -265,7 +258,7 @@ pub fn show_tools(
                     let log_clone = log.clone();
                     thread::spawn(move || {
                         let _guard = guard;
-                        let result = crate::commands::enable_consumer_features();
+                        let result = commands::enable_consumer_features();
                         let mut lg = log_clone.lock().unwrap();
                         if lg.is_empty() { *lg = result; } else { *lg = format!("{}\n{}", lg, result); }
                     });
@@ -287,7 +280,7 @@ pub fn show_tools(
                     let log_clone = log.clone();
                     thread::spawn(move || {
                         let _guard = guard;
-                        let result = crate::commands::disable_telemetry();
+                        let result = commands::disable_telemetry();
                         let mut lg = log_clone.lock().unwrap();
                         if lg.is_empty() { *lg = result; } else { *lg = format!("{}\n{}", lg, result); }
                     });
@@ -309,7 +302,7 @@ pub fn show_tools(
                     let log_clone = log.clone();
                     thread::spawn(move || {
                         let _guard = guard;
-                        let result = crate::commands::disable_location_tracking();
+                        let result = commands::disable_location_tracking();
                         let mut lg = log_clone.lock().unwrap();
                         if lg.is_empty() { *lg = result; } else { *lg = format!("{}\n{}", lg, result); }
                     });
@@ -331,7 +324,7 @@ pub fn show_tools(
                     let log_clone = log.clone();
                     thread::spawn(move || {
                         let _guard = guard;
-                        let result = crate::commands::disable_wifi_sense();
+                        let result = commands::disable_wifi_sense();
                         let mut lg = log_clone.lock().unwrap();
                         if lg.is_empty() { *lg = result; } else { *lg = format!("{}\n{}", lg, result); }
                     });
@@ -352,7 +345,7 @@ pub fn show_tools(
                     let log_clone = log.clone();
                     thread::spawn(move || {
                         let _guard = guard;
-                        let result = crate::commands::enable_end_task_right_click();
+                        let result = commands::enable_end_task_right_click();
                         let mut lg = log_clone.lock().unwrap();
                         if lg.is_empty() { *lg = result; } else { *lg = format!("{}\n{}", lg, result); }
                     });
@@ -372,7 +365,7 @@ pub fn show_tools(
                     let log_clone = log.clone();
                     thread::spawn(move || {
                         let _guard = guard;
-                        let result = crate::commands::disable_end_task_right_click();
+                        let result = commands::disable_end_task_right_click();
                         let mut lg = log_clone.lock().unwrap();
                         if lg.is_empty() { *lg = result; } else { *lg = format!("{}\n{}", lg, result); }
                     });
@@ -394,7 +387,7 @@ pub fn show_tools(
                     let log_clone = log.clone();
                     thread::spawn(move || {
                         let _guard = guard;
-                        let result = crate::commands::disable_recall();
+                        let result = commands::disable_recall();
                         let mut lg = log_clone.lock().unwrap();
                         if lg.is_empty() { *lg = result; } else { *lg = format!("{}\n{}", lg, result); }
                     });
@@ -415,7 +408,7 @@ pub fn show_tools(
                     let log_clone = log.clone();
                     thread::spawn(move || {
                         let _guard = guard;
-                        let result = crate::commands::enable_recall();
+                        let result = commands::enable_recall();
                         let mut lg = log_clone.lock().unwrap();
                         if lg.is_empty() { *lg = result; } else { *lg = format!("{}\n{}", lg, result); }
                     });
@@ -437,7 +430,7 @@ pub fn show_tools(
                     let log_clone = log.clone();
                     thread::spawn(move || {
                         let _guard = guard;
-                        let result = crate::commands::debloat_edge();
+                        let result = commands::debloat_edge();
                         let mut lg = log_clone.lock().unwrap();
                         if lg.is_empty() { *lg = result; } else { *lg = format!("{}\n{}", lg, result); }
                     });
@@ -459,9 +452,7 @@ pub fn show_tools(
                     let log_clone = log.clone();
                     thread::spawn(move || {
                         let _guard = guard;
-                        // apelăm varianta live care streamează în log
                         crate::commands::create_restore_point_live(log_clone.clone());
-                        // așteptăm finalul
                         let completed = wait_for_live_completion(&log_clone, 1800); // timeout 30m
                         if !completed {
                             let mut lg = log_clone.lock().unwrap();
@@ -486,7 +477,7 @@ pub fn show_tools(
                     let log_clone = log.clone();
                     thread::spawn(move || {
                         let _guard = guard;
-                        let result = crate::commands::disable_activity_history();
+                        let result = commands::disable_activity_history();
                         let mut lg = log_clone.lock().unwrap();
                         if lg.is_empty() { *lg = result; } else { *lg = format!("{}\n{}", lg, result); }
                     });
@@ -507,13 +498,13 @@ pub fn show_tools(
                     let log_clone = log.clone();
                     thread::spawn(move || {
                         let _guard = guard;
-                        let result = crate::commands::enable_activity_history();
+                        let result = commands::enable_activity_history();
                         let mut lg = log_clone.lock().unwrap();
                         if lg.is_empty() { *lg = result; } else { *lg = format!("{}\n{}", lg, result); }
                     });
                 }
             }
-            
+
             // Disable Storage Sense
             let resp = ui.add_enabled(!global_busy, egui::Button::new("🗄 Disable Storage Sense"));
             resp.clone().on_hover_ui(|ui| {
@@ -529,7 +520,7 @@ pub fn show_tools(
                     let log_clone = log.clone();
                     thread::spawn(move || {
                         let _guard = guard;
-                        let result = crate::commands::disable_storage_sense();
+                        let result = commands::disable_storage_sense();
                         let mut lg = log_clone.lock().unwrap();
                         if lg.is_empty() { *lg = result; } else { *lg = format!("{}\n{}", lg, result); }
                     });
@@ -550,14 +541,14 @@ pub fn show_tools(
                     let log_clone = log.clone();
                     thread::spawn(move || {
                         let _guard = guard;
-                        let result = crate::commands::enable_storage_sense();
+                        let result = commands::enable_storage_sense();
                         let mut lg = log_clone.lock().unwrap();
                         if lg.is_empty() { *lg = result; } else { *lg = format!("{}\n{}", lg, result); }
                     });
                 }
             }
 
-            // Show Hidden Files
+            // Show Hidden Files (this function returns Result<String, _> in original code)
             let resp = ui.add_enabled(!global_busy, egui::Button::new(if app_state.show_hidden_state { "🙈 Hide Hidden Files" } else { "👁 Show Hidden Files" }));
             resp.clone().on_hover_ui(|ui| {
                 ui.vertical(|ui| {
@@ -572,14 +563,16 @@ pub fn show_tools(
                     let current_state = app_state.show_hidden_state;
                     thread::spawn(move || {
                         let _guard = guard;
-                        let result = commands::show_hidden_files(!current_state).unwrap_or_else(|e| format!("ERROR: {}", e));
+                        // show_hidden_files returns Result<String, io::Error> in original project
+                        let result = commands::show_hidden_files(!current_state)
+                            .unwrap_or_else(|e| format!("ERROR: {}", e));
                         let mut lg = log_clone.lock().unwrap();
                         if lg.is_empty() { *lg = result; } else { *lg = format!("{}\n{}", lg, result); }
                     });
                 }
             }
 
-            // Show File Extensions
+            // Show File Extensions (also returns Result)
             let resp_ext = ui.add_enabled(!global_busy, egui::Button::new(
                 if app_state.show_file_ext_state { "🔤 Hide File Extensions" } else { "🔤 Show File Extensions" }
             ));
@@ -596,17 +589,14 @@ pub fn show_tools(
                     let current_state = app_state.show_file_ext_state;
                     thread::spawn(move || {
                         let _guard = guard;
-                        let result = commands::show_file_extensions(!current_state).unwrap_or_else(|e| format!("ERROR: {}", e));
+                        let result = commands::show_file_extensions(!current_state)
+                            .unwrap_or_else(|e| format!("ERROR: {}", e));
                         let mut lg = log_clone.lock().unwrap();
                         if lg.is_empty() { *lg = result; } else { *lg = format!("{}\n{}", lg, result); }
                     });
                 }
             }
-
-
         });
-
-        
     });
 
     ui.add_space(6.0);
@@ -765,7 +755,8 @@ pub fn show_tools(
                     });
                 }
             }
-                        // Set Time to UTC (Dual Boot)
+
+            // Set Time to UTC (Dual Boot)
             let resp = ui.add_enabled(!global_busy, egui::Button::new("⌚ Set Time to UTC (Dual Boot)"));
             resp.clone().on_hover_ui(|ui| {
                 ui.vertical(|ui| {
@@ -808,7 +799,7 @@ pub fn show_tools(
                 }
             }
 
-                        // Remove OneDrive (CAUTION)
+            // Remove OneDrive (CAUTION)
             let resp = ui.add_enabled(!global_busy, egui::Button::new("⛔ Remove OneDrive"));
             resp.clone().on_hover_ui(|ui| {
                 ui.vertical(|ui| {
@@ -819,7 +810,6 @@ pub fn show_tools(
                 });
             });
             if resp.clicked() {
-                // start long-running operation
                 if let Some(guard) = commands::try_start_global_op("Remove OneDrive", log) {
                     let log_clone = log.clone();
                     thread::spawn(move || {
@@ -846,6 +836,28 @@ pub fn show_tools(
                     thread::spawn(move || {
                         let _guard = guard;
                         let result = crate::commands::install_onedrive();
+                        let mut lg = log_clone.lock().unwrap();
+                        if lg.is_empty() { *lg = result; } else { *lg = format!("{}\n{}", lg, result); }
+                    });
+                }
+            }
+
+            // ---- Explorer Tabs (enable / disable) ----
+            let resp = ui.add_enabled(!global_busy, egui::Button::new("📑 Toggle Explorer Tabs"));
+            resp.clone().on_hover_ui(|ui| {
+                ui.vertical(|ui| {
+                    ui.colored_label(egui::Color32::from_rgb(57, 255, 20), "Enable / Disable tabs in File Explorer");
+                    ui.label("• Toggles tabs feature and restarts Explorer if needed");
+                    ui.colored_label(egui::Color32::YELLOW, "⚠ Requires Administrator for registry changes (if applicable)");
+                });
+            });
+            if resp.clicked() {
+                if let Some(guard) = commands::try_start_global_op("Toggle Explorer Tabs", log) {
+                    let log_clone = log.clone();
+                    thread::spawn(move || {
+                        let _guard = guard; // Ensure the guard is dropped when the thread finishes
+                        let result = commands::toggle_explorer_tabs()
+                            .unwrap_or_else(|e| format!("ERROR: {}", e));
                         let mut lg = log_clone.lock().unwrap();
                         if lg.is_empty() { *lg = result; } else { *lg = format!("{}\n{}", lg, result); }
                     });
@@ -1045,7 +1057,6 @@ pub fn show_tools(
                     });
                 }
             }
-
         });
     });
 

@@ -4,6 +4,8 @@ mod app;
 mod tabs;
 mod commands;
 mod utils;
+mod ui_helpers;
+
 
 use eframe::egui; // pentru ViewportBuilder
 use app::App;

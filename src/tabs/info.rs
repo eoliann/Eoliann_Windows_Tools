@@ -235,14 +235,16 @@ pub fn show_info(
     icons: &HashMap<String, egui::TextureHandle>,
 ) {
     // header + logo (unchanged)
-    let ascii_logo = r#"
-    ███████╗ ██████╗ ██╗     ██╗ █████╗ ███╗   ██╗███╗   ██╗
-    ██╔════╝██╔═══██╗██║     ██║██╔══██╗████╗  ██║████╗  ██║
-    █████╗  ██║   ██║██║     ██║███████║██╔██╗ ██║██╔██╗ ██║
-    ██╔══╝  ██║   ██║██║     ██║██╔══██║██║╚██╗██║██║╚██╗██║
-    ███████╗╚██████╔╝███████╗██║██║  ██║██║ ╚████║██║ ╚████║
-    ╚══════╝ ╚═════╝ ╚══════╝╚═╝╚═╝  ╚═╝╚═╝  ╚═══╝╚═╝  ╚═══╝
-    "#;
+    // let ascii_logo = r#"
+    // ███████╗ ██████╗ ██╗     ██╗ █████╗ ███╗   ██╗███╗   ██╗
+    // ██╔════╝██╔═══██╗██║     ██║██╔══██╗████╗  ██║████╗  ██║
+    // █████╗  ██║   ██║██║     ██║███████║██╔██╗ ██║██╔██╗ ██║
+    // ██╔══╝  ██║   ██║██║     ██║██╔══██║██║╚██╗██║██║╚██╗██║
+    // ███████╗╚██████╔╝███████╗██║██║  ██║██║ ╚████║██║ ╚████║
+    // ╚══════╝ ╚═════╝ ╚══════╝╚═╝╚═╝  ╚═╝╚═╝  ╚═══╝╚═╝  ╚═══╝
+    // "#;
+
+    let ascii_logo = r#"By Eoliann"#;
 
     ui.label(RichText::new(ascii_logo).monospace().color(Color32::from_rgb(57, 255, 20)).size(16.0));
     ui.separator();
@@ -279,24 +281,133 @@ pub fn show_info(
     }
 
     // quick buttons (same)
-    ui.horizontal_wrapped(|ui| {
-        if ui.button("👤 whoami").on_hover_text("Displays the current logged-in username.").clicked() {
+    // ui.horizontal_wrapped(|ui| {
+    //     if ui.button("👤 whoami").on_hover_text("Displays the current logged-in username.").clicked() {
+    //         let out = crate::utils::run_command("whoami");
+    //         *log_output.lock().unwrap() = format!("> whoami\n{}", out);
+    //     }
+    //     if ui.button("🌐 ipconfig").on_hover_text("Shows detailed network configuration.").clicked() {
+    //         let out = crate::utils::run_command("ipconfig /all");
+    //         *log_output.lock().unwrap() = format!("> ipconfig /all\n{}", out);
+    //     }
+    //     if ui.button("💻 systeminfo").on_hover_text("Displays detailed system configuration.").clicked() {
+    //         let out = crate::utils::run_command("systeminfo");
+    //         *log_output.lock().unwrap() = format!("> systeminfo\n{}", out);
+    //     }
+    //     if ui.button("📋 tasklist").on_hover_text("Lists all running processes.").clicked() {
+    //         let out = crate::utils::run_command("tasklist");
+    //         *log_output.lock().unwrap() = format!("> tasklist\n{}", out);
+    //     }
+    // });
+
+    // Styled command buttons (same style as the three action buttons)
+    {
+        let neon_green = egui::Color32::from_rgb(0, 255, 140);
+        let normal_stroke = egui::Color32::from_gray(160);
+
+        // helper that draws a styled button and shows a tooltip on hover
+        let draw_action_btn = |ui: &mut egui::Ui, _id_suffix: &str, label: &str, tooltip: &str| -> egui::Response {
+            let min_size = egui::Vec2::new(150.0, 30.0);
+            let (rect, resp) = ui.allocate_at_least(min_size, egui::Sense::click());
+
+            let visuals = ui.style().visuals.clone();
+            let normal_bg = visuals.widgets.inactive.bg_fill;
+            let hover_bg  = egui::Color32::WHITE;
+
+            let bg_fill   = if resp.hovered() { hover_bg } else { normal_bg };
+            let stroke_col= if resp.hovered() { neon_green } else { normal_stroke };
+
+            ui.painter().rect(
+                rect,
+                6.0,
+                bg_fill,
+                egui::Stroke::new(1.5, stroke_col),
+                egui::StrokeKind::Middle,
+            );
+
+            let font_id = egui::TextStyle::Button.resolve(ui.style());
+            let text_col = if resp.hovered() { egui::Color32::BLACK } else { neon_green };
+            ui.painter().text(rect.center(), egui::Align2::CENTER_CENTER, label, font_id, text_col);
+
+            if resp.hovered() {
+                ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+
+                // TOOLTIP: draw a rounded rect with padding and text above the button
+                let tip_text = tooltip;
+                let font_id = egui::TextStyle::Body.resolve(ui.style()); // bigger than Small
+                // estimate dimensions: fixed width (good for short tooltips)
+                let max_width = 260.0;
+                let padding = egui::Vec2::new(10.0, 6.0);
+
+                // measure text roughly by using layout via ui.fonts (approx using font size)
+                let glyph_height = font_id.size;
+                // compute number of chars per line roughly to estimate height (simple heuristic)
+                let approx_chars_per_line = 40.0;
+                let lines = (tip_text.len() as f32 / approx_chars_per_line).ceil().max(1.0);
+                let height = glyph_height * lines + padding.y * 2.0;
+                let width = max_width;
+
+                // position the tooltip above the button with a small offset
+                let tip_min = rect.left_top() - egui::Vec2::new(0.0, height + 6.0);
+                let tip_rect = egui::Rect::from_min_size(tip_min, egui::Vec2::new(width, height));
+
+                // background + stroke
+                let bg = egui::Color32::from_gray(24); // dark/opaque background — visible on both themes
+                let stroke = egui::Stroke::new(1.0, egui::Color32::from_gray(120));
+                ui.painter().rect_filled(tip_rect, 6.0, bg);
+                ui.painter().rect_stroke(tip_rect, 6.0, stroke, egui::StrokeKind::Middle);
+
+                // draw text with left padding
+                let text_pos = tip_rect.left_top() + padding;
+                ui.painter().text(
+                    text_pos,
+                    egui::Align2::LEFT_TOP,
+                    tip_text,
+                    font_id,
+                    egui::Color32::from_gray(240),
+                );
+            }
+
+
+            resp
+        };
+
+        // The `draw_action_btn` function takes 4 arguments, but only 3 were supplied in the original code.
+        // draw inline wrapped, capture responses and handle clicks afterward
+        let mut resp_whoami: Option<egui::Response> = None;
+        let mut resp_ipconfig: Option<egui::Response> = None;
+        let mut resp_systeminfo: Option<egui::Response> = None;
+        let mut resp_tasklist: Option<egui::Response> = None;
+
+        ui.horizontal_wrapped(|ui| {
+            resp_whoami = Some(draw_action_btn(ui, "whoami_tt", "👤 whoami", "Displays the current logged-in username.")); // The `draw_action_btn` function takes 4 arguments, but only 3 were supplied in the original code.
+            ui.add_space(6.0);
+            resp_ipconfig = Some(draw_action_btn(ui, "ipconfig_tt", "🌐 ipconfig", "Shows detailed network configuration."));
+            ui.add_space(6.0);
+            resp_systeminfo = Some(draw_action_btn(ui, "systeminfo_tt", "💻 systeminfo", "Displays detailed system configuration."));
+            ui.add_space(6.0);
+            resp_tasklist = Some(draw_action_btn(ui, "tasklist_tt", "📋 tasklist", "Lists all running processes."));
+        });
+
+        // handle actions after UI borrow ends
+        if let Some(r) = resp_whoami { if r.clicked() {
             let out = crate::utils::run_command("whoami");
             *log_output.lock().unwrap() = format!("> whoami\n{}", out);
-        }
-        if ui.button("🌐 ipconfig").on_hover_text("Shows detailed network configuration.").clicked() {
+        }}
+        if let Some(r) = resp_ipconfig { if r.clicked() {
             let out = crate::utils::run_command("ipconfig /all");
             *log_output.lock().unwrap() = format!("> ipconfig /all\n{}", out);
-        }
-        if ui.button("💻 systeminfo").on_hover_text("Displays detailed system configuration.").clicked() {
+        }}
+        if let Some(r) = resp_systeminfo { if r.clicked() {
             let out = crate::utils::run_command("systeminfo");
             *log_output.lock().unwrap() = format!("> systeminfo\n{}", out);
-        }
-        if ui.button("📋 tasklist").on_hover_text("Lists all running processes.").clicked() {
+        }}
+        if let Some(r) = resp_tasklist { if r.clicked() {
             let out = crate::utils::run_command("tasklist");
             *log_output.lock().unwrap() = format!("> tasklist\n{}", out);
-        }
-    });
+        }}
+    }
+
 
     ui.separator();
 
@@ -388,6 +499,8 @@ pub fn show_info(
                 l.push_str("User requested to view last log\n");
             }
         });
+
+        ui.ctx().request_repaint();
     });
 
     ui.add_space(12.0);

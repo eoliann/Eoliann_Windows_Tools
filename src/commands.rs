@@ -7,11 +7,21 @@ use std::process::{Command as StdCommand, Stdio};
 use std::sync::{Arc, Mutex};
 use std::thread;
 
+use std::process::Command;
+
 #[cfg(windows)]
 use std::os::windows::process::CommandExt;
 
 #[cfg(windows)]
 const CREATE_NO_WINDOW: u32 = 0x08000000;
+
+pub fn run_powershell_command(cmd: &str) -> String {
+    let mut c = Command::new(r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe");
+    c.args(&["-NoProfile","-NonInteractive","-ExecutionPolicy","Bypass","-Command", cmd]);
+    #[cfg(windows)] { c.creation_flags(CREATE_NO_WINDOW); }
+    let out = c.output().unwrap_or_else(|e| panic!("failed to spawn: {}", e));
+    String::from_utf8_lossy(&out.stdout).to_string() + &String::from_utf8_lossy(&out.stderr)
+}
 
 use std::io::BufRead; // Import BufRead aici
 // ---------- Helper logging ----------
@@ -294,106 +304,246 @@ pub fn disable_monitor() -> String {
 }
 
 #[allow(dead_code)]
-pub fn remove_app(package: &str) -> String {
-    // Robust remove: tries current user, -AllUsers (if supported), remove provisioned + DISM fallback
-    let ps = format!(r#"
-$needle = "{0}"
-Write-Output "=== Remove (current user) matching: $needle ==="
-Get-AppxPackage |
-  Where-Object {{ $_.Name -like "*{0}*" -or $_.PackageFullName -like "*{0}*" }} |
-  ForEach-Object {{
-    try {{ Remove-AppxPackage -Package $_.PackageFullName -ErrorAction Stop; Write-Output ("REMOVED_CURRENTUSER:" + $_.PackageFullName) }} catch {{ Write-Output ("ERR_REMOVE_CURRENTUSER:" + $_.PackageFullName + " -> " + $_.Exception.Message) }}
-  }}
+/// Robust removal routine for built-in apps + winget/MSIX/Win32 fallbacks.
+///
+/// Requirements:
+/// - crate::utils::run_powershell_cmd(cmd: &str) -> String
+/// - crate::utils::is_elevated() -> bool
+///
+/// Returns a multiline log String suitable for UI display.
+pub fn remove_app(pattern: &str) -> String {
+    let mut log = String::new();
+    macro_rules! la { ($e:expr) => { log.push_str(&format!("{}\n", $e)); } }
 
-Write-Output "=== Attempting -AllUsers (requires elevation) matching: $needle ==="
+    la!(format!("Starting removal for pattern '{}'", pattern));
+    // sanitize pattern for embedding in PowerShell strings
+    let safe = pattern.replace('\'', "").replace('"', "");
+    // PowerShell -like pattern (we will embed this directly)
+    let pat = format!("*{}*", safe);
+
+    // helper to run PowerShell via utils (must exist)
+    let run = |cmd: &str| -> String {
+        crate::utils::run_powershell_cmd(cmd)
+    };
+
+    // 0) quick presence check (includes Get-StartApps/winget/provisioned)
+    let ps_check = format!(
+        r#"if (
+  (Get-AppxPackage | Where-Object {{ ($_.Name -like '{0}') -or ($_.PackageFullName -like '{0}') -or ($_.PackageFamilyName -like '{0}')}} | Measure-Object).Count -gt 0 -or
+  (Get-AppxPackage -AllUsers | Where-Object {{ ($_.Name -like '{0}') -or ($_.PackageFullName -like '{0}') -or ($_.PackageFamilyName -like '{0}')}} | Measure-Object).Count -gt 0 -or
+  (Get-AppxProvisionedPackage -Online | Where-Object {{ ($_.DisplayName -like '{0}') -or ($_.PackageName -like '{0}')}} | Measure-Object).Count -gt 0 -or
+  (Get-StartApps | Where-Object {{ ($_.AppID -like '{0}') -or ($_.Name -like '{0}')}} | Measure-Object).Count -gt 0
+) {{ Write-Output '1' }} else {{ Write-Output '0' }}"#,
+        pat
+    );
+
+    let present = run(&ps_check).trim().ends_with('1');
+    if !present {
+        la!("Application not found on system (by Appx/StartApps/provisioned checks). Will still try winget/registry fallbacks.");
+        // we continue to attempt fallbacks below (winget/registry) instead of returning early.
+    } else {
+        la!("Application found by Appx/StartApps/provisioned checks — proceeding with removal attempts.");
+    }
+
+    // 1) Attempt Remove-AppxPackage for current user (enumerate PackageFullName)
+    la!("→ Attempting Remove-AppxPackage (current user)...");
+    let ps_remove_user = format!(
+        r#"Get-AppxPackage | Where-Object {{ ($_.Name -like '{0}') -or ($_.PackageFullName -like '{0}') -or ($_.PackageFamilyName -like '{0}')}} |
+  ForEach-Object {{
+    Write-Output ('[AppxUser] ' + $_.PackageFullName);
+    try {{ Remove-AppxPackage -Package $_.PackageFullName -ErrorAction Stop; Write-Output ('[AppxUser] REMOVED: ' + $_.PackageFullName) }} catch {{ Write-Output ('[AppxUser] FAILED: ' + $_.PackageFullName + ' -> ' + $_.Exception.Message) }}
+  }}"#,
+        pat
+    );
+    let out_user = run(&ps_remove_user);
+    if !out_user.trim().is_empty() {
+        la!(format!("• current-user output:\n{}", out_user.trim()));
+    } else {
+        la!("• current-user: no matching PackageFullName (or no output).");
+    }
+
+    // 2) Attempt Remove-AppxPackage -AllUsers (requires elevation)
+    if crate::utils::is_elevated() {
+        la!("→ Elevated: attempting Remove-AppxPackage (-AllUsers)...");
+        let ps_remove_all = format!(
+            r#"Get-AppxPackage -AllUsers | Where-Object {{ ($_.Name -like '{0}') -or ($_.PackageFullName -like '{0}') -or ($_.PackageFamilyName -like '{0}')}} |
+  ForEach-Object {{
+    Write-Output ('[AppxAll] ' + $_.PackageFullName);
+    try {{ Remove-AppxPackage -Package $_.PackageFullName -AllUsers -ErrorAction Stop; Write-Output ('[AppxAll] REMOVED: ' + $_.PackageFullName) }} catch {{ Write-Output ('[AppxAll] FAILED: ' + $_.PackageFullName + ' -> ' + $_.Exception.Message) }}
+  }}"#,
+            pat
+        );
+        let out_all = run(&ps_remove_all);
+        if !out_all.trim().is_empty() {
+            la!(format!("• all-users output:\n{}", out_all.trim()));
+        } else {
+            la!("• all-users: no matching PackageFullName (or no output).");
+        }
+    } else {
+        la!("⚠ Not elevated — skipping -AllUsers Remove-AppxPackage. Relaunch as Administrator to attempt system-wide removals.");
+    }
+
+    // 3) Attempt Remove-AppxProvisionedPackage (prevent reinstall for new users) if elevated
+    if crate::utils::is_elevated() {
+        la!("→ Elevated: attempting Remove-AppxProvisionedPackage (Online)...");
+        let ps_prov = format!(
+            r#"Get-AppxProvisionedPackage -Online | Where-Object {{ ($_.DisplayName -like '{0}') -or ($_.PackageName -like '{0}')}} |
+  ForEach-Object {{
+    Write-Output ('[Prov] ' + $_.PackageName);
+    try {{ Remove-AppxProvisionedPackage -Online -PackageName $_.PackageName -ErrorAction Stop; Write-Output ('[Prov] REMOVED: ' + $_.PackageName) }} catch {{ Write-Output ('[Prov] FAILED: ' + $_.PackageName + ' -> ' + $_.Exception.Message) }}
+  }}"#,
+            pat
+        );
+        let out_prov = run(&ps_prov);
+        if !out_prov.trim().is_empty() {
+            la!(format!("• provisioned output:\n{}", out_prov.trim()));
+
+            // additionally try DISM per each printed PackageName (lines beginning with [Prov] or package names)
+            for line in out_prov.lines() {
+                let l = line.trim();
+                if l.is_empty() { continue; }
+                // try to extract a package name-like token (skip lines with 'FAILED' text)
+                if l.contains("FAILED") || l.contains("REMOVED") {
+                    continue;
+                }
+                // attempt DISM remove provisioned if line looks like a package name
+                la!(format!("↪ Fallback: attempting DISM remove-provisioned for '{}'", l));
+                let dism_cmd = format!("dism /Online /Remove-ProvisionedAppxPackage /PackageName:{}", l);
+                let out_dism = run(&dism_cmd);
+                if !out_dism.trim().is_empty() {
+                    la!(format!("• DISM output:\n{}", out_dism.trim()));
+                } else {
+                    la!("• DISM: executed (no output).");
+                }
+            }
+        } else {
+            la!("• provisioned: no matching provisioned package removed (or no output).");
+        }
+    }
+
+    // 4) Fallback: Get-StartApps -> derive PackageFamilyName and attempt Remove-AppxPackage on matches
+    la!("→ Fallback: checking Get-StartApps for AppID/Name -> derive family -> Remove-AppxPackage");
+    let ps_startapps = format!(
+        r#"
+$pat = '{0}';
+Get-StartApps | Where-Object {{ $_.AppID -like $pat -or $_.Name -like $pat }} | ForEach-Object {{
+  $appId = $_.AppID;
+  Write-Output ('[StartApps] AppID: ' + $appId);
+  $family = ($appId -split '!')[0];
+  Write-Output ('[StartApps] DerivedFamily: ' + $family);
+  Get-AppxPackage -AllUsers | Where-Object {{ $_.PackageFamilyName -like (\"$family*\") -or $_.PackageFamilyName -like $family }} | ForEach-Object {{
+    Write-Output ('[StartApps] MatchingFull:' + $_.PackageFullName);
+    try {{ Remove-AppxPackage -Package $_.PackageFullName -AllUsers -ErrorAction Stop; Write-Output ('[StartApps] REMOVED:' + $_.PackageFullName) }} catch {{ Write-Output ('[StartApps] FAILED:' + $_.PackageFullName + ' -> ' + $_.Exception.Message) }}
+  }}
+}}
+"#,
+        pat
+    );
+    let out_start = run(&ps_startapps);
+    if !out_start.trim().is_empty() {
+        la!(format!("• Get-StartApps fallback output:\n{}", out_start.trim()));
+    } else {
+        la!("• Get-StartApps: no matching AppID/Name or no removable package found via family.");
+    }
+
+    // 5) Fallback: winget uninstall (MSIX/WinGet-managed)
+    // - find candidate Ids / PackageIdentifiers, then attempt uninstall for each.
+    la!("→ Fallback: checking winget for MSIX/WinGet-managed entries and attempting uninstall");
+    let ps_winget = format!(
+        r#"
 try {{
-  Get-AppxPackage -AllUsers |
-    Where-Object {{ $_.Name -like "*{0}*" -or $_.PackageFullName -like "*{0}*" }} |
-    ForEach-Object {{
-      try {{ Remove-AppxPackage -Package $_.PackageFullName -AllUsers -ErrorAction Stop; Write-Output ("REMOVED_ALLUSERS:" + $_.PackageFullName) }} catch {{ Write-Output ("ERR_REMOVE_ALLUSERS:" + $_.PackageFullName + " -> " + $_.Exception.Message) }}
+  $data = winget list --source winget --output json 2>$null | ConvertFrom-Json;
+  if ($null -ne $data) {{
+    $matches = $data | Where-Object {{ ($_.Id -like '{0}') -or ($_.Name -like '{0}') -or ($_.PackageIdentifier -like '{0}') }};
+    foreach ($m in $matches) {{
+      $id = $m.Id; if ([string]::IsNullOrWhiteSpace($id)) {{ $id = $m.PackageIdentifier }};
+      if (-not [string]::IsNullOrWhiteSpace($id)) {{
+        Write-Output ('[WingetCandidate] ' + $id);
+        # attempt uninstall; capture output
+        try {{
+          $out = winget uninstall --id $id --silent --accept-source-agreements --accept-package-agreements 2>&1 | Out-String;
+          Write-Output ('[WingetUninstallOutput] ' + $out);
+        }} catch {{
+          Write-Output ('[WingetUninstallFailed] ' + $id + ' -> ' + $_.Exception.Message);
+        }}
+      }}
     }}
+  }} else {{
+    Write-Output '';
+  }}
 }} catch {{
-  Write-Output ("WARN: -AllUsers failed or not supported: " + $_.Exception.Message)
+  Write-Output ('[WingetError] ' + $_.Exception.Message);
 }}
+"#,
+        pat
+    );
+    let out_winget = run(&ps_winget);
+    if !out_winget.trim().is_empty() {
+        la!(format!("• winget fallback output:\n{}", out_winget.trim()));
+    } else {
+        la!("• winget: no matching entries found or winget not available.");
+    }
 
-Write-Output "=== Removing provisioned packages (image) matching: $needle ==="
-Get-AppxProvisionedPackage -Online |
-  Where-Object {{ $_.DisplayName -like "*{0}*" -or $_.PackageName -like "*{0}*" }} |
-  ForEach-Object {{
-    try {{ Remove-AppxProvisionedPackage -Online -PackageName $_.PackageName -ErrorAction Stop; Write-Output ("REMOVED_PROVISIONED:" + $_.PackageName) }} catch {{ Write-Output ("ERR_REMOVE_PROVISIONED:" + $_.PackageName + " -> " + $_.Exception.Message) }}
-  }}
-
-Write-Output "=== DISM fallback for provisioned packages ==="
-$prov = Get-AppxProvisionedPackage -Online |
-        Where-Object {{ $_.DisplayName -like "*{0}*" -or $_.PackageName -like "*{0}*" }}
-foreach ($p in $prov) {{
+    // 6) Fallback: Registry UninstallString for Win32 apps — attempt to run UninstallString entries
+    la!("→ Fallback: checking registry uninstall keys for Win32 installers and attempting execution");
+    let ps_reg_uninstall = format!(
+        r#"
+$pat = '{0}';
+$keys = @(
+  'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall',
+  'HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall',
+  'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall'
+);
+foreach ($k in $keys) {{
   try {{
-    $pkg = $p.PackageName
-    Write-Output ("DISM_REMOVE:" + $pkg)
-    dism.exe /Online /Remove-ProvisionedAppxPackage /PackageName:"$pkg"
+    Get-ChildItem $k -ErrorAction SilentlyContinue | ForEach-Object {{
+      $p = Get-ItemProperty -Path ($_.PSPath) -ErrorAction SilentlyContinue;
+      if ($p -and $p.DisplayName -and ($p.DisplayName -like ""*$pat*"") -and $p.UninstallString) {{
+        Write-Output ('[RegUninstall] DisplayName=' + $p.DisplayName + ' ; UninstallString=' + $p.UninstallString);
+        try {{
+          # run uninstall string through cmd.exe to handle MSI/uninstallers; wait for completion
+          Start-Process -FilePath 'cmd.exe' -ArgumentList '/C', $p.UninstallString -Wait -NoNewWindow -WindowStyle Hidden;
+          Write-Output ('[RegUninstall] EXECUTED: ' + $p.DisplayName);
+        }} catch {{
+          Write-Output ('[RegUninstall] FAILED RUN: ' + $p.DisplayName + ' -> ' + $_.Exception.Message);
+        }}
+      }}
+    }}
   }} catch {{
-    Write-Output ("ERR_DISM:" + $p.PackageName + " -> " + $_.Exception.Message)
+    Write-Output ('[RegUninstall] KEYERROR: ' + $k + ' -> ' + $_.Exception.Message);
   }}
 }}
-Write-Output "=== Done ==="
-"#, package);
+"#,
+        safe
+    );
+    let out_regu = run(&ps_reg_uninstall);
+    if !out_regu.trim().is_empty() {
+        la!(format!("• registry uninstall attempts output:\n{}", out_regu.trim()));
+    } else {
+        la!("• registry uninstall: no matching uninstall strings found (or none executed).");
+    }
 
-    crate::utils::run_powershell(&ps)
-}
+    // 7) Final verification: re-check presence (same checks as initial)
+    la!("→ Final verification after removal attempts...");
+    std::thread::sleep(std::time::Duration::from_millis(800));
+    let ps_final_check = format!(
+        r#"if (
+  (Get-AppxPackage | Where-Object {{ ($_.Name -like '{0}') -or ($_.PackageFullName -like '{0}') -or ($_.PackageFamilyName -like '{0}')}} | Measure-Object).Count -gt 0 -or
+  (Get-AppxPackage -AllUsers | Where-Object {{ ($_.Name -like '{0}') -or ($_.PackageFullName -like '{0}') -or ($_.PackageFamilyName -like '{0}')}} | Measure-Object).Count -gt 0 -or
+  (Get-AppxProvisionedPackage -Online | Where-Object {{ ($_.DisplayName -like '{0}') -or ($_.PackageName -like '{0}')}} | Measure-Object).Count -gt 0 -or
+  (Get-StartApps | Where-Object {{ $_.AppID -like '{0}' -or $_.Name -like '{0}' }} | Measure-Object).Count -gt 0
+) {{ Write-Output '1' }} else {{ Write-Output '0' }}"#,
+        pat
+    );
+    let still = run(&ps_final_check).trim().ends_with('1');
+    if still {
+        la!(format!("❌ After attempts, pattern '{}' still matches installed traces (Appx/StartApps/provisioned).", pattern));
+        la!("• Inspect outputs above for specific failure reasons (Access denied / Protected / DISM errors / winget errors).");
+    } else {
+        la!(format!("✅ Removal successful (no matching traces found for '{}').", pattern));
+    }
 
-#[allow(dead_code)]
-pub fn remove_app_force(package: &str) -> String {
-    // Force remove: same as above, with additional attempts by PackageFamilyName
-    let ps = format!(r#"
-        $needle = "{0}"
-        Write-Output "=== FORCE Remove (current user) matching: $needle ==="
-        Get-AppxPackage |
-        Where-Object {{ $_.Name -like "*{0}*" -or $_.PackageFullName -like "*{0}*" }} |
-        ForEach-Object {{
-            try {{ Remove-AppxPackage -Package $_.PackageFullName -ErrorAction SilentlyContinue; Write-Output ("REMOVED_CURRENTUSER:" + $_.PackageFullName) }} catch {{ Write-Output ("ERR_REMOVE_CURRENTUSER:" + $_.PackageFullName + " -> " + $_.Exception.Message) }}
-        }}
-
-        Write-Output "=== FORCE Attempting -AllUsers (requires elevation) ==="
-        try {{
-        Get-AppxPackage -AllUsers |
-            Where-Object {{ $_.Name -like "*{0}*" -or $_.PackageFullName -like "*{0}*" }} |
-            ForEach-Object {{
-            try {{ Remove-AppxPackage -Package $_.PackageFullName -AllUsers -ErrorAction SilentlyContinue; Write-Output ("REMOVED_ALLUSERS:" + $_.PackageFullName) }} catch {{ Write-Output ("ERR_REMOVE_ALLUSERS:" + $_.PackageFullName + " -> " + $_.Exception.Message) }}
-            }}
-        }} catch {{
-        Write-Output ("WARN: -AllUsers failed: " + $_.Exception.Message)
-        }}
-
-        Write-Output "=== FORCE Removing provisioned packages (image) ==="
-        Get-AppxProvisionedPackage -Online |
-        Where-Object {{ $_.DisplayName -like "*{0}*" -or $_.PackageName -like "*{0}*" }} |
-        ForEach-Object {{
-            try {{ Remove-AppxProvisionedPackage -Online -PackageName $_.PackageName -ErrorAction SilentlyContinue; Write-Output ("REMOVED_PROVISIONED:" + $_.PackageName) }} catch {{ Write-Output ("ERR_REMOVE_PROVISIONED:" + $_.PackageName + " -> " + $_.Exception.Message) }}
-        }}
-
-        Write-Output "=== FORCE DISM fallback ==="
-        $prov = Get-AppxProvisionedPackage -Online |
-                Where-Object {{ $_.DisplayName -like "*{0}*" -or $_.PackageName -like "*{0}*" }}
-        foreach ($p in $prov) {{
-        try {{
-            $pkg = $p.PackageName
-            Write-Output ("DISM_REMOVE:" + $pkg)
-            dism.exe /Online /Remove-ProvisionedAppxPackage /PackageName:"$pkg"
-        }} catch {{
-            Write-Output ("ERR_DISM:" + $p.PackageName + " -> " + $_.Exception.Message)
-        }}
-        }}
-
-        Write-Output "=== FORCE: Attempt removal by PackageFamilyName and wildcard ==="
-        $family = Get-AppxPackage -AllUsers | Where-Object {{ $_.PackageFamilyName -like "*{0}*" }} | Select-Object -ExpandProperty PackageFullName -Unique
-        foreach ($f in $family) {{
-        try {{ Remove-AppxPackage -Package $f -AllUsers -ErrorAction SilentlyContinue; Write-Output ("REMOVED_BY_FAMILY:" + $f) }} catch {{ Write-Output ("ERR_REMOVE_BY_FAMILY:" + $f + " -> " + $_.Exception.Message) }}
-        }}
-
-        Write-Output "=== FORCE Done ==="
-        "#, package);
-
-    crate::utils::run_powershell(&ps)
+    log
 }
 
 #[allow(dead_code)]
@@ -2366,7 +2516,6 @@ pub fn wpftweaks_disable_edge() -> String {
 
 
 
-use std::process::Command;
 // use std::thread;
 use std::time::Duration;
 use winreg::enums::*;

@@ -295,64 +295,191 @@ pub fn show_install(ui: &mut egui::Ui, log: &Arc<Mutex<String>>) {
     ui.add_space(6.0);
 
     // Acțiuni
-    ui.horizontal(|ui| {
-        let disabled = sel_count == 0 || running;
-        if ui.add_enabled(!disabled, egui::Button::new("Install selections")).clicked() {
+    // Styled action row — same visual behavior as previous action buttons
+    {
+        let neon_green = egui::Color32::from_rgb(0, 255, 140);
+        let normal_text = egui::Color32::BLACK;
+        let normal_stroke = egui::Color32::from_gray(160);
+        let disabled_text = egui::Color32::from_gray(140);
+        let disabled_stroke = egui::Color32::from_gray(110);
+
+        // helper that draws a styled button and returns a Response
+        let draw_action_btn = |ui: &mut egui::Ui, label: &str, enabled: bool| -> egui::Response {
+            let min_size = egui::Vec2::new(150.0, 30.0);
+            let sense = if enabled { egui::Sense::click() } else { egui::Sense::hover() };
+            let (rect, resp) = ui.allocate_at_least(min_size, sense);
+
+            let visuals = ui.style().visuals.clone();
+            let normal_bg = visuals.widgets.inactive.bg_fill; // grey-like background
+            let hover_bg = egui::Color32::WHITE;
+
+            let bg_fill = if resp.hovered() && enabled { hover_bg } else { normal_bg };
+            let stroke_col = if !enabled {
+                disabled_stroke
+            } else if resp.hovered() {
+                neon_green
+            } else {
+                normal_stroke
+            };
+
+            ui.painter().rect(
+                rect,
+                6.0,
+                bg_fill,
+                egui::Stroke::new(1.5, stroke_col),
+                egui::StrokeKind::Middle,
+            );
+
+            let font_id = egui::TextStyle::Button.resolve(ui.style());
+            let text_col = if !enabled {
+                disabled_text
+            } else if resp.hovered() {
+                normal_text
+            } else {
+                neon_green
+            };
+
+            ui.painter().text(rect.center(), egui::Align2::CENTER_CENTER, label, font_id, text_col);
+
+            if resp.hovered() && enabled {
+                ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+            }
+
+            resp
+        };
+
+        // draw inline, capture responses and handle actions after borrow
+        let mut r_install: Option<egui::Response> = None;
+        let mut r_uninstall: Option<egui::Response> = None;
+        let mut r_update: Option<egui::Response> = None;
+        let mut r_clear: Option<egui::Response> = None;
+        let mut r_upgrade: Option<egui::Response> = None;
+
+        ui.horizontal(|ui| {
+            let disabled = sel_count == 0 || running;
+
+            r_install  = Some(draw_action_btn(ui, "Install selections", !disabled));
+            ui.add_space(6.0);
+            r_uninstall = Some(draw_action_btn(ui, "Uninstall selections", !disabled));
+            ui.add_space(6.0);
+            r_update = Some(draw_action_btn(ui, "Update selections", !disabled));
+            ui.add_space(6.0);
+
+            // Clear selection (non-styled original behavior but keep same visual style)
+            r_clear = Some(draw_action_btn(ui, "Clear selection", true));
+            ui.add_space(6.0);
+
+            // Upgrade all Applications (may be long-running)
+            r_upgrade = Some(draw_action_btn(ui, "Upgrade all Applications", true));
+        });
+
+        // actions after drawing UI
+        if let Some(r) = r_install { if r.clicked() {
             spawn_task(DoWhat::Install, log.clone());
-        }
-        if ui.add_enabled(!disabled, egui::Button::new("Uninstall selections")).clicked() {
+        }}
+        if let Some(r) = r_uninstall { if r.clicked() {
             spawn_task(DoWhat::Uninstall, log.clone());
-        }
-        if ui.add_enabled(!disabled, egui::Button::new("Update selections")).clicked() {
+        }}
+        if let Some(r) = r_update { if r.clicked() {
             spawn_task(DoWhat::Update, log.clone());
-        }
-        if ui.button("Clear selection").clicked() {
+        }}
+        if let Some(r) = r_clear { if r.clicked() {
             state().lock().unwrap().selected.clear();
-        }
-        if ui.button("Upgrade all Applications").clicked() {
+        }}
+        if let Some(r) = r_upgrade { if r.clicked() {
             let log = log.clone();
             std::thread::spawn(move || {
                 commands::upgrade_all_apps_with_log(log);
             });
-        }
-        // if ui.button("Reinstall winget").clicked() {
-        //     let log = log.clone();
-        //     std::thread::spawn(move || {
-        //         commands::reinstall_winget_with_log(log);
-        //     });
-        // }
-    });
+        }}
+    }
+
 
     ui.add_space(6.0);
     ui.separator();
 
     // 🔎 Search bar cu chenar verde
     {
-        use egui::{Frame, Stroke, Color32, Margin}; // import corect
+        use egui::{Frame, Stroke, Color32, Margin, Vec2, TextStyle, Align2, StrokeKind, CursorIcon};
 
         let mut query = search_query().lock().unwrap();
+
+        // styling
+        let neon_green = Color32::from_rgb(0, 255, 140);
+        let normal_text = Color32::BLACK;
+        let normal_stroke = Color32::from_gray(160);
+
+        // helper that draws a small action button matching the other styled buttons
+        let draw_small_action_btn = |ui: &mut egui::Ui, label: &str| -> egui::Response {
+            let min_size = Vec2::new(110.0, 28.0);
+            let (rect, resp) = ui.allocate_at_least(min_size, egui::Sense::click());
+
+            let visuals = ui.style().visuals.clone();
+            let normal_bg = visuals.widgets.inactive.bg_fill;
+            let hover_bg = Color32::WHITE;
+
+            let bg_fill = if resp.hovered() { hover_bg } else { normal_bg };
+            let stroke_col = if resp.hovered() { neon_green } else { normal_stroke };
+
+            ui.painter().rect(
+                rect,
+                6.0,
+                bg_fill,
+                egui::Stroke::new(1.5, stroke_col),
+                StrokeKind::Middle,
+            );
+
+            let font_id = TextStyle::Button.resolve(ui.style());
+            let text_col = if resp.hovered() { normal_text } else { neon_green };
+            ui.painter().text(rect.center(), Align2::CENTER_CENTER, label, font_id, text_col);
+
+            if resp.hovered() {
+                ui.ctx().set_cursor_icon(CursorIcon::PointingHand);
+            }
+
+            resp
+        };
+
+        // responses captured to handle actions after UI borrow ends
+        let mut resp_filter: Option<egui::Response> = None;
+        let mut resp_reset: Option<egui::Response> = None;
 
         ui.horizontal(|ui| {
             ui.label("Search:");
 
-            // Stil verde corect pentru egui 0.32
+            // green framed search box (keeps your Frame config)
             let frame = Frame::new()
                 .stroke(Stroke::new(1.5, Color32::GREEN))
-                .corner_radius(4.0) // f32 acceptat aici
-                .inner_margin(Margin::symmetric(4, 2)); // i8, deci fără punct zecimal
+                .corner_radius(4.0)
+                .inner_margin(Margin::symmetric(4, 2));
 
             frame.show(ui, |ui| {
+                ui.set_min_width(300.0);
                 ui.text_edit_singleline(&mut *query);
             });
 
-            if ui.button("Filtrare").clicked() {
-                // filtrarea se aplică automat
+            ui.add_space(6.0);
+
+            // draw the two small action buttons inline
+            resp_filter = Some(draw_small_action_btn(ui, "Filtrare"));
+            ui.add_space(6.0);
+            resp_reset = Some(draw_small_action_btn(ui, "Reset"));
+        });
+
+        // actions after UI borrow ends
+        if let Some(r) = resp_filter {
+            if r.clicked() {
+                // aplică filtrarea: depinde de implementarea ta (de ex. set a filter flag or call function)
+                // ex: apply_search_filter(&*query);
             }
-            if ui.button("Reset").clicked() {
+        }
+        if let Some(r) = resp_reset {
+            if r.clicked() {
                 query.clear();
             }
-        });
+        }
     }
+
 
     ui.add_space(6.0);
 

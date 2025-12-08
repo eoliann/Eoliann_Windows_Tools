@@ -198,3 +198,42 @@ pub fn is_elevated() -> bool { true }
 
 #[cfg(not(target_os = "windows"))]
 pub fn relaunch_as_admin() -> Result<(), String> { Ok(()) }
+
+
+// src/utils.rs
+// Adaugă această funcție publică; nu înlocuiește run_command() existent (dacă există).
+// Folosește explicit powershell.exe din System32 și transmite comanda ca un singur argument.
+
+
+// const CREATE_NO_WINDOW: u32 = 0x08000000;
+
+/// Run a PowerShell command by invoking the system powershell.exe and returning stdout+stderr.
+/// Uses a numeric creation_flags literal so we don't redeclare a global constant.
+pub fn run_powershell_cmd(cmd: &str) -> String {
+    // explicit system path to avoid PATH ambiguity
+    let ps_path = r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe";
+
+    let mut c = std::process::Command::new(ps_path);
+    c.args(&["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", cmd]);
+
+    #[cfg(windows)]
+    {
+        // use numeric literal for CREATE_NO_WINDOW to avoid duplicate constant definitions
+        // 0x08000000 == CREATE_NO_WINDOW.
+        // creation_flags exists only on Windows.
+        c.creation_flags(0x08000000);
+    }
+
+    match c.output() {
+        Ok(out) => {
+            let mut s = String::new();
+            s.push_str(&String::from_utf8_lossy(&out.stdout));
+            if !out.stderr.is_empty() {
+                s.push_str("\n[stderr]\n");
+                s.push_str(&String::from_utf8_lossy(&out.stderr));
+            }
+            s
+        }
+        Err(e) => format!("[run_powershell_cmd error] failed to spawn powershell: {}", e),
+    }
+}

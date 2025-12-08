@@ -406,53 +406,116 @@ pub fn show_customize_preferences(
                 ui.checkbox(auto_check_updates, "Auto-check for updates (Windows Update)");
 
                 ui.add_space(8.0);
-                ui.horizontal(|ui| {
-                    if ui.button("Save General Preferences").clicked() {
-                        let prefs = PrefsFile {
-                            enable_tooltips: *enable_tooltips,
-                            auto_check_updates: *auto_check_updates,
-                            mouse_accel_enabled: *mouse_accel_enabled,
-                            numlock_enabled: *numlock_enabled,
-                            taskbar_search_enabled: *taskbar_search_enabled,
-                            taskbar_widgets_enabled: *taskbar_widgets_enabled,
-                            snap_enabled: *snap_enabled,
-                            sticky_enabled: *sticky_enabled,
-                            taskview_enabled: *taskview_enabled,
-                            verbose_logon_enabled: *verbose_logon_enabled,
-                            bitlocker_protection_on: *bitlocker_protection_on,
-                        };
+                // Styled Save / Reset row — avoid borrow conflicts by capturing Responses and handling them after UI drawing.
+                {
+                    use egui::{Stroke, Color32, TextStyle, Align2, StrokeKind};
 
-                        if let Err(e) = save_prefs(&prefs) {
-                            if let Ok(mut lg) = log.lock() { lg.push_str(&format!("Failed to save prefs: {}\n", e)); }
-                            *show_popup = true;
-                            *popup_message = format!("Failed to save preferences: {}", e);
-                        } else {
-                            if let Ok(mut lg) = log.lock() { lg.push_str("General preferences saved to disk.\n"); }
+                    let neon_green = Color32::from_rgb(0, 255, 140);
+                    let normal_text = Color32::BLACK;
+                    let normal_stroke = Color32::from_gray(160);
+                    let _disabled_text = Color32::from_gray(140);
 
-                            // apply tooltips flag (best-effort)
-                            if let Err(err) = apply_enable_tooltips_flag(*enable_tooltips) {
-                                if let Ok(mut lg) = log.lock() { lg.push_str(&format!("Failed to persist tooltips flag: {}\n", err)); }
-                            }
+                    // helper to draw a styled button and return the Response
+                    let draw_action_btn = |ui: &mut egui::Ui, label: &str, min_w: f32| -> egui::Response {
+                        let min_size = egui::Vec2::new(min_w, 30.0);
+                        let (rect, resp) = ui.allocate_at_least(min_size, egui::Sense::click());
 
-                            // configure Windows Update auto-check (best-effort)
-                            match set_auto_check_windows_updates(*auto_check_updates) {
-                                Ok(msg) => { if let Ok(mut lg) = log.lock() { lg.push_str(&format!("Auto-check for Windows Updates configured: {}\n", msg)); } }
-                                Err(err) => {
-                                    if let Ok(mut lg) = log.lock() { lg.push_str(&format!("Failed to configure Windows Update auto-check: {}\n", err)); }
+                        let visuals = ui.style().visuals.clone();
+                        let normal_bg = visuals.widgets.inactive.bg_fill;
+                        let hover_bg  = Color32::WHITE;
+
+                        let bg_fill = if resp.hovered() { hover_bg } else { normal_bg };
+                        let stroke_col = if resp.hovered() { neon_green } else { normal_stroke };
+
+                        ui.painter().rect(
+                            rect,
+                            6.0,
+                            bg_fill,
+                            Stroke::new(1.5, stroke_col),
+                            StrokeKind::Middle,
+                        );
+
+                        let font_id = TextStyle::Button.resolve(ui.style());
+                        let text_col = if resp.hovered() { normal_text } else { neon_green };
+                        ui.painter().text(rect.center(), Align2::CENTER_CENTER, label, font_id, text_col);
+
+                        if resp.hovered() {
+                            ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+                        }
+
+                        resp
+                    };
+
+                    // draw row and capture responses
+                    let mut resp_save: Option<egui::Response> = None;
+                    let mut resp_reset: Option<egui::Response> = None;
+
+                    ui.horizontal(|ui| {
+                        resp_save = Some(draw_action_btn(ui, "Save General Preferences", 200.0));
+                        ui.add_space(8.0);
+                        resp_reset = Some(draw_action_btn(ui, "Reset General Defaults", 180.0));
+                    });
+
+                    // handle clicks AFTER UI borrow ends to avoid rust-analyzer borrow errors
+                    if let Some(r) = resp_save {
+                        if r.clicked() {
+                            // build prefs from current values (these are &mut bool in scope)
+                            let prefs = PrefsFile {
+                                enable_tooltips: *enable_tooltips,
+                                auto_check_updates: *auto_check_updates,
+                                mouse_accel_enabled: *mouse_accel_enabled,
+                                numlock_enabled: *numlock_enabled,
+                                taskbar_search_enabled: *taskbar_search_enabled,
+                                taskbar_widgets_enabled: *taskbar_widgets_enabled,
+                                snap_enabled: *snap_enabled,
+                                sticky_enabled: *sticky_enabled,
+                                taskview_enabled: *taskview_enabled,
+                                verbose_logon_enabled: *verbose_logon_enabled,
+                                bitlocker_protection_on: *bitlocker_protection_on,
+                            };
+
+                            // attempt save and log results
+                            match save_prefs(&prefs) {
+                                Err(e) => {
+                                    if let Ok(mut lg) = log.lock() { lg.push_str(&format!("Failed to save prefs: {}\n", e)); }
                                     *show_popup = true;
-                                    *popup_message = format!("Saved but failed to configure Windows Update auto-check: {}", err);
-                                    return;
+                                    *popup_message = format!("Failed to save preferences: {}", e);
+                                }
+                                Ok(_) => {
+                                    if let Ok(mut lg) = log.lock() { lg.push_str("General preferences saved to disk.\n"); }
+
+                                    // apply tooltips flag (best-effort)
+                                    if let Err(err) = apply_enable_tooltips_flag(*enable_tooltips) {
+                                        if let Ok(mut lg) = log.lock() { lg.push_str(&format!("Failed to persist tooltips flag: {}\n", err)); }
+                                    }
+
+                                    // configure Windows Update auto-check (best-effort)
+                                    match set_auto_check_windows_updates(*auto_check_updates) {
+                                        Ok(msg) => {
+                                            if let Ok(mut lg) = log.lock() { lg.push_str(&format!("Auto-check for Windows Updates configured: {}\n", msg)); }
+                                        }
+                                        Err(err) => {
+                                            if let Ok(mut lg) = log.lock() { lg.push_str(&format!("Failed to configure Windows Update auto-check: {}\n", err)); }
+                                            *show_popup = true;
+                                            *popup_message = format!("Saved but failed to configure Windows Update auto-check: {}", err);
+                                            // early return to avoid further actions (mirrors previous behavior)
+                                            return;
+                                        }
+                                    }
                                 }
                             }
                         }
                     }
 
-                    if ui.button("Reset General Defaults").clicked() {
-                        *enable_tooltips = true;
-                        *auto_check_updates = true;
-                        if let Ok(mut lg) = log.lock() { lg.push_str("General preferences reset to defaults (not yet saved).\n"); }
+                    if let Some(r) = resp_reset {
+                        if r.clicked() {
+                            *enable_tooltips = true;
+                            *auto_check_updates = true;
+                            if let Ok(mut lg) = log.lock() { lg.push_str("General preferences reset to defaults (not yet saved).\n"); }
+                        }
                     }
-                });
+                }
+
             });
         });
 
@@ -560,66 +623,118 @@ pub fn show_customize_preferences(
                 });
 
                 ui.add_space(12.0);
-                if ui.button("Save / Apply Features").clicked() {
-                    if let Err(err) = set_mouse_accel_in_registry(*mouse_accel_enabled) {
-                        if let Ok(mut lg) = log.lock() { lg.push_str(&format!("Failed to apply mouse accel: {}\n", err)); }
-                        *show_popup = true; *popup_message = format!("Failed to apply mouse accel: {}", err); return;
-                    }
-                    if let Err(err) = set_numlock_in_registry(*numlock_enabled) {
-                        if let Ok(mut lg) = log.lock() { lg.push_str(&format!("Failed to apply NumLock: {}\n", err)); }
-                        *show_popup = true; *popup_message = format!("Failed to apply NumLock: {}", err); return;
-                    }
-                    if let Err(err) = set_taskbar_search_in_registry(*taskbar_search_enabled) {
-                        if let Ok(mut lg) = log.lock() { lg.push_str(&format!("Failed to apply Taskbar Search: {}\n", err)); }
-                        *show_popup = true; *popup_message = format!("Failed to apply Taskbar Search: {}", err); return;
-                    }
-                    if let Err(err) = set_taskbar_widgets_in_registry(*taskbar_widgets_enabled) {
-                        if let Ok(mut lg) = log.lock() { lg.push_str(&format!("Failed to apply Taskbar Widgets: {}\n", err)); }
-                        *show_popup = true; *popup_message = format!("Failed to apply Taskbar Widgets: {}", err); return;
-                    }
-                    if let Err(err) = set_snap_in_registry(*snap_enabled) {
-                        if let Ok(mut lg) = log.lock() { lg.push_str(&format!("Failed to apply Snap Windows: {}\n", err)); }
-                        *show_popup = true; *popup_message = format!("Failed to apply Snap Windows: {}", err); return;
-                    }
-                    if let Err(err) = set_sticky_in_registry(*sticky_enabled) {
-                        if let Ok(mut lg) = log.lock() { lg.push_str(&format!("Failed to apply Sticky Keys: {}\n", err)); }
-                        *show_popup = true; *popup_message = format!("Failed to apply Sticky Keys: {}", err); return;
-                    }
-                    if let Err(err) = set_taskview_in_registry(*taskview_enabled) {
-                        if let Ok(mut lg) = log.lock() { lg.push_str(&format!("Failed to apply Task View: {}\n", err)); }
-                        *show_popup = true; *popup_message = format!("Failed to apply Task View: {}", err); return;
-                    }
-                    if let Err(err) = set_verbose_logon_in_registry(*verbose_logon_enabled) {
-                        if let Ok(mut lg) = log.lock() { lg.push_str(&format!("Failed to apply Verbose Logon: {}\n", err)); }
-                        *show_popup = true; *popup_message = format!("Failed to apply Verbose Logon: {}", err); return;
-                    }
-                    if let Err(err) = set_bitlocker_protection(*bitlocker_protection_on) {
-                        if let Ok(mut lg) = log.lock() { lg.push_str(&format!("Failed to change BitLocker: {}\n", err)); }
-                        *show_popup = true; *popup_message = format!("Failed to change BitLocker: {}", err); return;
-                    }
+                // Replace the inline handler with this pattern: draw the button, capture Response, handle clicks AFTER UI borrow.
+                // This avoids rust-analyzer borrow errors when mutating `log`, `show_popup`, `popup_message`, etc.
+                {
+                    use egui::{Stroke, StrokeKind, Color32, TextStyle, Align2};
 
-                    let prefs = PrefsFile {
-                        enable_tooltips: *enable_tooltips,
-                        auto_check_updates: *auto_check_updates,
-                        mouse_accel_enabled: *mouse_accel_enabled,
-                        numlock_enabled: *numlock_enabled,
-                        taskbar_search_enabled: *taskbar_search_enabled,
-                        taskbar_widgets_enabled: *taskbar_widgets_enabled,
-                        snap_enabled: *snap_enabled,
-                        sticky_enabled: *sticky_enabled,
-                        taskview_enabled: *taskview_enabled,
-                        verbose_logon_enabled: *verbose_logon_enabled,
-                        bitlocker_protection_on: *bitlocker_protection_on,
+                    let neon_green = Color32::from_rgb(0, 255, 140);
+                    let normal_text = Color32::BLACK;
+                    let normal_stroke = Color32::from_gray(160);
+
+                    // helper to draw the styled "Save / Apply Features" button and return Response
+                    let draw_action_btn = |ui: &mut egui::Ui, label: &str, min_w: f32| -> egui::Response {
+                        let min_size = egui::Vec2::new(min_w, 30.0);
+                        let (rect, resp) = ui.allocate_at_least(min_size, egui::Sense::click());
+
+                        let visuals = ui.style().visuals.clone();
+                        let normal_bg = visuals.widgets.inactive.bg_fill;
+                        let hover_bg = Color32::WHITE;
+
+                        let bg_fill = if resp.hovered() { hover_bg } else { normal_bg };
+                        let stroke_col = if resp.hovered() { neon_green } else { normal_stroke };
+
+                        ui.painter().rect(
+                            rect,
+                            6.0,
+                            bg_fill,
+                            Stroke::new(1.5, stroke_col),
+                            StrokeKind::Middle,
+                        );
+
+                        let font_id = TextStyle::Button.resolve(ui.style());
+                        let text_col = if resp.hovered() { normal_text } else { neon_green };
+                        ui.painter().text(rect.center(), Align2::CENTER_CENTER, label, font_id, text_col);
+
+                        if resp.hovered() {
+                            ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+                        }
+
+                        resp
                     };
-                    if let Err(e) = save_prefs(&prefs) {
-                        if let Ok(mut lg) = log.lock() { lg.push_str(&format!("Failed to persist prefs after apply: {}\n", e)); }
-                        *show_popup = true; *popup_message = format!("Applied but failed to persist prefs: {}", e);
-                        return;
-                    }
 
-                    if let Ok(mut lg) = log.lock() { lg.push_str("All features applied successfully and persisted.\n"); }
-                    *show_popup = true;
-                    *popup_message = "Features applied.".to_string();
+                    // draw and capture response
+                    let mut resp_apply_opt: Option<egui::Response> = None;
+                    ui.horizontal(|ui| {
+                        resp_apply_opt = Some(draw_action_btn(ui, "Save / Apply Features", 240.0));
+                    });
+
+                    // handle click AFTER UI borrow ends
+                    if let Some(resp_apply) = resp_apply_opt {
+                        if resp_apply.clicked() {
+                            // apply each feature; on error log + show popup + set popup_message and return early
+                            if let Err(err) = set_mouse_accel_in_registry(*mouse_accel_enabled) {
+                                if let Ok(mut lg) = log.lock() { lg.push_str(&format!("Failed to apply mouse accel: {}\n", err)); }
+                                *show_popup = true; *popup_message = format!("Failed to apply mouse accel: {}", err); return;
+                            }
+                            if let Err(err) = set_numlock_in_registry(*numlock_enabled) {
+                                if let Ok(mut lg) = log.lock() { lg.push_str(&format!("Failed to apply NumLock: {}\n", err)); }
+                                *show_popup = true; *popup_message = format!("Failed to apply NumLock: {}", err); return;
+                            }
+                            if let Err(err) = set_taskbar_search_in_registry(*taskbar_search_enabled) {
+                                if let Ok(mut lg) = log.lock() { lg.push_str(&format!("Failed to apply Taskbar Search: {}\n", err)); }
+                                *show_popup = true; *popup_message = format!("Failed to apply Taskbar Search: {}", err); return;
+                            }
+                            if let Err(err) = set_taskbar_widgets_in_registry(*taskbar_widgets_enabled) {
+                                if let Ok(mut lg) = log.lock() { lg.push_str(&format!("Failed to apply Taskbar Widgets: {}\n", err)); }
+                                *show_popup = true; *popup_message = format!("Failed to apply Taskbar Widgets: {}", err); return;
+                            }
+                            if let Err(err) = set_snap_in_registry(*snap_enabled) {
+                                if let Ok(mut lg) = log.lock() { lg.push_str(&format!("Failed to apply Snap Windows: {}\n", err)); }
+                                *show_popup = true; *popup_message = format!("Failed to apply Snap Windows: {}", err); return;
+                            }
+                            if let Err(err) = set_sticky_in_registry(*sticky_enabled) {
+                                if let Ok(mut lg) = log.lock() { lg.push_str(&format!("Failed to apply Sticky Keys: {}\n", err)); }
+                                *show_popup = true; *popup_message = format!("Failed to apply Sticky Keys: {}", err); return;
+                            }
+                            if let Err(err) = set_taskview_in_registry(*taskview_enabled) {
+                                if let Ok(mut lg) = log.lock() { lg.push_str(&format!("Failed to apply Task View: {}\n", err)); }
+                                *show_popup = true; *popup_message = format!("Failed to apply Task View: {}", err); return;
+                            }
+                            if let Err(err) = set_verbose_logon_in_registry(*verbose_logon_enabled) {
+                                if let Ok(mut lg) = log.lock() { lg.push_str(&format!("Failed to apply Verbose Logon: {}\n", err)); }
+                                *show_popup = true; *popup_message = format!("Failed to apply Verbose Logon: {}", err); return;
+                            }
+                            if let Err(err) = set_bitlocker_protection(*bitlocker_protection_on) {
+                                if let Ok(mut lg) = log.lock() { lg.push_str(&format!("Failed to change BitLocker: {}\n", err)); }
+                                *show_popup = true; *popup_message = format!("Failed to change BitLocker: {}", err); return;
+                            }
+
+                            // persist prefs
+                            let prefs = PrefsFile {
+                                enable_tooltips: *enable_tooltips,
+                                auto_check_updates: *auto_check_updates,
+                                mouse_accel_enabled: *mouse_accel_enabled,
+                                numlock_enabled: *numlock_enabled,
+                                taskbar_search_enabled: *taskbar_search_enabled,
+                                taskbar_widgets_enabled: *taskbar_widgets_enabled,
+                                snap_enabled: *snap_enabled,
+                                sticky_enabled: *sticky_enabled,
+                                taskview_enabled: *taskview_enabled,
+                                verbose_logon_enabled: *verbose_logon_enabled,
+                                bitlocker_protection_on: *bitlocker_protection_on,
+                            };
+                            if let Err(e) = save_prefs(&prefs) {
+                                if let Ok(mut lg) = log.lock() { lg.push_str(&format!("Failed to persist prefs after apply: {}\n", e)); }
+                                *show_popup = true; *popup_message = format!("Applied but failed to persist prefs: {}", e);
+                                return;
+                            }
+
+                            if let Ok(mut lg) = log.lock() { lg.push_str("All features applied successfully and persisted.\n"); }
+                            *show_popup = true;
+                            *popup_message = "Features applied.".to_string();
+                        }
+                    }
                 }
             });
         });

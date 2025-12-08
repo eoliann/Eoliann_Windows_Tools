@@ -40,16 +40,17 @@ Now install it on your system!
 <img width="1402" height="932" alt="update-1 1 7-to-1 1 8" src="https://github.com/user-attachments/assets/4d442ac3-679d-4c51-9f00-8f6383eea4b6" />
 
 ### INFO
-<img width="1402" height="932" alt="info-1 1 8" src="https://github.com/user-attachments/assets/ea2ecaba-aec8-43ad-9d41-3dca2aa311ed" />
-
+<img width="1402" height="1104" alt="Info-1 2 0" src="https://github.com/user-attachments/assets/3ef5d6a1-4b5b-416d-82c8-5a11490ad3d1" />
 
 - `whoami` → displays the current user
 - `ipconfig` → display network settings
 - `systeminfo` → system details
 - `tasklist` → active processes
+- `System Information` → information about the entire system: PC Name, Windows Edition, Processor, RAM, Storage, Graphics Card, Installed apps, Open processes, Services running, and Network.
+- `About` → all about application: developer, version, website
 
 ### TOOLS
-<img width="1402" height="932" alt="tools-1 1 8" src="https://github.com/user-attachments/assets/cbcaf573-1d3b-471c-921f-00929a35effd" />
+<img width="1402" height="995" alt="Tools-1 2 0" src="https://github.com/user-attachments/assets/e2d8e330-b54b-4cc4-a4d9-0af1a9371049" />
 
 #### Context menu
 - `Toggle Context Menu` → instantly switch between the **Win11 ↔ Classic** context menu (with Explorer restart)
@@ -86,6 +87,7 @@ Now install it on your system!
 - `Restore Time to Local` → restores Windows default: hardware clock treated as local time
 - `Remove OneDrive` → moves OneDrive files to default home folders and uninstalls OneDrive
 - `Install OneDrive (Restore)` → installs OneDrive using winget (undo)
+- `Toggle Explorer Tabs` → enabling and disabling tabs in Explorer (My Computer)
 - `Run OO Shutup 10` → downloads and launches OO Shutup 10 (third-party executable)
 - `Set DNS` → set the DNS for the network card
 #### Power Plans
@@ -100,7 +102,7 @@ Now install it on your system!
 - `Disable Monitor Timeout` → prevents the monitor from turning off automatically
 
 ### INSTALL
-<img width="1402" height="932" alt="install-1 1 8" src="https://github.com/user-attachments/assets/e96496c3-6426-40cd-8835-f137cc51fc03" />
+<img width="1402" height="995" alt="Install-1 2 0" src="https://github.com/user-attachments/assets/d26e603e-bfba-4c61-ad0b-f877b6552552" />
 
 #### Install application
 ![install-app](https://github.com/user-attachments/assets/1d50fdc2-eea6-4b72-863f-e3e7f44a330f)
@@ -121,7 +123,7 @@ Now install it on your system!
 - `Utilities`
   
 ### WINDOWS APP REMOVAL
-<img width="1402" height="932" alt="winapp-removal-1 1 8" src="https://github.com/user-attachments/assets/3eef7b2e-320d-4dfa-82b6-1bb2833117e8" />
+<img width="1402" height="995" alt="WinApp-Remover-1 2 0" src="https://github.com/user-attachments/assets/ef70ca16-f3ba-4f23-ab7b-03dd2ba295e1" />
 
 - `Communication` → remove default applications that come with Windows installation, such as: Outlook for Windows, Skype, Teams, GroupMe, To-Do, Your Phone, CommsPhone, Messaging, Mail & Calendar, and others.
 - `Media & Creativity` → removes default applications that come with Windows installation, such as: Climpchamp, Camera, MS Paint, 3D Builder, 3D Viewer, Print 3D, Mixed Reality Portal
@@ -131,13 +133,13 @@ Now install it on your system!
 - `System & Misc` → remove default applications that come with Windows installation, such as: People, Maps, Wallet, Get Started, Feedback Hub, Alarms & Clock, OneConnect, Windows Phone, Voice Recorder
 
 ### CUSTOMIZE PREFERENCES
-<img width="1402" height="932" alt="customize-preferences-1 1 8" src="https://github.com/user-attachments/assets/40aa982c-b8fa-4f5b-aba5-b8039521228a" />
+<img width="1402" height="995" alt="Customize-Preferences-1 2 0" src="https://github.com/user-attachments/assets/02c3e301-9e38-4e22-9cbc-eea1ae456ba3" />
 
 - `General Preferences` → Start with Windows, Enable advanced tooltips, Auto-check for updates
 - `Features / Tweaks` → Mouse Acceleration, NumLock on startup, Taskbar Search Button, Taskbar Widgets, Snap Windows on startup, Sticky Keys on startup, Task View button, Verbose Logon Messages (system), BitLocker protection
 
 ### SETTINGS
-<img width="1402" height="932" alt="settings-1 1 8" src="https://github.com/user-attachments/assets/c34c2d76-7ee9-495c-adb6-f49fc3476a1a" />
+<img width="1402" height="995" alt="Settings-1 2 0" src="https://github.com/user-attachments/assets/9a37a47e-2415-4386-8a9c-c3f95f9762b7" />
 
 - `Switch to Light Mode / Switch to Dark Mode` → switch between Windows Light and Dark themes
 - `Display Current alignment` → Display Current alignment of taskbar elements (Center or Left)

@@ -98,7 +98,7 @@ Now install it on your system!
 - `Disable Monitor Timeout` → prevents the monitor from turning off automatically
 
 ### INSTALL
-<img width="1402" height="932" alt="install-1 2 1" src="https://github.com/user-attachments/assets/12b954d6-d081-4e72-addc-62a2aff0ff5f" />
+<img width="1368" height="800" alt="install-1 2 2" src="https://github.com/user-attachments/assets/eec61403-68df-43ec-89a0-0d5c97d6b224" />
 
 #### Install application
 ![install-app](https://github.com/user-attachments/assets/1d50fdc2-eea6-4b72-863f-e3e7f44a330f)

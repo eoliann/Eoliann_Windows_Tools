@@ -940,6 +940,8 @@ pub fn show_tools(
                 }
             }
         });
+
+        ui.ctx().request_repaint();
     });
 
     ui.add_space(6.0);

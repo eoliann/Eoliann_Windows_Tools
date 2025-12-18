@@ -13,7 +13,7 @@ use app::App;
 fn main() -> eframe::Result<()> {
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
-            .with_inner_size([1400.0, 900.0])   // dimensiune inițială mai mare
+            .with_inner_size([1366.0, 768.0])   // dimensiune inițială mai mare
             .with_min_inner_size([800.0, 600.0])
             .with_position(egui::Pos2::new(50.0, 50.0)), // pornește centrat pe ecran
         ..Default::default()

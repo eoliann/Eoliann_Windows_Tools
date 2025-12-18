@@ -1,6 +1,20 @@
+// src/tabs/install.rs
+// Rewritten install tab (full file). Includes the original, complete APP_CATALOG,
+// UI, spawn_task logic and the Google Chrome panel (install + extension registry).
+//
+// Notes:
+// - This file expects `crate::commands` to export winget helpers used below
+//   (ensure_winget_ready, winget_is_installed, winget_install, winget_uninstall, winget_upgrade, upgrade_all_apps_with_log).
+// - If your project has different helpers, adaptează apelurile la `crate::commands`.
+// - The Chrome extension install uses registry keys (HKCU). Admin rights may be required.
+
 use std::collections::{BTreeMap, HashSet};
 use std::sync::{Arc, Mutex, OnceLock};
-use egui::{self, ProgressBar};
+use std::path::PathBuf;
+use std::process::Command;
+
+use eframe::egui;
+
 use crate::commands;
 
 /// Un element instalabil via winget.
@@ -11,7 +25,7 @@ struct AppItem {
     desc: &'static str,
 }
 
-/// ✅ Catalog de start (poți adăuga ușor mai multe din lista ta)
+/// ORIGINAL COMPLETE APP_CATALOG (restored)
 static APP_CATALOG: &[AppItem] = &[
     // Browsers
     AppItem { name: "Brave", winget_id: "Brave.Brave", category: "Browsers", desc: "Brave is a privacy-focused web browser that blocks ads and trackers, offering a faster and safer browsing experience." },
@@ -149,7 +163,7 @@ static APP_CATALOG: &[AppItem] = &[
     AppItem { name: "Foxit PDF Reader", winget_id: "Foxit.FoxitReader", category: "Document", desc: "Foxit PDF Reader is a lightweight and fast PDF viewer that allows users to view, annotate, and sign PDF documents. It provides features like tabbed viewing, text highlighting, and form filling." },
     AppItem { name: "Grammarly for Windows", winget_id: "Grammarly.Grammarly", category: "Document", desc: "Grammarly for Windows is a writing assistant that helps users improve their writing by providing grammar, spelling, and style suggestions. It integrates with various applications and platforms to enhance writing quality." },
     AppItem { name: "LibreOffice", winget_id: "TheDocumentFoundation.LibreOffice", category: "Document", desc: "LibreOffice is a free and open-source office suite that includes applications for word processing, spreadsheets, presentations, and more. It is compatible with various file formats, including Microsoft Office formats." },
-    AppItem { name: "Notepad++", winget_id: "Notepad++.Notepad++", category: "Utilities", desc: "Notepad++ is a free source code editor and Notepad replacement that supports several programming languages and is highly customizable." },
+    AppItem { name: "Notepad++", winget_id: "Notepad++.Notepad++", category: "Document", desc: "Notepad++ is a free source code editor and Notepad replacement that supports several programming languages and is highly customizable." },
     AppItem { name: "Okular", winget_id: "KDE.Okular", category: "Document", desc: "Okular is a free and open-source document viewer developed by the KDE community. It supports various document formats, including PDF, EPUB, and images, and provides features like annotations and bookmarks." },
     AppItem { name: "OnlyOffice", winget_id: "ONLYOFFICE.DesktopEditors", category: "Document", desc: "OnlyOffice is a free and open-source office suite that includes applications for word processing, spreadsheets, and presentations. It is compatible with various file formats, including Microsoft Office formats." },
     AppItem { name: "PDF24 creator", winget_id: "geeksoftwareGmbH.PDF24Creator", category: "Document", desc: "PDF24 Creator is a free PDF creation and editing software that allows users to create, edit, and convert PDF documents. It provides features like merging, splitting, and compressing PDF files." },
@@ -261,7 +275,7 @@ fn log_line(log: &Arc<Mutex<String>>, s: impl AsRef<str>) {
     }
 }
 
-/// 🔎 Stocăm query-ul de search global pentru tab
+/// Stocăm query-ul de search global pentru tab
 static SEARCH_QUERY: OnceLock<Mutex<String>> = OnceLock::new();
 fn search_query() -> &'static Mutex<String> {
     SEARCH_QUERY.get_or_init(|| Mutex::new(String::new()))
@@ -275,14 +289,13 @@ pub fn show_install(ui: &mut egui::Ui, log: &Arc<Mutex<String>>) {
         (st.selected.len(), p.running, p)
     };
 
-    // Header mic cu progres
     ui.group(|ui| {
         if running {
             ui.label(format!("Working on: {}", p_snapshot.current_name));
             let frac = if p_snapshot.total > 0 {
                 p_snapshot.current as f32 / p_snapshot.total as f32
             } else { 0.0 };
-            ui.add(ProgressBar::new(frac).text(format!("{} / {}", p_snapshot.current, p_snapshot.total)));
+            ui.add(egui::ProgressBar::new(frac).text(format!("{} / {}", p_snapshot.current, p_snapshot.total)));
         } else {
             ui.label(if sel_count > 0 {
                 format!("Selected: {} apps", sel_count)
@@ -294,61 +307,32 @@ pub fn show_install(ui: &mut egui::Ui, log: &Arc<Mutex<String>>) {
 
     ui.add_space(6.0);
 
-    // Acțiuni
-    // Styled action row — same visual behavior as previous action buttons
+    // Action buttons (styled)
     {
-        let neon_green = egui::Color32::from_rgb(0, 255, 140);
-        let normal_text = egui::Color32::BLACK;
-        let normal_stroke = egui::Color32::from_gray(160);
-        let disabled_text = egui::Color32::from_gray(140);
-        let disabled_stroke = egui::Color32::from_gray(110);
-
-        // helper that draws a styled button and returns a Response
         let draw_action_btn = |ui: &mut egui::Ui, label: &str, enabled: bool| -> egui::Response {
             let min_size = egui::Vec2::new(150.0, 30.0);
             let sense = if enabled { egui::Sense::click() } else { egui::Sense::hover() };
             let (rect, resp) = ui.allocate_at_least(min_size, sense);
 
             let visuals = ui.style().visuals.clone();
-            let normal_bg = visuals.widgets.inactive.bg_fill; // grey-like background
+            let normal_bg = visuals.widgets.inactive.bg_fill;
             let hover_bg = egui::Color32::WHITE;
 
             let bg_fill = if resp.hovered() && enabled { hover_bg } else { normal_bg };
-            let stroke_col = if !enabled {
-                disabled_stroke
-            } else if resp.hovered() {
-                neon_green
-            } else {
-                normal_stroke
-            };
+            let stroke_col = if resp.hovered() { egui::Color32::from_rgb(0,255,140) } else { egui::Color32::from_gray(160) };
 
-            ui.painter().rect(
-                rect,
-                6.0,
-                bg_fill,
-                egui::Stroke::new(1.5, stroke_col),
-                egui::StrokeKind::Middle,
-            );
+            ui.painter().rect(rect, 6.0, bg_fill, egui::Stroke::new(1.5, stroke_col), egui::StrokeKind::Middle);
 
             let font_id = egui::TextStyle::Button.resolve(ui.style());
-            let text_col = if !enabled {
-                disabled_text
-            } else if resp.hovered() {
-                normal_text
-            } else {
-                neon_green
-            };
-
+            let text_col = if resp.hovered() { egui::Color32::BLACK } else { egui::Color32::from_rgb(0,255,140) };
             ui.painter().text(rect.center(), egui::Align2::CENTER_CENTER, label, font_id, text_col);
 
             if resp.hovered() && enabled {
                 ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
             }
-
             resp
         };
 
-        // draw inline, capture responses and handle actions after borrow
         let mut r_install: Option<egui::Response> = None;
         let mut r_uninstall: Option<egui::Response> = None;
         let mut r_update: Option<egui::Response> = None;
@@ -357,23 +341,17 @@ pub fn show_install(ui: &mut egui::Ui, log: &Arc<Mutex<String>>) {
 
         ui.horizontal(|ui| {
             let disabled = sel_count == 0 || running;
-
             r_install  = Some(draw_action_btn(ui, "Install selections", !disabled));
             ui.add_space(6.0);
             r_uninstall = Some(draw_action_btn(ui, "Uninstall selections", !disabled));
             ui.add_space(6.0);
             r_update = Some(draw_action_btn(ui, "Update selections", !disabled));
             ui.add_space(6.0);
-
-            // Clear selection (non-styled original behavior but keep same visual style)
             r_clear = Some(draw_action_btn(ui, "Clear selection", true));
             ui.add_space(6.0);
-
-            // Upgrade all Applications (may be long-running)
             r_upgrade = Some(draw_action_btn(ui, "Upgrade all Applications", true));
         });
 
-        // actions after drawing UI
         if let Some(r) = r_install { if r.clicked() {
             spawn_task(DoWhat::Install, log.clone());
         }}
@@ -389,141 +367,150 @@ pub fn show_install(ui: &mut egui::Ui, log: &Arc<Mutex<String>>) {
         if let Some(r) = r_upgrade { if r.clicked() {
             let log = log.clone();
             std::thread::spawn(move || {
-                commands::upgrade_all_apps_with_log(log);
+                let _ = commands::upgrade_all_apps_with_log(log);
             });
         }}
     }
 
-
     ui.add_space(6.0);
     ui.separator();
 
-    // 🔎 Search bar cu chenar verde
+    // Search row
     {
         use egui::{Frame, Stroke, Color32, Margin, Vec2, TextStyle, Align2, StrokeKind, CursorIcon};
 
         let mut query = search_query().lock().unwrap();
 
-        // styling
-        let neon_green = Color32::from_rgb(0, 255, 140);
-        let normal_text = Color32::BLACK;
-        let normal_stroke = Color32::from_gray(160);
-
-        // helper that draws a small action button matching the other styled buttons
         let draw_small_action_btn = |ui: &mut egui::Ui, label: &str| -> egui::Response {
             let min_size = Vec2::new(110.0, 28.0);
             let (rect, resp) = ui.allocate_at_least(min_size, egui::Sense::click());
-
             let visuals = ui.style().visuals.clone();
             let normal_bg = visuals.widgets.inactive.bg_fill;
             let hover_bg = Color32::WHITE;
-
             let bg_fill = if resp.hovered() { hover_bg } else { normal_bg };
-            let stroke_col = if resp.hovered() { neon_green } else { normal_stroke };
+            let stroke_col = if resp.hovered() { Color32::from_rgb(0,255,140) } else { Color32::from_gray(160) };
 
-            ui.painter().rect(
-                rect,
-                6.0,
-                bg_fill,
-                egui::Stroke::new(1.5, stroke_col),
-                StrokeKind::Middle,
-            );
-
+            ui.painter().rect(rect, 6.0, bg_fill, Stroke::new(1.5, stroke_col), StrokeKind::Middle);
             let font_id = TextStyle::Button.resolve(ui.style());
-            let text_col = if resp.hovered() { normal_text } else { neon_green };
+            let text_col = if resp.hovered() { Color32::BLACK } else { Color32::from_rgb(0,255,140) };
             ui.painter().text(rect.center(), Align2::CENTER_CENTER, label, font_id, text_col);
 
-            if resp.hovered() {
-                ui.ctx().set_cursor_icon(CursorIcon::PointingHand);
-            }
-
+            if resp.hovered() { ui.ctx().set_cursor_icon(CursorIcon::PointingHand); }
             resp
         };
 
-        // responses captured to handle actions after UI borrow ends
         let mut resp_filter: Option<egui::Response> = None;
         let mut resp_reset: Option<egui::Response> = None;
 
         ui.horizontal(|ui| {
             ui.label("Search:");
-
-            // green framed search box (keeps your Frame config)
             let frame = Frame::new()
                 .stroke(Stroke::new(1.5, Color32::GREEN))
                 .corner_radius(4.0)
                 .inner_margin(Margin::symmetric(4, 2));
-
             frame.show(ui, |ui| {
                 ui.set_min_width(300.0);
                 ui.text_edit_singleline(&mut *query);
             });
-
             ui.add_space(6.0);
-
-            // draw the two small action buttons inline
             resp_filter = Some(draw_small_action_btn(ui, "Filtrare"));
             ui.add_space(6.0);
             resp_reset = Some(draw_small_action_btn(ui, "Reset"));
         });
 
-        // actions after UI borrow ends
-        if let Some(r) = resp_filter {
-            if r.clicked() {
-                // aplică filtrarea: depinde de implementarea ta (de ex. set a filter flag or call function)
-                // ex: apply_search_filter(&*query);
-            }
-        }
-        if let Some(r) = resp_reset {
-            if r.clicked() {
-                query.clear();
-            }
-        }
+        if let Some(r) = resp_filter { if r.clicked() { /* apply filter if needed */ } }
+        if let Some(r) = resp_reset { if r.clicked() { query.clear(); } }
     }
-
 
     ui.add_space(6.0);
 
-    // ===== Listă aplicații =====
+    // Lista aplicatiilor filtrata
     let query = search_query().lock().unwrap().to_lowercase();
-
     let mut by_cat: BTreeMap<&'static str, Vec<&'static AppItem>> = BTreeMap::new();
     for item in APP_CATALOG.iter() {
-        // dacă query-ul e gol, afișăm tot; altfel filtrăm după nume sau descriere
-        if query.is_empty()
-            || item.name.to_lowercase().contains(&query)
-            || item.desc.to_lowercase().contains(&query)
-        {
+        if query.is_empty() || item.name.to_lowercase().contains(&query) || item.desc.to_lowercase().contains(&query) {
             by_cat.entry(item.category).or_default().push(item);
         }
     }
 
+    // egui::ScrollArea::vertical()
+    //     .id_salt("install_scroll")
+    //     .auto_shrink([false, false])
+    //     .show(ui, |ui| {
+    //         for (category, items) in by_cat.into_iter() {
+    //             ui.collapsing(category, |ui| {
+    //                 for app in items {
+    //                     let mut checked = {
+    //                         state().lock().unwrap().selected.contains(app.winget_id)
+    //                     };
+
+    //                     let resp = ui.checkbox(&mut checked, app.name).on_hover_text(app.desc);
+
+    //                     if resp.changed() {
+    //                         let mut st = state().lock().unwrap();
+    //                         if checked {
+    //                             st.selected.insert(app.winget_id.to_string());
+    //                         } else {
+    //                             st.selected.remove(app.winget_id);
+    //                         }
+    //                     }
+    //                 }
+    //             });
+    //         }
+    //     });
+    
     egui::ScrollArea::vertical()
-        .id_salt("install_scroll")
-        .auto_shrink([false, false])
-        .show(ui, |ui| {
-            for (category, items) in by_cat.into_iter() {
-                ui.collapsing(category, |ui| {
-                    for app in items {
-                        let mut checked = {
-                            state().lock().unwrap().selected.contains(app.winget_id)
-                        };
-
-                        let resp = ui
-                            .checkbox(&mut checked, app.name)
-                            .on_hover_text(app.desc);
-
-                        if resp.changed() {
-                            let mut st = state().lock().unwrap();
-                            if checked {
-                                st.selected.insert(app.winget_id.to_string());
-                            } else {
-                                st.selected.remove(app.winget_id);
+    .id_salt("install_scroll")
+    .auto_shrink([false, false])
+    .show(ui, |ui| {
+        // layout pe două coloane: stânga = listă, dreapta = Chrome panel
+        ui.horizontal(|ui| {
+            // Coloană stângă: lista de categorii (ocupe ~65% din lățime)
+            ui.vertical(|ui_left| {
+                ui_left.set_min_width(ui_left.available_width() * 0.65);
+                for (category, items) in by_cat.clone().into_iter() {
+                    ui_left.collapsing(category, |ui_cat| {
+                        for app in items {
+                            let mut checked = state().lock().unwrap().selected.contains(app.winget_id);
+                            let resp = ui_cat.checkbox(&mut checked, app.name).on_hover_text(app.desc);
+                            if resp.changed() {
+                                let mut st = state().lock().unwrap();
+                                if checked {
+                                    st.selected.insert(app.winget_id.to_string());
+                                } else {
+                                    st.selected.remove(app.winget_id);
+                                }
                             }
                         }
-                    }
-                });
-            }
-        });
+                    });
+                }
+            });
+
+            // mic spațiu orizontal
+            ui.add_space(6.0);
+
+            // Separator vertical (delimitează clar cele două coloane)
+            ui.separator();
+
+            // mic spațiu orizontal după separator
+            ui.add_space(6.0);
+
+            // Coloană dreaptă: Chrome panel (ocupe restul lățimii)
+            ui.vertical(|ui_right| {
+                // Optional: un header mic, pentru claritate
+                ui_right.heading("Extensions / Chrome tools");
+                ui_right.add_space(4.0);
+
+                // Aici afișăm panelul Chrome — folosește același log
+                show_chrome_panel(ui_right, log);
+            });
+        }); // end horizontal
+    });
+
+
+    // --- Chrome panel (placed at the end of install tab) ---
+    // show_chrome_panel(ui, log);
+    // dacă tocmai am afișat Utilities, punem imediat secțiunea Chrome
 }
 
 fn spawn_task(what: DoWhat, log: Arc<Mutex<String>>) {
@@ -542,6 +529,7 @@ fn spawn_task(what: DoWhat, log: Arc<Mutex<String>>) {
     }
 
     if !commands::ensure_winget_ready(log.clone()) {
+        log_line(&log, "ERROR: winget not ready; aborting task.");
         return;
     }
 
@@ -598,5 +586,155 @@ fn spawn_task(what: DoWhat, log: Arc<Mutex<String>>) {
 
         log_line(&log, "✅ Finished processing selection.");
         state().lock().unwrap().selected.clear();
+    });
+}
+
+//
+// --- Google Chrome panel (self-contained) ---
+//
+
+// Registry-based "external extension" method uses HKCU\Software\Google\Chrome\Extensions\{id} with update_url
+const CHROME_UPDATE_URL: &str = "https://clients2.google.com/service/update2/crx";
+const ADGUARD_ID: &str = "bgnkhhnnamicmpeenaelnjfhikgbkllg";
+const TRAFFICLIGHT_ID: &str = "cfnpidifppmenkapgihekkeednfoenal";
+
+static CHROME_EXT_STATE: OnceLock<Mutex<(bool, bool)>> = OnceLock::new();
+fn chrome_ext_state() -> &'static Mutex<(bool, bool)> {
+    CHROME_EXT_STATE.get_or_init(|| Mutex::new((true, true)))
+}
+
+fn chrome_is_installed() -> bool {
+    let candidates = [
+        std::env::var("PROGRAMFILES").ok(),
+        std::env::var("PROGRAMFILES(X86)").ok(),
+        std::env::var("LOCALAPPDATA").ok(),
+    ];
+    for base in candidates.iter().flatten() {
+        let mut p = PathBuf::from(base);
+        p.push("Google");
+        p.push("Chrome");
+        p.push("Application");
+        p.push("chrome.exe");
+        if p.exists() {
+            return true;
+        }
+    }
+    false
+}
+
+fn install_chrome_with_winget() -> (bool, String) {
+    match Command::new("winget").arg("--version").output() {
+        Ok(out) if out.status.success() => {
+            let res = Command::new("winget")
+                .args(&[
+                    "install",
+                    "--id",
+                    "Google.Chrome",
+                    "-e",
+                    "--accept-source-agreements",
+                    "--accept-package-agreements",
+                ])
+                .status();
+
+            match res {
+                Ok(s) if s.success() => (true, "winget: install command returned success".to_string()),
+                Ok(s) => (false, format!("winget returned non-zero status: {}", s)),
+                Err(e) => (false, format!("failed to run winget install: {}", e)),
+            }
+        }
+        _ => (false, "winget not found on PATH".to_string()),
+    }
+}
+
+fn add_chrome_external_extension_registry(ext_id: &str) -> (bool, String) {
+    let key = format!(r#"HKCU\Software\Google\Chrome\Extensions\{}"#, ext_id);
+    let args = ["add", &key, "/v", "update_url", "/t", "REG_SZ", "/d", CHROME_UPDATE_URL, "/f"];
+
+    match Command::new("reg").args(&args).output() {
+        Ok(out) => {
+            if out.status.success() {
+                (true, format!("Registry key added for extension {}", ext_id))
+            } else {
+                (false, format!("reg failed: {}", String::from_utf8_lossy(&out.stderr)))
+            }
+        }
+        Err(e) => (false, format!("failed to run reg: {}", e)),
+    }
+}
+
+/// Afișează panoul Chrome (folosește loggerul aplicației: Arc<Mutex<String>>).
+/// IMPORTANT: apelează această funcție **numai dintr-o funcție care are `ui: &mut egui::Ui`**.
+pub fn show_chrome_panel(ui: &mut egui::Ui, log: &Arc<Mutex<String>>) {
+    ui.separator();
+
+    // 12.0 = aproximativ 2-3 linii de spațiu; crește/decreasează dacă vrei mai mult/mai puțin
+    ui.add_space(12.0);
+
+    ui.collapsing("Google Chrome (Install & Extensions)", |ui| {
+        ui.label("Verify Chrome installation + install extensions from the Chrome Web Store");
+
+        let installed = chrome_is_installed();
+        ui.horizontal(|ui| {
+            ui.label(format!("Chrome installation status: {}", if installed { "Yes" } else { "No" }));
+            if !installed {
+                if ui.button("Install Chrome (winget)").clicked() {
+                    let (ok, msg) = install_chrome_with_winget();
+                    if let Ok(mut lg) = log.lock() {
+                        lg.push_str(&format!("Installing Chrome: ok={} msg={}\n", ok, msg));
+                    }
+                }
+            } else {
+                if ui.button("Reinstall/Repair Chrome (winget)").clicked() {
+                    let (ok, msg) = install_chrome_with_winget();
+                    if let Ok(mut lg) = log.lock() {
+                        lg.push_str(&format!("Reinstall attempted: ok={} msg={}\n", ok, msg));
+                    }
+                }
+            }
+        });
+
+        ui.separator();
+
+        // checkbox state kept in RAM via OnceLock + Mutex (stable behavior across egui versions)
+        {
+            let state_mutex = chrome_ext_state();
+            let mut state = state_mutex.lock().unwrap();
+            let mut adguard = state.0;
+            let mut traffic = state.1;
+
+            ui.checkbox(&mut adguard, "Adguard Adblocker (AdGuard ad blocker effectively blocks all types of ads on all web pages, even on Facebook, YouTube and others!)");
+            ui.checkbox(&mut traffic, "TrafficLight (Bitdefender TrafficLight adds a strong and non-intrusive layer of security to your browsing experience.)");
+
+            // daca s-au schimbat, salvăm în mutex (persistă doar cât rulează aplicația)
+            state.0 = adguard;
+            state.1 = traffic;
+        }
+
+        ui.add_space(6.0);
+
+        if ui.button("Install selected extensions").clicked() {
+            if !chrome_is_installed() {
+                if let Ok(mut lg) = log.lock() {
+                    lg.push_str("Chrome is not installed. Install Chrome before adding extensions.\n");
+                }
+            } else {
+                let st = chrome_ext_state().lock().unwrap();
+                if st.0 {
+                    let (ok, msg) = add_chrome_external_extension_registry(ADGUARD_ID);
+                    if let Ok(mut lg) = log.lock() {
+                        lg.push_str(&format!("Adguard -> ok={} msg={}\n", ok, msg));
+                    }
+                }
+                if st.1 {
+                    let (ok, msg) = add_chrome_external_extension_registry(TRAFFICLIGHT_ID);
+                    if let Ok(mut lg) = log.lock() {
+                        lg.push_str(&format!("TrafficLight -> ok={} msg={}\n", ok, msg));
+                    }
+                }
+                if let Ok(mut lg) = log.lock() {
+                    lg.push_str("Extension installation: complete (Chrome will load the extensions the next time it starts).\n");
+                }
+            }
+        }
     });
 }

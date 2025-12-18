@@ -1,23 +1,19 @@
 ![Followers](https://img.shields.io/github/followers/eoliann?style=plastic&color=green)
 ![Watchers](https://img.shields.io/github/watchers/eoliann/wup-web?style=plastic)
 ![Stars](https://img.shields.io/github/stars/eoliann/Eoliann_Windows_Tools?style=plastic)
+[![Donate](https://img.shields.io/badge/Donate-PayPal-blue?style=plastic)](https://www.paypal.com/donate/?hosted_button_id=PTH2EXUDS423S)
+[![Donate](https://img.shields.io/badge/Donate-Revolut-8A2BE2?style=plastic)](http://revolut.me/adriannm9?style=plastic)
 
 ![Release Date](https://img.shields.io/github/release-date/eoliann/Eoliann_Windows_Tools?style=plastic)
 ![Last Commit](https://img.shields.io/github/last-commit/eoliann/Eoliann_Windows_Tools?style=plastic)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg?style=plastic)](LICENSE.md)
+![OS](https://img.shields.io/badge/OS-Windows-blue?style=plastic)
+![Lang](https://img.shields.io/badge/Lang-Rust-magenta?style=plastic)
 
 ![Total Downloads](https://img.shields.io/github/downloads/eoliann/Eoliann_Windows_Tools/total?style=plastic)
 ![](https://img.shields.io/github/downloads/eoliann/Eoliann_Windows_Tools/latest/eoliann_windows_tools_w11.exe?displayAssetName=true&style=plastic&color=green)
 ![](https://img.shields.io/github/downloads/eoliann/Eoliann_Windows_Tools/latest/Eoliann_Windows_Tools_Installer.exe?displayAssetName=true&style=plastic&color=red)
 [![Downloads latest](https://img.shields.io/github/downloads/eoliann/Eoliann_Windows_Tools/latest/total?style=plastic)](https://github.com/eoliann/Eoliann_Windows_Tools/releases/latest/download/eoliann_windows_tools_w11.exe)
-
-[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg?style=plastic)](LICENSE.md)
-![OS](https://img.shields.io/badge/OS-Windows-blue?style=plastic)
-![Lang](https://img.shields.io/badge/Lang-Rust-magenta?style=plastic)
-
-[![Donate](https://img.shields.io/badge/Donate-PayPal-blue?style=plastic)](https://www.paypal.com/donate/?hosted_button_id=U9XAX3XBTU67G?style=plastic)
-[![Donate](https://img.shields.io/badge/Donate-Revolut-8A2BE2?style=plastic)](http://revolut.me/adriannm9?style=plastic)
-
-
 
 # 🟢 Eoliann Windows Tools
 
@@ -40,7 +36,7 @@ Now install it on your system!
 <img width="1402" height="932" alt="update-1 1 7-to-1 1 8" src="https://github.com/user-attachments/assets/4d442ac3-679d-4c51-9f00-8f6383eea4b6" />
 
 ### INFO
-<img width="1402" height="1104" alt="Info-1 2 0" src="https://github.com/user-attachments/assets/3ef5d6a1-4b5b-416d-82c8-5a11490ad3d1" />
+<img width="1402" height="932" alt="info-1 2 1" src="https://github.com/user-attachments/assets/4c16a87d-1ad6-4bbd-9383-5b4dad1ef410" />
 
 - `whoami` → displays the current user
 - `ipconfig` → display network settings
@@ -50,7 +46,7 @@ Now install it on your system!
 - `About` → all about application: developer, version, website
 
 ### TOOLS
-<img width="1402" height="995" alt="Tools-1 2 0" src="https://github.com/user-attachments/assets/e2d8e330-b54b-4cc4-a4d9-0af1a9371049" />
+<img width="1402" height="932" alt="tools-1 2 1" src="https://github.com/user-attachments/assets/71cb32cc-22ad-4d0d-ae5c-e2bec9b0b85a" />
 
 #### Context menu
 - `Toggle Context Menu` → instantly switch between the **Win11 ↔ Classic** context menu (with Explorer restart)
@@ -102,7 +98,7 @@ Now install it on your system!
 - `Disable Monitor Timeout` → prevents the monitor from turning off automatically
 
 ### INSTALL
-<img width="1402" height="995" alt="Install-1 2 0" src="https://github.com/user-attachments/assets/d26e603e-bfba-4c61-ad0b-f877b6552552" />
+<img width="1402" height="932" alt="install-1 2 1" src="https://github.com/user-attachments/assets/12b954d6-d081-4e72-addc-62a2aff0ff5f" />
 
 #### Install application
 ![install-app](https://github.com/user-attachments/assets/1d50fdc2-eea6-4b72-863f-e3e7f44a330f)
@@ -123,23 +119,24 @@ Now install it on your system!
 - `Utilities`
   
 ### WINDOWS APP REMOVAL
-<img width="1402" height="995" alt="WinApp-Remover-1 2 0" src="https://github.com/user-attachments/assets/ef70ca16-f3ba-4f23-ab7b-03dd2ba295e1" />
+<img width="1402" height="1035" alt="winapp-removal-1 2 1" src="https://github.com/user-attachments/assets/83b15a52-dc27-4fa1-9670-7fb5a86d9f56" />
 
 - `Communication` → remove default applications that come with Windows installation, such as: Outlook for Windows, Skype, Teams, GroupMe, To-Do, Your Phone, CommsPhone, Messaging, Mail & Calendar, and others.
-- `Media & Creativity` → removes default applications that come with Windows installation, such as: Climpchamp, Camera, MS Paint, 3D Builder, 3D Viewer, Print 3D, Mixed Reality Portal
+- `Media & Creativity` → removes default applications that come with Windows installation, such as: Climpchamp, Camera, MS Paint, 3D Builder, 3D Viewer, Mixed Reality Portal
 - `Microsoft Apps` → removes default applications that come with Windows installation, such as: Office Hub, OneNote, Sway, Sticky Notes, Family Safety
 - `Bing Apps` → removes default applications that come with Windows installation, such as: Bing Weather, Bing Sports, Bing Finance, Bing News
 - `Games` → removes default applications that come with Windows installation, such as: Solitaire Collection, Minecraft for Windows
 - `System & Misc` → remove default applications that come with Windows installation, such as: People, Maps, Wallet, Get Started, Feedback Hub, Alarms & Clock, OneConnect, Windows Phone, Voice Recorder
+- `Other` → remove default applications that come with Windows installation, such as: Print 3D, Office-related
 
 ### CUSTOMIZE PREFERENCES
-<img width="1402" height="995" alt="Customize-Preferences-1 2 0" src="https://github.com/user-attachments/assets/02c3e301-9e38-4e22-9cbc-eea1ae456ba3" />
+<img width="1402" height="932" alt="customize-preferences-1 2 1" src="https://github.com/user-attachments/assets/299a4bf6-68f1-45f3-bfb4-49b9c622cca5" />
 
 - `General Preferences` → Start with Windows, Enable advanced tooltips, Auto-check for updates
 - `Features / Tweaks` → Mouse Acceleration, NumLock on startup, Taskbar Search Button, Taskbar Widgets, Snap Windows on startup, Sticky Keys on startup, Task View button, Verbose Logon Messages (system), BitLocker protection
 
 ### SETTINGS
-<img width="1402" height="995" alt="Settings-1 2 0" src="https://github.com/user-attachments/assets/9a37a47e-2415-4386-8a9c-c3f95f9762b7" />
+<img width="1402" height="932" alt="settings-1 2 1" src="https://github.com/user-attachments/assets/1e20e74e-51eb-4c9e-abb2-271423e75854" />
 
 - `Switch to Light Mode / Switch to Dark Mode` → switch between Windows Light and Dark themes
 - `Display Current alignment` → Display Current alignment of taskbar elements (Center or Left)

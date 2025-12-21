@@ -28,7 +28,7 @@ jobs:
 
           if [[ -n "${ASSET_URL}" ]]; then
             TEXT="$TEXT
-            ⬇️ <a href='${ASSET_URL}'>Descarcă fișierul .exe</a>"
+            ⬇️ <a href='${ASSET_URL}'>Descarcă fișierul <u><b>Eoliann_Windows_Tools_Installer.exe</b></u> instalabil sau <u><b>eoliann_windows_tools_w11.exe</b></u> portabil</a>"
           fi
 
           IFS=',' read -r -a CHATS <<< "${TG_CHATS}"

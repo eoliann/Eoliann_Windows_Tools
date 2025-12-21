@@ -21,6 +21,8 @@ jobs:
         run: |
           TEXT="📢 <b>Eoliann Windows Tools are o nouă versiune pe GitHub!</b>
           <b>${RELEASE_NAME}</b> (tag: <code>${RELEASE_TAG}</code>)
+          Un set de instrumente rapid pentru Windows 11, scris în Rust, care include comenzi de administrare utile și ajustări pentru Windows 11.
+
           👉 <a href='${RELEASE_URL}'>Mergi la pagina noii versiuni</a>"
 
           if [[ -n "${ASSET_URL}" ]]; then

@@ -116,6 +116,10 @@ Now install it on your system!
 - `Multimedia Tools`
 - `Pro Tools`
 - `Utilities`
+
+For Google Chrome users:
+- `Install/Reinstall Google Chrome` → if the browser is not in the system
+- `Install Chrome extensions` → install Chrome extensions from the Chrome Web Store
   
 ### WINDOWS APP REMOVAL
 <img width="2048" height="1104" alt="WinApp_Removal-1 2 3" src="https://github.com/user-attachments/assets/9d20a9d9-f99e-4f61-8300-5d02a7f78da4" />

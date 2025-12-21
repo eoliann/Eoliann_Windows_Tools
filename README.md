@@ -36,7 +36,7 @@ Now install it on your system!
 <img width="1402" height="932" alt="update-1 1 7-to-1 1 8" src="https://github.com/user-attachments/assets/4d442ac3-679d-4c51-9f00-8f6383eea4b6" />
 
 ### INFO
-<img width="1402" height="932" alt="info-1 2 1" src="https://github.com/user-attachments/assets/4c16a87d-1ad6-4bbd-9383-5b4dad1ef410" />
+<img width="1368" height="800" alt="Info-1 2 3" src="https://github.com/user-attachments/assets/78dade2a-b843-42fc-888b-78f333f6e6fb" />
 
 - `whoami` → displays the current user
 - `ipconfig` → display network settings
@@ -46,7 +46,7 @@ Now install it on your system!
 - `About` → all about application: developer, version, website
 
 ### TOOLS
-<img width="1402" height="932" alt="tools-1 2 1" src="https://github.com/user-attachments/assets/71cb32cc-22ad-4d0d-ae5c-e2bec9b0b85a" />
+<img width="1368" height="800" alt="Tools-1 2 3" src="https://github.com/user-attachments/assets/ab46b710-ea6a-4d0e-9b02-e675f19ac7e5" />
 
 #### Context menu
 - `Toggle Context Menu` → instantly switch between the **Win11 ↔ Classic** context menu (with Explorer restart)
@@ -98,11 +98,10 @@ Now install it on your system!
 - `Disable Monitor Timeout` → prevents the monitor from turning off automatically
 
 ### INSTALL
-<img width="1368" height="800" alt="install-1 2 2" src="https://github.com/user-attachments/assets/eec61403-68df-43ec-89a0-0d5c97d6b224" />
+<img width="1368" height="906" alt="Install-1 2 3" src="https://github.com/user-attachments/assets/10eeec4e-90ad-4240-ac60-f2a3247b0867" />
 
 #### Install application
 ![install-app](https://github.com/user-attachments/assets/1d50fdc2-eea6-4b72-863f-e3e7f44a330f)
-
 
 #### Uninstall installed application
 ![uninstall-app](https://github.com/user-attachments/assets/55bccd07-4b97-4c57-bca0-858f9cf31e0b)
@@ -117,9 +116,13 @@ Now install it on your system!
 - `Multimedia Tools`
 - `Pro Tools`
 - `Utilities`
+
+For Google Chrome users:
+- `Install/Reinstall Google Chrome` → if the browser is not in the system
+- `Install Chrome extensions` → install Chrome extensions from the Chrome Web Store
   
 ### WINDOWS APP REMOVAL
-<img width="1402" height="1035" alt="winapp-removal-1 2 1" src="https://github.com/user-attachments/assets/83b15a52-dc27-4fa1-9670-7fb5a86d9f56" />
+<img width="2048" height="1104" alt="WinApp_Removal-1 2 3" src="https://github.com/user-attachments/assets/9d20a9d9-f99e-4f61-8300-5d02a7f78da4" />
 
 - `Communication` → remove default applications that come with Windows installation, such as: Outlook for Windows, Skype, Teams, GroupMe, To-Do, Your Phone, CommsPhone, Messaging, Mail & Calendar, and others.
 - `Media & Creativity` → removes default applications that come with Windows installation, such as: Climpchamp, Camera, MS Paint, 3D Builder, 3D Viewer, Mixed Reality Portal
@@ -130,13 +133,13 @@ Now install it on your system!
 - `Other` → remove default applications that come with Windows installation, such as: Print 3D, Office-related
 
 ### CUSTOMIZE PREFERENCES
-<img width="1402" height="932" alt="customize-preferences-1 2 1" src="https://github.com/user-attachments/assets/299a4bf6-68f1-45f3-bfb4-49b9c622cca5" />
+<img width="1368" height="828" alt="Customize_Preferences-1 2 3" src="https://github.com/user-attachments/assets/ae538329-ae77-49f9-ab4e-a0c1870cb9bd" />
 
 - `General Preferences` → Start with Windows, Enable advanced tooltips, Auto-check for updates
 - `Features / Tweaks` → Mouse Acceleration, NumLock on startup, Taskbar Search Button, Taskbar Widgets, Snap Windows on startup, Sticky Keys on startup, Task View button, Verbose Logon Messages (system), BitLocker protection
 
 ### SETTINGS
-<img width="1402" height="932" alt="settings-1 2 1" src="https://github.com/user-attachments/assets/1e20e74e-51eb-4c9e-abb2-271423e75854" />
+<img width="1368" height="828" alt="Settings-1 2 3" src="https://github.com/user-attachments/assets/e8e530ed-d60f-4bf6-a455-ee0c66a4bad9" />
 
 - `Switch to Light Mode / Switch to Dark Mode` → switch between Windows Light and Dark themes
 - `Display Current alignment` → Display Current alignment of taskbar elements (Center or Left)

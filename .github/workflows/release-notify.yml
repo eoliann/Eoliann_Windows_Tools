@@ -24,7 +24,7 @@ jobs:
 
           👉 Un set de instrumente rapid pentru Windows 11, scris în Rust, care include comenzi de administrare utile și ajustări pentru Windows 11.
 
-          👉 <a href='${RELEASE_URL}'>Mergi la pagina noii versiuni</a>"
+          👉 <a href='${RELEASE_URL}'>Mergi la pagina ultimei versiuni</a>"
 
           if [[ -n "${ASSET_URL}" ]]; then
             TEXT="$TEXT

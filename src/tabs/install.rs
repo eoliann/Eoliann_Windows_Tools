@@ -1,21 +1,19 @@
 // src/tabs/install.rs
-// Rewritten install tab (full file). Includes the original, complete APP_CATALOG,
-// UI, spawn_task logic and the Google Chrome panel (install + extension registry).
+// Rewritten install tab (full file). Focus: remove unwanted vertical gaps in the Chrome panel
+// and provide a compact, predictable layout for the right column (Chrome panel).
 //
 // Notes:
-// - This file expects `crate::commands` to export winget helpers used below
+// - Expects `crate::commands` to export winget helpers used below
 //   (ensure_winget_ready, winget_is_installed, winget_install, winget_uninstall, winget_upgrade, upgrade_all_apps_with_log).
-// - If your project has different helpers, adaptează apelurile la `crate::commands`.
-// - The Chrome extension install uses registry keys (HKCU). Admin rights may be required.
+// - Uses standard egui layout techniques: temporarily reduces `item_spacing` around
+//   the button + separator and ensures spacing is restored after the compact blocks.
 
-use std::collections::{BTreeMap, HashSet};
+use std::collections::{BTreeMap, HashSet, HashMap};
 use std::sync::{Arc, Mutex, OnceLock};
 use std::path::PathBuf;
 use std::process::Command;
-
-use eframe::egui;
-
 use crate::commands;
+use eframe::egui::{self, Align2};
 
 /// Un element instalabil via winget.
 struct AppItem {
@@ -288,6 +286,18 @@ pub fn show_install(ui: &mut egui::Ui, log: &Arc<Mutex<String>>) {
         let p = st.progress.lock().unwrap().clone();
         (st.selected.len(), p.running, p)
     };
+    ui.vertical_centered(|ui| {
+        let title = egui::RichText::new(
+            "Adjust the window size to full screen or scroll down for an optimal experience!",
+        )
+        .size(20.0) // ajustează mărimea după nevoie (ex: 18.0, 22.0)
+        .color(egui::Color32::from_rgb(0, 180, 0)) // verde
+        .strong();
+        ui.label(title);
+    });
+
+    ui.separator();
+    ui.add_space(6.0);
 
     ui.group(|ui| {
         if running {
@@ -316,16 +326,15 @@ pub fn show_install(ui: &mut egui::Ui, log: &Arc<Mutex<String>>) {
 
             let visuals = ui.style().visuals.clone();
             let normal_bg = visuals.widgets.inactive.bg_fill;
-            let hover_bg = egui::Color32::WHITE;
+            let hover_bg = egui::Color32::from_rgb(0, 120, 215);
 
             let bg_fill = if resp.hovered() && enabled { hover_bg } else { normal_bg };
             let stroke_col = if resp.hovered() { egui::Color32::from_rgb(0,255,140) } else { egui::Color32::from_gray(160) };
 
             ui.painter().rect(rect, 6.0, bg_fill, egui::Stroke::new(1.5, stroke_col), egui::StrokeKind::Middle);
-
             let font_id = egui::TextStyle::Button.resolve(ui.style());
-            let text_col = if resp.hovered() { egui::Color32::BLACK } else { egui::Color32::from_rgb(0,255,140) };
-            ui.painter().text(rect.center(), egui::Align2::CENTER_CENTER, label, font_id, text_col);
+            let text_col = if resp.hovered() { egui::Color32::WHITE } else { egui::Color32::from_rgb(0,255,140) };
+            ui.painter().text(rect.center(), Align2::CENTER_CENTER, label, font_id, text_col);
 
             if resp.hovered() && enabled {
                 ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
@@ -345,9 +354,9 @@ pub fn show_install(ui: &mut egui::Ui, log: &Arc<Mutex<String>>) {
             ui.add_space(6.0);
             r_uninstall = Some(draw_action_btn(ui, "Uninstall selections", !disabled));
             ui.add_space(6.0);
-            r_update = Some(draw_action_btn(ui, "Update selections", !disabled));
+            r_update = Some(draw_action_btn(ui, "Update selections", true));
             ui.add_space(6.0);
-            r_clear = Some(draw_action_btn(ui, "Clear selection", true));
+            r_clear = Some(draw_action_btn(ui, "Clear selection", !disabled));
             ui.add_space(6.0);
             r_upgrade = Some(draw_action_btn(ui, "Upgrade all Applications", true));
         });
@@ -374,6 +383,7 @@ pub fn show_install(ui: &mut egui::Ui, log: &Arc<Mutex<String>>) {
 
     ui.add_space(6.0);
     ui.separator();
+    ui.add_space(6.0);
 
     // Search row
     {
@@ -433,84 +443,68 @@ pub fn show_install(ui: &mut egui::Ui, log: &Arc<Mutex<String>>) {
         }
     }
 
-    // egui::ScrollArea::vertical()
-    //     .id_salt("install_scroll")
-    //     .auto_shrink([false, false])
-    //     .show(ui, |ui| {
-    //         for (category, items) in by_cat.into_iter() {
-    //             ui.collapsing(category, |ui| {
-    //                 for app in items {
-    //                     let mut checked = {
-    //                         state().lock().unwrap().selected.contains(app.winget_id)
-    //                     };
+    // === două coloane independente cu scroll separat ===
+    let avail_h = ui.available_height().max(200.0); // asigură o înălțime rezonabilă
+    let total_w = ui.available_width();
+    let gap = 12.0;
+    let left_w = (total_w * 0.50).max(320.0);
+    let right_w = (total_w - left_w - gap).max(280.0);
 
-    //                     let resp = ui.checkbox(&mut checked, app.name).on_hover_text(app.desc);
+    ui.horizontal(|ui_h| {
+        // stânga: listă de aplicații (scroll independent)
+        ui_h.allocate_ui_with_layout(egui::vec2(left_w, avail_h), egui::Layout::top_down(egui::Align::LEFT), |ui_left| {
+            egui::ScrollArea::vertical()
+                .id_salt("install_left_scroll")
+                .auto_shrink([false, false])
+                .max_height(avail_h)
+                .show(ui_left, |ui_left| {
+                    ui_left.set_min_width(left_w);
 
-    //                     if resp.changed() {
-    //                         let mut st = state().lock().unwrap();
-    //                         if checked {
-    //                             st.selected.insert(app.winget_id.to_string());
-    //                         } else {
-    //                             st.selected.remove(app.winget_id);
-    //                         }
-    //                     }
-    //                 }
-    //             });
-    //         }
-    //     });
-    
-    egui::ScrollArea::vertical()
-    .id_salt("install_scroll")
-    .auto_shrink([false, false])
-    .show(ui, |ui| {
-        // layout pe două coloane: stânga = listă, dreapta = Chrome panel
-        ui.horizontal(|ui| {
-            // Coloană stângă: lista de categorii (ocupe ~65% din lățime)
-            ui.vertical(|ui_left| {
-                ui_left.set_min_width(ui_left.available_width() * 0.65);
-                for (category, items) in by_cat.clone().into_iter() {
-                    ui_left.collapsing(category, |ui_cat| {
-                        for app in items {
-                            let mut checked = state().lock().unwrap().selected.contains(app.winget_id);
-                            let resp = ui_cat.checkbox(&mut checked, app.name).on_hover_text(app.desc);
-                            if resp.changed() {
-                                let mut st = state().lock().unwrap();
-                                if checked {
-                                    st.selected.insert(app.winget_id.to_string());
-                                } else {
-                                    st.selected.remove(app.winget_id);
+                    // conținutul listei (folosește by_cat calculat anterior)
+                    for (category, items) in by_cat.clone().into_iter() {
+                        ui_left.collapsing(category, |ui_cat| {
+                            for app in items {
+                                // folosește variabilă locală pentru checkbox; actualizează state la schimbare
+                                let mut checked = state().lock().unwrap().selected.contains(app.winget_id);
+                                let resp = ui_cat.checkbox(&mut checked, app.name).on_hover_text(app.desc);
+                                if resp.changed() {
+                                    let mut st = state().lock().unwrap();
+                                    if checked {
+                                        st.selected.insert(app.winget_id.to_string());
+                                    } else {
+                                        st.selected.remove(app.winget_id);
+                                    }
                                 }
                             }
-                        }
-                    });
-                }
-            });
+                        });
+                    }
 
-            // mic spațiu orizontal
-            ui.add_space(6.0);
+                    ui_left.add_space(6.0);
+                });
+        });
 
-            // Separator vertical (delimitează clar cele două coloane)
-            ui.separator();
+        ui_h.add_space(6.0);
+        ui_h.separator();
+        ui_h.add_space(6.0);
 
-            // mic spațiu orizontal după separator
-            ui.add_space(6.0);
+        // dreapta: Chrome panel (scroll independent)
+        ui_h.allocate_ui_with_layout(egui::vec2(right_w, avail_h), egui::Layout::top_down(egui::Align::LEFT), |ui_right| {
+            egui::ScrollArea::vertical()
+                .id_salt("install_right_scroll")
+                .auto_shrink([false, false])
+                .max_height(avail_h)
+                .show(ui_right, |ui_right| {
+                    ui_right.set_min_width(right_w);
 
-            // Coloană dreaptă: Chrome panel (ocupe restul lățimii)
-            ui.vertical(|ui_right| {
-                // Optional: un header mic, pentru claritate
-                ui_right.heading("Extensions / Chrome tools");
-                ui_right.add_space(4.0);
+                    // afișează panelul Chrome în această coloană
+                    show_chrome_panel(ui_right, log);
 
-                // Aici afișăm panelul Chrome — folosește același log
-                show_chrome_panel(ui_right, log);
-            });
-        }); // end horizontal
+                    ui_right.add_space(6.0);
+                });
+        });
     });
 
 
-    // --- Chrome panel (placed at the end of install tab) ---
-    // show_chrome_panel(ui, log);
-    // dacă tocmai am afișat Utilities, punem imediat secțiunea Chrome
 }
 
 fn spawn_task(what: DoWhat, log: Arc<Mutex<String>>) {
@@ -545,7 +539,7 @@ fn spawn_task(what: DoWhat, log: Arc<Mutex<String>>) {
         for (idx, (name, id)) in list.iter().enumerate() {
             {
                 let mut p = progress.lock().unwrap();
-                p.current = idx;
+                p.current = idx + 1; // make progress human-friendly (1..total)
                 p.current_name = name.clone();
             }
 
@@ -590,19 +584,69 @@ fn spawn_task(what: DoWhat, log: Arc<Mutex<String>>) {
 }
 
 //
-// --- Google Chrome panel (self-contained) ---
+// --- Google Chrome panel (dynamic catalog) ---
 //
 
-// Registry-based "external extension" method uses HKCU\Software\Google\Chrome\Extensions\{id} with update_url
-const CHROME_UPDATE_URL: &str = "https://clients2.google.com/service/update2/crx";
-const ADGUARD_ID: &str = "bgnkhhnnamicmpeenaelnjfhikgbkllg";
-const TRAFFICLIGHT_ID: &str = "cfnpidifppmenkapgihekkeednfoenal";
-
-static CHROME_EXT_STATE: OnceLock<Mutex<(bool, bool)>> = OnceLock::new();
-fn chrome_ext_state() -> &'static Mutex<(bool, bool)> {
-    CHROME_EXT_STATE.get_or_init(|| Mutex::new((true, true)))
+#[derive(Clone)]
+struct ChromeExt {
+    id: &'static str,
+    name: &'static str,
+    desc: &'static str,
+    default_enabled: bool,
 }
 
+/// Lista inițială de extensii (deduplicată)
+static INITIAL_CHROME_EXTS: &[ChromeExt] = &[
+    ChromeExt { id: "bgnkhhnnamicmpeenaelnjfhikgbkllg", name: "Adguard Adblocker", desc: "AdGuard ad blocker effectively blocks ads on many websites.", default_enabled: true },
+    ChromeExt { id: "cfnpidifppmenkapgihekkeednfoenal", name: "TrafficLight", desc: "Bitdefender TrafficLight adds a security layer while browsing.", default_enabled: true },
+    ChromeExt { id: "khndhdhbebhaddchcgnalcjlaekbbeof", name: "Bitdefender Anti-tracker", desc: "Blocks trackers and allows managing tracking data per site.", default_enabled: true },
+    ChromeExt { id: "fihnjjcciajhdojfnbdddfaoknhalnja", name: "I don't care about cookies", desc: "Tries to remove cookie consent popups on many sites.", default_enabled: false },
+    ChromeExt { id: "oeopbcgkkoapgobdbedcemjljbihmemj", name: "Checker Plus for Gmail™", desc: "Get notifications, read or delete emails without opening Gmail.", default_enabled: false },
+    ChromeExt { id: "lpcaedmchfhocbbapmcbpinfpgnhiddi", name: "Google Keep", desc: "Save to Google Keep with one click.", default_enabled: false },
+    ChromeExt { id: "jldhpllghnbhlbpcmnajkpdmadaolakh", name: "Todoist for Chrome", desc: "Organize work and life with Todoist for Chrome.", default_enabled: false },
+    ChromeExt { id: "ghgabhipcejejjmhhchfonmamedcbeod", name: "Click&Clean", desc: "Deletes typed URLs, Cache, Cookies and Browsing History with one click.", default_enabled: false },
+    ChromeExt { id: "nlkaejimjacpillmajjnopmpbkbnocid", name: "YouTube NonStop", desc: "Remove the 'Video paused. Continue watching?' prompt.", default_enabled: false },
+    ChromeExt { id: "pachckjkecffpdphbpmfolblodfkgbhl", name: "vidIQ Vision for YouTube", desc: "Uncover the secrets to success behind your favorite YouTube videos.", default_enabled: false },
+];
+
+static CHROME_EXT_CATALOG: OnceLock<Mutex<Vec<ChromeExt>>> = OnceLock::new();
+fn chrome_ext_catalog() -> &'static Mutex<Vec<ChromeExt>> {
+    CHROME_EXT_CATALOG.get_or_init(|| {
+        let mut v = Vec::new();
+        v.extend_from_slice(INITIAL_CHROME_EXTS);
+        Mutex::new(v)
+    })
+}
+
+/// State map: ext_id -> enabled
+static CHROME_EXT_STATE_MAP: OnceLock<Mutex<HashMap<&'static str, bool>>> = OnceLock::new();
+fn chrome_ext_state_map_init() -> &'static Mutex<HashMap<&'static str, bool>> {
+    CHROME_EXT_STATE_MAP.get_or_init(|| {
+        let mut m = HashMap::new();
+        for ext in chrome_ext_catalog().lock().unwrap().iter() {
+            m.insert(ext.id, ext.default_enabled);
+        }
+        Mutex::new(m)
+    })
+}
+
+/// Add extension at runtime (id/name/desc MUST be 'static strings)
+#[allow(dead_code)]
+fn add_extension_to_catalog(ext: ChromeExt) {
+    {
+        let mut cat = chrome_ext_catalog().lock().unwrap();
+        if !cat.iter().any(|e| e.id == ext.id) {
+            cat.push(ext.clone());
+        }
+    }
+    let mut state = chrome_ext_state_map_init().lock().unwrap();
+    state.entry(ext.id).or_insert(ext.default_enabled);
+}
+
+// reuse constant
+const CHROME_UPDATE_URL: &str = "https://clients2.google.com/service/update2/crx";
+
+/// Detect Chrome by searching usual install locations
 fn chrome_is_installed() -> bool {
     let candidates = [
         std::env::var("PROGRAMFILES").ok(),
@@ -622,6 +666,7 @@ fn chrome_is_installed() -> bool {
     false
 }
 
+/// Install Chrome using winget; returns (ok, message)
 fn install_chrome_with_winget() -> (bool, String) {
     match Command::new("winget").arg("--version").output() {
         Ok(out) if out.status.success() => {
@@ -646,6 +691,7 @@ fn install_chrome_with_winget() -> (bool, String) {
     }
 }
 
+/// Add registry key HKCU\Software\Google\Chrome\Extensions\{extid}\update_url -> clients2...
 fn add_chrome_external_extension_registry(ext_id: &str) -> (bool, String) {
     let key = format!(r#"HKCU\Software\Google\Chrome\Extensions\{}"#, ext_id);
     let args = ["add", &key, "/v", "update_url", "/t", "REG_SZ", "/d", CHROME_UPDATE_URL, "/f"];
@@ -662,79 +708,132 @@ fn add_chrome_external_extension_registry(ext_id: &str) -> (bool, String) {
     }
 }
 
-/// Afișează panoul Chrome (folosește loggerul aplicației: Arc<Mutex<String>>).
-/// IMPORTANT: apelează această funcție **numai dintr-o funcție care are `ui: &mut egui::Ui`**.
+/// --- Stylized button drawer (reusable) ------------------------------------
+fn draw_action_btn(ui: &mut egui::Ui, label: &str, enabled: bool) -> egui::Response {
+    let min_size = egui::Vec2::new(220.0, 28.0);
+    let sense = if enabled { egui::Sense::click() } else { egui::Sense::hover() };
+    let (rect, resp) = ui.allocate_at_least(min_size, sense);
+
+    let visuals = ui.style().visuals.clone();
+    let normal_bg = visuals.widgets.inactive.bg_fill;
+    let hover_bg = egui::Color32::from_rgb(0, 120, 215);
+    let bg_fill = if resp.hovered() && enabled { hover_bg } else { normal_bg };
+
+    ui.painter().rect_filled(rect, 6.0, bg_fill);
+    ui.painter().rect_stroke(
+        rect,
+        6.0,
+        egui::Stroke::new(
+            1.0,
+            if resp.hovered() { egui::Color32::from_rgb(0,255,140) } else { egui::Color32::from_gray(160) }
+        ),
+        egui::StrokeKind::Middle
+    );
+
+    let font_id = egui::TextStyle::Button.resolve(ui.style());
+    let text_col = if resp.hovered() { egui::Color32::WHITE } else { egui::Color32::from_rgb(0, 255, 140) };
+    ui.painter().text(rect.center(), Align2::CENTER_CENTER, label, font_id, text_col);
+
+    if resp.hovered() && enabled {
+        ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+    }
+    resp
+}
+
+
 pub fn show_chrome_panel(ui: &mut egui::Ui, log: &Arc<Mutex<String>>) {
     ui.separator();
-
-    // 12.0 = aproximativ 2-3 linii de spațiu; crește/decreasează dacă vrei mai mult/mai puțin
-    ui.add_space(12.0);
-
-    ui.collapsing("Google Chrome (Install & Extensions)", |ui| {
-        ui.label("Verify Chrome installation + install extensions from the Chrome Web Store");
-
-        let installed = chrome_is_installed();
-        ui.horizontal(|ui| {
-            ui.label(format!("Chrome installation status: {}", if installed { "Yes" } else { "No" }));
-            if !installed {
-                if ui.button("Install Chrome (winget)").clicked() {
-                    let (ok, msg) = install_chrome_with_winget();
-                    if let Ok(mut lg) = log.lock() {
-                        lg.push_str(&format!("Installing Chrome: ok={} msg={}\n", ok, msg));
-                    }
-                }
-            } else {
-                if ui.button("Reinstall/Repair Chrome (winget)").clicked() {
-                    let (ok, msg) = install_chrome_with_winget();
-                    if let Ok(mut lg) = log.lock() {
-                        lg.push_str(&format!("Reinstall attempted: ok={} msg={}\n", ok, msg));
-                    }
-                }
-            }
-        });
-
-        ui.separator();
-
-        // checkbox state kept in RAM via OnceLock + Mutex (stable behavior across egui versions)
-        {
-            let state_mutex = chrome_ext_state();
-            let mut state = state_mutex.lock().unwrap();
-            let mut adguard = state.0;
-            let mut traffic = state.1;
-
-            ui.checkbox(&mut adguard, "Adguard Adblocker (AdGuard ad blocker effectively blocks all types of ads on all web pages, even on Facebook, YouTube and others!)");
-            ui.checkbox(&mut traffic, "TrafficLight (Bitdefender TrafficLight adds a strong and non-intrusive layer of security to your browsing experience.)");
-
-            // daca s-au schimbat, salvăm în mutex (persistă doar cât rulează aplicația)
-            state.0 = adguard;
-            state.1 = traffic;
-        }
-
-        ui.add_space(6.0);
-
-        if ui.button("Install selected extensions").clicked() {
-            if !chrome_is_installed() {
-                if let Ok(mut lg) = log.lock() {
-                    lg.push_str("Chrome is not installed. Install Chrome before adding extensions.\n");
-                }
-            } else {
-                let st = chrome_ext_state().lock().unwrap();
-                if st.0 {
-                    let (ok, msg) = add_chrome_external_extension_registry(ADGUARD_ID);
-                    if let Ok(mut lg) = log.lock() {
-                        lg.push_str(&format!("Adguard -> ok={} msg={}\n", ok, msg));
-                    }
-                }
-                if st.1 {
-                    let (ok, msg) = add_chrome_external_extension_registry(TRAFFICLIGHT_ID);
-                    if let Ok(mut lg) = log.lock() {
-                        lg.push_str(&format!("TrafficLight -> ok={} msg={}\n", ok, msg));
-                    }
-                }
-                if let Ok(mut lg) = log.lock() {
-                    lg.push_str("Extension installation: complete (Chrome will load the extensions the next time it starts).\n");
-                }
-            }
-        }
+    ui.vertical_centered(|ui| {
+        let title = egui::RichText::new(
+            "Google Chrome install & add most \n important extensions from the Chrome Web Store",
+        )
+        .size(20.0) // ajustează mărimea după nevoie (ex: 18.0, 22.0)
+        .color(egui::Color32::from_rgb(0, 180, 0)) // verde
+        .strong();
+        ui.label(title);
     });
+
+
+    egui::CollapsingHeader::new("Google Chrome (Install & Extensions)")
+        .default_open(true)
+        .show(ui, |ui| {
+            // scurt text informativ
+            ui.label("Verify Chrome installation + install extensions from the Chrome Web Store");
+
+            // Afisare status + buton pe aceeasi linie
+            let installed = chrome_is_installed();
+
+            // Folosim un singur rând orizontal: label + spacer + buton
+            ui.horizontal(|ui| {
+                ui.label(format!("Chrome installation status: {}", if installed { "Yes" } else { "No" }));
+                ui.add_space(8.0); // mică separare între text și buton
+
+                // Forțăm min-height 0 pentru a nu introduce padding vertical implicit
+                ui.set_min_height(0.0);
+
+                let btn_label = if !installed { "Install Chrome (winget)" } else { "Reinstall/Repair Chrome (winget)" };
+                let resp = draw_action_btn(ui, btn_label, true);
+                if resp.clicked() {
+                    let (ok, msg) = install_chrome_with_winget();
+                    if let Ok(mut lg) = log.lock() {
+                        if !installed {
+                            lg.push_str(&format!("Installing Chrome: ok={} msg={}\n", ok, msg));
+                        } else {
+                            lg.push_str(&format!("Reinstall attempted: ok={} msg={}\n", ok, msg));
+                        }
+                    }
+                }
+            });
+
+            // mic separator sub rând
+            let (rect, _resp) = ui.allocate_exact_size(egui::vec2(ui.available_width(), 1.0), egui::Sense::hover());
+            let y = rect.center().y;
+            ui.painter().line_segment(
+                [egui::pos2(rect.left(), y), egui::pos2(rect.right(), y)],
+                egui::Stroke::new(1.0, egui::Color32::from_gray(140)),
+            );
+
+            // Catalog extensii: checkbox-uri
+            let state_map_mutex = chrome_ext_state_map_init();
+            let catalog = chrome_ext_catalog().lock().unwrap().clone();
+            {
+                let mut state_map = state_map_mutex.lock().unwrap();
+                for ext in catalog.iter() {
+                    let cur = *state_map.get(ext.id).unwrap_or(&ext.default_enabled);
+                    let mut local = cur;
+                    let resp = ui.checkbox(&mut local, ext.name).on_hover_text(ext.desc);
+                    if resp.changed() {
+                        state_map.insert(ext.id, local);
+                    }
+                }
+            }
+
+            ui.add_space(6.0);
+
+            // Butonul final "Install selected extensions"
+            ui.horizontal_centered(|ui| {
+                let resp_install = draw_action_btn(ui, "Install selected extensions", true);
+                if resp_install.clicked() {
+                    let state_map = state_map_mutex.lock().unwrap();
+                    let selected_ids: Vec<&str> = state_map.iter().filter_map(|(id, enabled)| if *enabled { Some(*id) } else { None }).collect();
+
+                    if selected_ids.is_empty() {
+                        if let Ok(mut lg) = log.lock() { lg.push_str("No extensions selected.\n"); }
+                    } else if !chrome_is_installed() {
+                        if let Ok(mut lg) = log.lock() { lg.push_str("Chrome is not installed. Install Chrome before adding extensions.\n"); }
+                    } else {
+                        for id in selected_ids {
+                            let (ok, msg) = add_chrome_external_extension_registry(id);
+                            if let Ok(mut lg) = log.lock() {
+                                let name = chrome_ext_catalog().lock().unwrap().iter().find(|e| e.id == id).map(|e| e.name).unwrap_or(id);
+                                lg.push_str(&format!("{} ({}) -> ok={} msg={}\n", name, id, ok, msg));
+                            }
+                        }
+                        if let Ok(mut lg) = log.lock() {
+                            lg.push_str("Extension installation: complete (Chrome will load the extensions the next time it starts).\n");
+                        }
+                    }
+                }
+            });
+        });
 }

@@ -135,7 +135,7 @@ pub fn show_tools(
                 });
             });
             if resp.clicked() {
-                if let Some(guard) = commands::try_start_global_op("Empty Recycle Bin", log) {
+                if let Some(guard) = commands::try_start_global_op("Empty Recycle Bin", log)   {
                     let log_clone = log.clone();
                     thread::spawn(move || {
                         let _guard = guard;
@@ -714,6 +714,7 @@ pub fn show_tools(
                 }
             }
 
+            // Existing Copilot disable (keep)
             let resp = ui.add_enabled(!global_busy, egui::Button::new("🚫 Disable Microsoft Copilot"));
             resp.clone().on_hover_ui(|ui| {
                 ui.vertical(|ui| {
@@ -735,6 +736,85 @@ pub fn show_tools(
                 }
             }
 
+            // =========================
+            // NEW (Issue): Add/Remove Power Automate
+            // =========================
+            // --- Power Automate Desktop (Install / Remove) ---
+
+            let resp = ui.add_enabled(!global_busy, egui::Button::new("➕ Install Power Automate Desktop"));
+            if resp.clicked() {
+                if let Some(guard) = commands::try_start_global_op("Install Power Automate Desktop", log) {
+                    let log_clone = log.clone();
+                    thread::spawn(move || {
+                        let _guard = guard;
+                        let result = crate::commands::install_power_automate_desktop();
+                        let mut lg = log_clone.lock().unwrap();
+                        if lg.is_empty() { *lg = result; } else { *lg = format!("{}\n{}", lg, result); }
+                    });
+                }
+            }
+
+            let resp = ui.add_enabled(!global_busy, egui::Button::new("➖ Uninstall Power Automate Desktop"));
+            if resp.clicked() {
+                if let Some(guard) = commands::try_start_global_op("Uninstall Power Automate Desktop", log) {
+                    let log_clone = log.clone();
+                    thread::spawn(move || {
+                        let _guard = guard;
+                        let result = crate::commands::uninstall_power_automate_desktop();
+                        let mut lg = log_clone.lock().unwrap();
+                        if lg.is_empty() { *lg = result; } else { *lg = format!("{}\n{}", lg, result); }
+                    });
+                }
+            }
+
+            // =========================
+            // NEW (Issue): Add/Remove Microsoft Copilot (remove package)
+            // =========================
+            // Install Microsoft Copilot
+            let resp = ui.add_enabled(!global_busy, egui::Button::new("➕ Install Microsoft Copilot"));
+            resp.clone().on_hover_ui(|ui| {
+                ui.vertical(|ui| {
+                    ui.colored_label(egui::Color32::from_rgb(57, 255, 20), "Installs Microsoft Copilot (MS Store) using winget");
+                    ui.label("• Runs winget in hidden mode (no cmd window)");
+                    ui.label("• Waits for completion and prints status in log");
+                    ui.colored_label(egui::Color32::YELLOW, "⚠ Requires Microsoft Store / winget working on system");
+                });
+            });
+            if resp.clicked() {
+                if let Some(guard) = commands::try_start_global_op("Install Microsoft Copilot", log) {
+                    let log_clone = log.clone();
+                    thread::spawn(move || {
+                        let _guard = guard;
+                        let result = crate::commands::install_copilot();
+                        let mut lg = log_clone.lock().unwrap();
+                        if lg.is_empty() { *lg = result; } else { *lg = format!("{}\n{}", lg, result); }
+                    });
+                }
+            }
+
+            // Uninstall Microsoft Copilot
+            let resp = ui.add_enabled(!global_busy, egui::Button::new("🗑 Uninstall Microsoft Copilot"));
+            resp.clone().on_hover_ui(|ui| {
+                ui.vertical(|ui| {
+                    ui.colored_label(egui::Color32::from_rgb(255, 100, 100), "Uninstalls Microsoft Copilot Appx (current user) using PowerShell");
+                    ui.label("• Runs PowerShell hidden (no window)");
+                    ui.label("• Waits for completion and prints status in log");
+                    ui.colored_label(egui::Color32::YELLOW, "⚠ All-users removal requires running app as Administrator");
+                });
+            });
+            if resp.clicked() {
+                if let Some(guard) = commands::try_start_global_op("Uninstall Microsoft Copilot", log) {
+                    let log_clone = log.clone();
+                    thread::spawn(move || {
+                        let _guard = guard;
+                        let result = crate::commands::uninstall_copilot();
+                        let mut lg = log_clone.lock().unwrap();
+                        if lg.is_empty() { *lg = result; } else { *lg = format!("{}\n{}", lg, result); }
+                    });
+                }
+            }
+
+            // ---- rest of your existing Advanced Tweaks buttons ----
             let resp = ui.add_enabled(!global_busy, egui::Button::new("🖥 Set Display for Performance"));
             resp.clone().on_hover_ui(|ui| {
                 ui.vertical(|ui| {

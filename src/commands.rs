@@ -2685,3 +2685,291 @@ pub fn toggle_explorer_tabs() -> Result<String, String> {
         enable_explorer_tabs()
     }
 }
+
+
+
+// --- START: ADD TO END OF src/commands.rs ---
+/// Helpers pentru rulare PowerShell elevat + logging (folosesc căi complet calificate
+/// pentru a evita importuri duplicate în modulul existent).
+
+fn make_temp_ps_path(prefix: &str) -> std::path::PathBuf {
+    let ts = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+    let mut p = std::env::temp_dir();
+    p.push(format!("{}_{}.ps1", prefix, ts));
+    p
+}
+
+fn make_temp_log_path(prefix: &str) -> std::path::PathBuf {
+    let ts = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+    let mut p = std::env::temp_dir();
+    p.push(format!("{}_{}.log", prefix, ts));
+    p
+}
+
+fn write_ps_script(script_body: &str, ps_path: &std::path::PathBuf, log_path: &std::path::PathBuf) -> std::io::Result<()> {
+    let mut f = std::fs::File::create(ps_path)?;
+    let wrapper = format!(
+r#"
+Set-StrictMode -Version Latest
+try {{
+    & {{
+        {}
+    }} 2>&1 | Out-File -FilePath "{}" -Encoding UTF8 -Append
+    exit $LASTEXITCODE
+}} catch {{
+    $_ | Out-String | Out-File -FilePath "{}" -Encoding UTF8 -Append
+    exit 1
+}}
+"#,
+        script_body.replace("\r\n", "\n"),
+        log_path.display(),
+        log_path.display()
+    );
+    use std::io::Write as _; // foloseşte trait local, nu re-import global
+    f.write_all(wrapper.as_bytes())?;
+    Ok(())
+}
+
+fn run_ps_elevated_and_wait(ps_path: &std::path::PathBuf) -> std::io::Result<()> {
+    // Start-Process powershell -ArgumentList '-NoProfile -ExecutionPolicy Bypass -File "C:\...ps1"' -Verb RunAs -Wait
+    let arg = format!(
+        "-NoProfile -ExecutionPolicy Bypass -Command Start-Process powershell -ArgumentList '-NoProfile -ExecutionPolicy Bypass -File \"{}\"' -Verb RunAs -Wait",
+        ps_path.display()
+    );
+    std::process::Command::new("powershell")
+        .arg(arg)
+        .spawn()?
+        .wait()?;
+    Ok(())
+}
+
+pub fn run_elevated_powershell_with_log(script_body: &str, prefix: &str) -> std::io::Result<std::path::PathBuf> {
+    let ps_path = make_temp_ps_path(prefix);
+    let log_path = make_temp_log_path(prefix);
+    write_ps_script(script_body, &ps_path, &log_path)?;
+    run_ps_elevated_and_wait(&ps_path)?;
+    Ok(log_path)
+}
+
+// Concrete commands (public) — folosesc funcţia de mai sus
+pub fn install_power_automate_with_log() -> std::io::Result<std::path::PathBuf> {
+    let script = r#"
+winget install -e --id Microsoft.PowerAutomateDesktop --accept-package-agreements --accept-source-agreements
+"#;
+    run_elevated_powershell_with_log(script, "install_power_automate")
+}
+
+pub fn remove_power_automate_with_log() -> std::io::Result<std::path::PathBuf> {
+    let script = r#"
+winget uninstall --id Microsoft.PowerAutomateDesktop -e
+"#;
+    run_elevated_powershell_with_log(script, "remove_power_automate")
+}
+
+pub fn remove_copilot_current_user_with_log() -> std::io::Result<std::path::PathBuf> {
+    let script = r#"
+Get-AppxPackage *Copilot* | ForEach-Object { Try { Remove-AppxPackage -Package $_.PackageFullName -ErrorAction Stop } Catch { $_ | Out-String; Continue } }
+"#;
+    run_elevated_powershell_with_log(script, "remove_copilot_user")
+}
+
+pub fn remove_copilot_all_users_with_log() -> std::io::Result<std::path::PathBuf> {
+    let script = r#"
+Get-AppxPackage -AllUsers | Where-Object { $_.Name -like '*Copilot*' } | ForEach-Object { Try { Remove-AppxPackage -Package $_.PackageFullName -ErrorAction Stop } Catch { $_ | Out-String; Continue } }
+Get-AppxProvisionedPackage -Online | Where-Object { $_.PackageName -like '*Copilot*' } | ForEach-Object { Try { Remove-AppxProvisionedPackage -Online -PackageName $_.PackageName -ErrorAction Stop } Catch { $_ | Out-String; Continue } }
+"#;
+    run_elevated_powershell_with_log(script, "remove_copilot_all")
+}
+// --- END: ADD TO END OF src/commands.rs ---
+
+
+
+
+
+pub fn install_power_automate() -> String {
+    match install_power_automate_with_log() {
+        Ok(log_path) => format!("Power Automate Desktop installation attempted. See log: {}", log_path.display()),
+        Err(e) => format!("Failed to run installation: {}", e),
+    }
+}
+
+pub fn remove_power_automate() -> String {
+    match remove_power_automate_with_log() {
+        Ok(log_path) => format!("Power Automate Desktop removal attempted. See log: {}", log_path.display()),
+        Err(e) => format!("Failed to run removal: {}", e),
+    }
+}
+
+pub fn remove_copilot_current_user() -> String {
+    match remove_copilot_current_user_with_log() {
+        Ok(log_path) => format!("Copilot removal for current user attempted. See log: {}", log_path.display()),
+        Err(e) => format!("Failed to run removal: {}", e),
+    }
+}
+
+pub fn remove_copilot_all_users() -> String {
+    match remove_copilot_all_users_with_log() {
+        Ok(log_path) => format!("Copilot removal for all users attempted. See log: {}", log_path.display()),
+        Err(e) => format!("Failed to run removal: {}", e),
+    }
+}
+
+// --- Power Automate Desktop (winget) ---
+
+fn run_winget(args: &[&str]) -> String {
+    // IMPORTANT: nu adăuga `use std::process::Command;` dacă există deja în fișier.
+    // IMPORTANT: nu adăuga `use std::io;` dacă există deja în fișier.
+
+    let out = std::process::Command::new("winget")
+        .args(args)
+        .output();
+
+    match out {
+        Ok(o) => {
+            let mut text = String::new();
+            if !o.stdout.is_empty() {
+                text.push_str(&String::from_utf8_lossy(&o.stdout));
+            }
+            if !o.stderr.is_empty() {
+                if !text.is_empty() { text.push('\n'); }
+                text.push_str(&String::from_utf8_lossy(&o.stderr));
+            }
+
+            if o.status.success() {
+                if text.trim().is_empty() {
+                    "SUCCESS: winget command completed.".to_string()
+                } else {
+                    format!("SUCCESS: winget command completed.\n{}", text.trim())
+                }
+            } else {
+                let code = o.status.code().map(|c| c.to_string()).unwrap_or_else(|| "unknown".into());
+                if text.trim().is_empty() {
+                    format!("ERROR: winget command failed (exit {}).", code)
+                } else {
+                    format!("ERROR: winget command failed (exit {}).\n{}", code, text.trim())
+                }
+            }
+        }
+        Err(e) => format!("ERROR: Failed to run winget: {}", e),
+    }
+}
+
+
+fn run_winget_hidden(args: &[&str]) -> String {
+    let mut cmd = std::process::Command::new("winget");
+    cmd.args(args);
+
+    #[cfg(windows)]
+    {
+        cmd.creation_flags(CREATE_NO_WINDOW);
+    }
+
+    match cmd.output() {
+        Ok(out) => {
+            let stdout = String::from_utf8_lossy(&out.stdout).trim().to_string();
+            let stderr = String::from_utf8_lossy(&out.stderr).trim().to_string();
+
+            if out.status.success() {
+                if stdout.is_empty() {
+                    "SUCCESS: winget finished successfully.".to_string()
+                } else {
+                    format!("SUCCESS: {}", stdout)
+                }
+            } else {
+                let code = out.status.code().unwrap_or(-1);
+                if !stderr.is_empty() {
+                    format!("ERROR: winget failed (code {}): {}", code, stderr)
+                } else if !stdout.is_empty() {
+                    format!("ERROR: winget failed (code {}): {}", code, stdout)
+                } else {
+                    format!("ERROR: winget failed (code {}).", code)
+                }
+            }
+        }
+        Err(e) => format!("ERROR: failed to execute winget: {}", e),
+    }
+}
+
+pub fn install_power_automate_desktop() -> String {
+    run_winget_hidden(&[
+        "install",
+        "--id", "Microsoft.PowerAutomateDesktop",
+        "--silent",
+        "--disable-interactivity",
+        "--accept-package-agreements",
+        "--accept-source-agreements",
+    ])
+}
+
+pub fn uninstall_power_automate_desktop() -> String {
+    run_winget_hidden(&[
+        "uninstall",
+        "--id", "Microsoft.PowerAutomateDesktop",
+        "--silent",
+        "--disable-interactivity",
+        "--accept-source-agreements",
+    ])
+}
+
+
+fn run_powershell_hidden(script: &str) -> String {
+    let out = Command::new("powershell")
+        .args(["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", script])
+        .creation_flags(CREATE_NO_WINDOW)
+        .output();
+
+    match out {
+        Ok(o) => {
+            let stdout = String::from_utf8_lossy(&o.stdout);
+            let stderr = String::from_utf8_lossy(&o.stderr);
+            if o.status.success() {
+                // multe comenzi PS nu scriu nimic pe stdout; tot marcăm SUCCESS dacă exit code e ok
+                if stdout.trim().is_empty() && stderr.trim().is_empty() {
+                    "SUCCESS: PowerShell finished.".to_string()
+                } else {
+                    format!("SUCCESS: PowerShell finished.\n{}\n{}", stdout, stderr)
+                }
+            } else {
+                format!(
+                    "ERROR: PowerShell failed (code: {:?}).\nSTDOUT:\n{}\nSTDERR:\n{}",
+                    o.status.code(),
+                    stdout,
+                    stderr
+                )
+            }
+        }
+        Err(e) => format!("ERROR: failed to start PowerShell: {}", e),
+    }
+}
+
+pub fn install_copilot() -> String {
+    // Copilot MS Store app id: 9NHT9RB2F4HD :contentReference[oaicite:1]{index=1}
+    run_winget_hidden(&[
+        "install",
+        "-s", "msstore",
+        "--id", "9NHT9RB2F4HD",
+        "--accept-package-agreements",
+        "--accept-source-agreements",
+        "--disable-interactivity",
+        "--silent",
+    ])
+}
+
+pub fn uninstall_copilot() -> String {
+    // Uninstall Copilot via Appx (current user). :contentReference[oaicite:2]{index=2}
+    // Dacă vrei all-users, trebuie rulat ca admin; altfel va da eroare/nu va elimina pentru toți.
+    let script = r#"
+$pkgs = Get-AppxPackage | Where-Object { $_.Name -Like '*Microsoft.Copilot*' }
+if ($null -eq $pkgs) { Write-Output 'Copilot Appx not found for current user.'; exit 0 }
+$pkgs | Remove-AppxPackage -ErrorAction Continue
+Write-Output 'Copilot Appx removed for current user.'
+"#;
+
+    run_powershell_hidden(script)
+}

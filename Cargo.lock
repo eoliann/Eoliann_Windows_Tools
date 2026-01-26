@@ -1014,7 +1014,7 @@ dependencies = [
 
 [[package]]
 name = "eoliann_windows_tools_w11"
-version = "1.2.5"
+version = "1.2.6"
 dependencies = [
  "dirs",
  "eframe",

@@ -36,7 +36,7 @@ Now install it on your system!
 <img width="1402" height="932" alt="update-1 1 7-to-1 1 8" src="https://github.com/user-attachments/assets/4d442ac3-679d-4c51-9f00-8f6383eea4b6" />
 
 ### INFO
-<img width="2048" height="1104" alt="info-1 2 5" src="https://github.com/user-attachments/assets/0e6df9b5-90c6-4c8f-9ec0-3cb2d671905c" />
+<img width="1368" height="800" alt="Info-1 2 3" src="https://github.com/user-attachments/assets/78dade2a-b843-42fc-888b-78f333f6e6fb" />
 
 - `whoami` → displays the current user
 - `ipconfig` → display network settings
@@ -46,7 +46,7 @@ Now install it on your system!
 - `About` → all about application: developer, version, website
 
 ### TOOLS
-<img width="2048" height="1104" alt="tools-1 2 5" src="https://github.com/user-attachments/assets/c1ad474a-1432-4ae7-8aca-88eaaf20bef3" />
+<img width="1368" height="800" alt="Tools-1 2 3" src="https://github.com/user-attachments/assets/ab46b710-ea6a-4d0e-9b02-e675f19ac7e5" />
 
 #### Context menu
 - `Toggle Context Menu` → instantly switch between the **Win11 ↔ Classic** context menu (with Explorer restart)
@@ -76,15 +76,8 @@ Now install it on your system!
 - `Show File Extensions` → Toggle showing file extensions for known file types.
 #### Advanced Tweaks
 - `Adobe Network Block` → reduce user interruptions by selectively blocking connections to Adobe’s activation and telemetry servers. Credit: Ruddernation-Designs
-- `Debloat Adobe` → manages Adobe Services, Adobe Desktop Service, and Acrobat Updates
-- `Debloat Brave` → apply policies to Brave to disable unwanted features
-- `WPFTweaks Edge Debloat` → Edge Debloat (WPFTweaks)
-- `Disable Edge` → disables Microsoft Edge via registry (DisallowRun)
+- `Adobe Debloat` → manages Adobe Services, Adobe Desktop Service, and Acrobat Updates
 - `Disable Microsoft Copilot` → disables MS Copilot AI built into Windows since 23H2
-- `Install Power Automote Desktop` → installs Microsoft Power Automate Desktop
-- `Uninstall Power Automote Desktop` → uninstalls Microsoft Power Automate Desktop
-- `Install Microsoft Copilot` → installs Microsoft Copilot
-- `Uninstall Microsoft Copilot` → uninstalls Microsoft Copilot
 - `Set Display for Performance` → sets the system preferences to performance. You can do this manually with sysdm.cpl as well
 - `Set Time to UTC (Dual Boot)` → essential for dual-boot systems: syncs Windows with Linux hardware clock (UTC)
 - `Restore Time to Local` → restores Windows default: hardware clock treated as local time
@@ -105,7 +98,7 @@ Now install it on your system!
 - `Disable Monitor Timeout` → prevents the monitor from turning off automatically
 
 ### INSTALL
-<img width="2048" height="1104" alt="install-1 2 5" src="https://github.com/user-attachments/assets/9c04e265-854d-48fc-978f-e8c680d88141" />
+<img width="1368" height="906" alt="Install-1 2 3" src="https://github.com/user-attachments/assets/10eeec4e-90ad-4240-ac60-f2a3247b0867" />
 
 #### Install application
 ![install-app](https://github.com/user-attachments/assets/1d50fdc2-eea6-4b72-863f-e3e7f44a330f)
@@ -129,7 +122,7 @@ For Google Chrome users:
 - `Install Chrome extensions` → install Chrome extensions from the Chrome Web Store
   
 ### WINDOWS APP REMOVAL
-<img width="2048" height="1104" alt="winapp_removal-1 2 5" src="https://github.com/user-attachments/assets/02ecaa4e-adc6-4ee2-8f8c-3061f5f6cbcc" />
+<img width="2048" height="1104" alt="WinApp_Removal-1 2 3" src="https://github.com/user-attachments/assets/9d20a9d9-f99e-4f61-8300-5d02a7f78da4" />
 
 - `Communication` → remove default applications that come with Windows installation, such as: Outlook for Windows, Skype, Teams, GroupMe, To-Do, Your Phone, CommsPhone, Messaging, Mail & Calendar, and others.
 - `Media & Creativity` → removes default applications that come with Windows installation, such as: Climpchamp, Camera, MS Paint, 3D Builder, 3D Viewer, Mixed Reality Portal
@@ -140,13 +133,13 @@ For Google Chrome users:
 - `Other` → remove default applications that come with Windows installation, such as: Print 3D, Office-related
 
 ### CUSTOMIZE PREFERENCES
-<img width="2048" height="1104" alt="customize_preferences-1 2 5" src="https://github.com/user-attachments/assets/800eed1a-e004-480f-83fb-00a72773b20e" />
+<img width="1368" height="828" alt="Customize_Preferences-1 2 3" src="https://github.com/user-attachments/assets/ae538329-ae77-49f9-ab4e-a0c1870cb9bd" />
 
 - `General Preferences` → Start with Windows, Enable advanced tooltips, Auto-check for updates
 - `Features / Tweaks` → Mouse Acceleration, NumLock on startup, Taskbar Search Button, Taskbar Widgets, Snap Windows on startup, Sticky Keys on startup, Task View button, Verbose Logon Messages (system), BitLocker protection
 
 ### SETTINGS
-<img width="2048" height="1104" alt="settings-1 2 5" src="https://github.com/user-attachments/assets/13e654ef-06a1-4d97-9d66-408d866f1169" />
+<img width="1368" height="828" alt="Settings-1 2 3" src="https://github.com/user-attachments/assets/e8e530ed-d60f-4bf6-a455-ee0c66a4bad9" />
 
 - `Switch to Light Mode / Switch to Dark Mode` → switch between Windows Light and Dark themes
 - `Display Current alignment` → Display Current alignment of taskbar elements (Center or Left)
@@ -181,7 +174,7 @@ cd Eoliann_Windows_Tools
 ---
 
 ## 💖 Support
-- If you find the project helpful, please consider giving it a ⭐️ to show your support!
+- To morally and mentally support the project, make sure to leave a ⭐️!
 - Support this project with a donation on:
   - Revolut [![Donate](https://img.shields.io/badge/Donate-Revolut-purple)](http://revolut.me/adriannm9)
   - PayPal [![Donate](https://img.shields.io/badge/Donate-PayPal-blue)](https://www.paypal.com/donate/?hosted_button_id=U9XAX3XBTU67G)

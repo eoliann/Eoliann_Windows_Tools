@@ -181,7 +181,7 @@ cd Eoliann_Windows_Tools
 ---
 
 ## 💖 Support
-- To morally and mentally support the project, make sure to leave a ⭐️!
+- If you find the project helpful, please consider giving it a ⭐️ to show your support!
 - Support this project with a donation on:
   - Revolut [![Donate](https://img.shields.io/badge/Donate-Revolut-purple)](http://revolut.me/adriannm9)
   - PayPal [![Donate](https://img.shields.io/badge/Donate-PayPal-blue)](https://www.paypal.com/donate/?hosted_button_id=U9XAX3XBTU67G)

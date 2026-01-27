@@ -2517,7 +2517,7 @@ pub fn wpftweaks_disable_edge() -> String {
 
 
 // use std::thread;
-use std::time::Duration;
+use std::time::{Duration, UNIX_EPOCH};
 use winreg::enums::*;
 use winreg::RegKey;
 
@@ -2961,6 +2961,7 @@ pub fn install_copilot() -> String {
     ])
 }
 
+/// Dezinstalează Copilot pentru utilizatorul curent
 pub fn uninstall_copilot() -> String {
     // Uninstall Copilot via Appx (current user). :contentReference[oaicite:2]{index=2}
     // Dacă vrei all-users, trebuie rulat ca admin; altfel va da eroare/nu va elimina pentru toți.
@@ -2972,4 +2973,428 @@ Write-Output 'Copilot Appx removed for current user.'
 "#;
 
     run_powershell_hidden(script)
+}
+
+
+
+/// Șterge conținutul folderului Prefetch
+pub fn empty_prefetch_files() -> String {
+    // Șterge C:\Windows\Prefetch în mod robust:
+    // - verifică admin
+    // - oprește SysMain (best-effort)
+    // - șterge fișierele per-item ca să nu “mascheze” eșecurile
+    // - pornește SysMain la loc (best-effort)
+    // - rulează PowerShell ascuns (fereastră ascunsă) și returnează output text
+
+    let ps = r#"
+        $ErrorActionPreference = 'Stop'
+
+        function Write-Line([string]$s) { Write-Output $s }
+
+        # Admin check
+        $isAdmin = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()
+        ).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+        Write-Line ("IsAdmin: " + $isAdmin)
+        if (-not $isAdmin) {
+        Write-Line "ERROR: Administrator privileges required."
+        exit 2
+        }
+
+        $path = Join-Path $env:windir 'Prefetch'
+        if (-not (Test-Path -LiteralPath $path)) {
+        Write-Line ("Prefetch folder not found: " + $path)
+        exit 0
+        }
+
+        # Stop SysMain (best-effort)
+        $svcStopped = $false
+        try {
+        Write-Line "Stopping SysMain..."
+        Stop-Service -Name 'SysMain' -Force -ErrorAction Stop
+        $svcStopped = $true
+        } catch {
+        Write-Line ("WARNING: Failed to stop SysMain: " + $_.Exception.Message)
+        }
+
+        # Enumerate items
+        $items = @()
+        try {
+        $items = Get-ChildItem -LiteralPath $path -Force -ErrorAction Stop
+        } catch {
+        Write-Line ("ERROR: Failed to enumerate Prefetch: " + $_.Exception.Message)
+        if ($svcStopped) {
+            try { Write-Line "Starting SysMain..."; Start-Service -Name 'SysMain' -ErrorAction Stop } catch {}
+        }
+        exit 1
+        }
+
+        Write-Line ("Items before: " + $items.Count)
+
+        # Delete per item, capture failures
+        $failed = New-Object System.Collections.Generic.List[string]
+        foreach ($it in $items) {
+        try {
+            Remove-Item -LiteralPath $it.FullName -Force -Recurse -ErrorAction Stop
+        } catch {
+            $failed.Add(($it.Name + " -> " + $_.Exception.Message)) | Out-Null
+        }
+        }
+
+        # Re-check remaining
+        $remaining = 0
+        try {
+        $remaining = (Get-ChildItem -LiteralPath $path -Force -ErrorAction SilentlyContinue | Measure-Object).Count
+        } catch { $remaining = -1 }
+
+        Write-Line ("Items remaining: " + $remaining)
+
+        if ($failed.Count -gt 0) {
+        Write-Line ("FAILED items: " + $failed.Count)
+        # Nu lista prea mult, dar dă câteva exemple utile
+        $failed | Select-Object -First 25 | ForEach-Object { Write-Line (" - " + $_) }
+        }
+
+        # Start SysMain back (best-effort)
+        if ($svcStopped) {
+        try {
+            Write-Line "Starting SysMain..."
+            Start-Service -Name 'SysMain' -ErrorAction Stop
+        } catch {
+            Write-Line ("WARNING: Failed to start SysMain: " + $_.Exception.Message)
+        }
+        }
+
+        if ($failed.Count -gt 0) { exit 1 } else { exit 0 }
+        "#;
+
+    run_powershell_hidden(ps)
+}
+
+
+
+/// Disk CleanUp pe toate partițiile (Fixed drives) folosind cleanmgr /verylowdisk.
+/// - Enumeră toate volumele de tip “Fixed” (DriveType=3)
+/// - Rulează cleanmgr.exe pe fiecare: /verylowdisk /d <DriveLetter>
+/// - Necesită Administrator pentru rezultate mai bune (și pentru unele volume)
+pub fn disk_cleanup_all_partitions() -> String {
+    let ps = r#"
+        $ErrorActionPreference = 'Stop'
+
+        # Admin check (recomandat)
+        $isAdmin = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()
+        ).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+
+        Write-Output ("IsAdmin: " + $isAdmin)
+        if (-not $isAdmin) {
+        Write-Output "ERROR: Please run the app as Administrator for Disk Cleanup on all partitions."
+        exit 2
+        }
+
+        $cleanmgr = Join-Path $env:windir 'System32\cleanmgr.exe'
+        if (-not (Test-Path -LiteralPath $cleanmgr)) {
+        Write-Output ("ERROR: cleanmgr.exe not found at: " + $cleanmgr)
+        exit 1
+        }
+
+        # Fixed drives (HDD/SSD) – exclude removable/network
+        $drives = Get-CimInstance Win32_LogicalDisk -Filter "DriveType=3" |
+        Select-Object -ExpandProperty DeviceID
+
+        if (-not $drives -or $drives.Count -eq 0) {
+        Write-Output "INFO: No fixed drives found."
+        exit 0
+        }
+
+        Write-Output ("Fixed drives: " + ($drives -join ', '))
+
+        foreach ($d in $drives) {
+        try {
+            Write-Output ("Running Disk Cleanup on " + $d + " ...")
+            # /verylowdisk = rulează fără UI (sau minimal), folosind setările implicite.
+            Start-Process -FilePath $cleanmgr -ArgumentList @("/verylowdisk","/d",$d) -WindowStyle Hidden -Wait
+            Write-Output ("DONE: " + $d)
+        } catch {
+            Write-Output ("ERROR: " + $d + " -> " + $_.Exception.Message)
+        }
+        }
+
+        Write-Output "SUCCESS: Disk Cleanup attempted on all fixed drives."
+        exit 0
+        "#;
+
+    run_powershell_hidden(ps)
+}
+
+
+
+
+// commands.rs (adaugi acest bloc; include si `use`-urile de mai jos)
+// IMPORTANT: aceste functii ruleaza PowerShell elevat (UAC) si capteaza output-ul intr-un fisier temporar.
+
+use std::{
+    // fs,
+    io::Write,
+    path::PathBuf,
+    // process::{Command, Stdio},
+    // time::{SystemTime, UNIX_EPOCH},
+};
+
+// #[cfg(windows)]
+// use std::os::windows::process::CommandExt;
+
+// #[cfg(windows)]
+// const CREATE_NO_WINDOW: u32 = 0x08000000;
+
+fn ps_escape_single_quotes(s: &str) -> String {
+    // in PowerShell single-quoted strings: ' -> ''
+    s.replace('\'', "''")
+}
+
+fn run_powershell_elevated_capture(script_body: &str) -> String {
+    let stamp = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos();
+
+    let mut ps1_path: PathBuf = std::env::temp_dir();
+    ps1_path.push(format!("eoliann_updates_{stamp}.ps1"));
+
+    let mut out_path: PathBuf = std::env::temp_dir();
+    out_path.push(format!("eoliann_updates_{stamp}.log"));
+
+    // scrie scriptul in fisier
+    match fs::File::create(&ps1_path) {
+        Ok(mut f) => {
+            if let Err(e) = f.write_all(script_body.as_bytes()) {
+                return format!("Failed to write temp script: {e}");
+            }
+        }
+        Err(e) => return format!("Failed to create temp script: {e}"),
+    }
+
+    let ps1_escaped = ps_escape_single_quotes(&ps1_path.to_string_lossy());
+    let out_escaped = ps_escape_single_quotes(&out_path.to_string_lossy());
+
+    // Comanda care ruleaza in PowerShell-ul elevat:
+    // ruleaza ps1 si redirecteaza TOATE stream-urile (inclusiv warning/error/info) in fisier.
+    let inner_cmd = format!(
+        "& '{ps1}' *>&1 | Out-File -FilePath '{out}' -Encoding utf8; exit $LASTEXITCODE",
+        ps1 = ps1_escaped,
+        out = out_escaped
+    );
+
+    // Comanda externa (ne-elevata) care lanseaza un PowerShell elevat (UAC) ascuns si asteapta sa termine.
+    let outer_cmd = format!(
+        "$cmd = \"{inner}\"; \
+         $p = Start-Process -FilePath 'powershell.exe' -Verb RunAs -WindowStyle Hidden -Wait -PassThru \
+             -ArgumentList @('-NoProfile','-ExecutionPolicy','Bypass','-Command',$cmd); \
+         exit $p.ExitCode",
+        inner = inner_cmd.replace('"', "`\"")
+    );
+
+    let mut cmd = Command::new("powershell.exe");
+    cmd.args([
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-Command",
+        &outer_cmd,
+    ])
+    .stdout(Stdio::piped())
+    .stderr(Stdio::piped());
+
+    #[cfg(windows)]
+    {
+        cmd.creation_flags(CREATE_NO_WINDOW);
+    }
+
+    let output = match cmd.output() {
+        Ok(o) => o,
+        Err(e) => {
+            let _ = fs::remove_file(&ps1_path);
+            let _ = fs::remove_file(&out_path);
+            return format!("Failed to start PowerShell: {e}");
+        }
+    };
+
+    // incearca sa citeasca log-ul produs de procesul elevat
+    let file_log = fs::read_to_string(&out_path).unwrap_or_default();
+
+    // cleanup
+    let _ = fs::remove_file(&ps1_path);
+    let _ = fs::remove_file(&out_path);
+
+    if !file_log.trim().is_empty() {
+        return file_log;
+    }
+
+    // fallback: stdout/stderr din procesul extern (de ex. daca user-ul a anulat UAC)
+    let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+    let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+
+    if stdout.trim().is_empty() && stderr.trim().is_empty() {
+        if output.status.success() {
+            "Done (no output).".to_string()
+        } else {
+            format!("Operation failed (exit={}).", output.status)
+        }
+    } else {
+        format!(
+            "{}{}{}",
+            if stdout.trim().is_empty() { "" } else { &stdout },
+            if !stdout.trim().is_empty() && !stderr.trim().is_empty() {
+                "\n"
+            } else {
+                ""
+            },
+            if stderr.trim().is_empty() { "" } else { &stderr }
+        )
+    }
+}
+
+pub fn updates_default_settings() -> String {
+    let script = r#"
+        $ErrorActionPreference = 'SilentlyContinue'
+
+        Write-Output "Removing Windows Update policy settings..."
+
+        Remove-Item -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU" -Recurse -Force
+        Remove-Item -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\DeliveryOptimization" -Recurse -Force
+        Remove-Item -Path "HKLM:\SOFTWARE\Microsoft\WindowsUpdate\UX\Settings" -Recurse -Force
+        Remove-Item -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\Device Metadata" -Recurse -Force
+        Remove-Item -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\DriverSearching" -Recurse -Force
+        Remove-Item -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate" -Recurse -Force
+
+        Write-Output "Reenabling Windows Update Services..."
+
+        Write-Output "Restored BITS to Manual"
+        Set-Service -Name BITS -StartupType Manual
+
+        Write-Output "Restored wuauserv to Manual"
+        Set-Service -Name wuauserv -StartupType Manual
+
+        Write-Output "Restored UsoSvc to Automatic"
+        Set-Service -Name UsoSvc -StartupType Automatic
+
+        Write-Output "Restored WaaSMedicSvc to Manual"
+        Set-Service -Name WaaSMedicSvc -StartupType Manual
+
+        Write-Output "Enabling update-related scheduled tasks..."
+
+        $TaskPaths = @(
+        "\Microsoft\Windows\InstallService\",
+        "\Microsoft\Windows\UpdateOrchestrator\",
+        "\Microsoft\Windows\UpdateAssistant\",
+        "\Microsoft\Windows\WaaSMedic\",
+        "\Microsoft\Windows\WindowsUpdate\",
+        "\Microsoft\WindowsUpdate\"
+        )
+
+        foreach ($p in $TaskPaths) {
+        Get-ScheduledTask -TaskPath $p -ErrorAction SilentlyContinue | Enable-ScheduledTask -ErrorAction SilentlyContinue
+        }
+
+        Write-Output "Windows Local Policies Reset to Default"
+        secedit /configure /cfg "$Env:SystemRoot\inf\defltbase.inf" /db defltbase.sdb
+
+        Write-Output "==================================================="
+        Write-Output "---  Windows Update Settings Reset to Default   ---"
+        Write-Output "==================================================="
+        Write-Output "Note: You must restart your system in order for all changes to take effect."
+        "#;
+
+    run_powershell_elevated_capture(script)
+}
+
+pub fn updates_disable_all() -> String {
+    let script = r#"
+        $ErrorActionPreference = 'SilentlyContinue'
+
+        Write-Output "Configuring registry settings..."
+
+        New-Item -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU" -Force | Out-Null
+
+        Set-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU" -Name "NoAutoUpdate" -Type DWord -Value 1
+        Set-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU" -Name "AUOptions" -Type DWord -Value 1
+
+        New-Item -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\DeliveryOptimization\Config" -Force | Out-Null
+        Set-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\DeliveryOptimization\Config" -Name "DODownloadMode" -Type DWord -Value 0
+
+        Write-Output "Disabling services..."
+
+        Write-Output "Disabled BITS Service"
+        Set-Service -Name BITS -StartupType Disabled
+
+        Write-Output "Disabled wuauserv Service"
+        Set-Service -Name wuauserv -StartupType Disabled
+
+        Write-Output "Disabled UsoSvc Service"
+        Set-Service -Name UsoSvc -StartupType Disabled
+
+        Write-Output "Disabled WaaSMedicSvc Service"
+        Set-Service -Name WaaSMedicSvc -StartupType Disabled
+
+        Remove-Item "C:\Windows\SoftwareDistribution\*" -Recurse -Force -ErrorAction SilentlyContinue
+        Write-Output "Cleared SoftwareDistribution folder"
+
+        Write-Output "Disabling update-related scheduled tasks..."
+
+        $TaskPaths = @(
+        "\Microsoft\Windows\InstallService\",
+        "\Microsoft\Windows\UpdateOrchestrator\",
+        "\Microsoft\Windows\UpdateAssistant\",
+        "\Microsoft\Windows\WaaSMedic\",
+        "\Microsoft\Windows\WindowsUpdate\",
+        "\Microsoft\WindowsUpdate\"
+        )
+
+        foreach ($p in $TaskPaths) {
+        Get-ScheduledTask -TaskPath $p -ErrorAction SilentlyContinue | Disable-ScheduledTask -ErrorAction SilentlyContinue
+        }
+
+        Write-Output "================================="
+        Write-Output "---   Updates Are Disabled    ---"
+        Write-Output "================================="
+        Write-Output "Note: You must restart your system in order for all changes to take effect."
+        "#;
+
+    run_powershell_elevated_capture(script)
+}
+
+pub fn updates_security_settings() -> String {
+    let script = r#"
+        $ErrorActionPreference = 'SilentlyContinue'
+
+        Write-Output "Disabling driver offering through Windows Update..."
+
+        New-Item -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\Device Metadata" -Force | Out-Null
+        Set-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\Device Metadata" -Name "PreventDeviceMetadataFromNetwork" -Type DWord -Value 1
+
+        New-Item -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\DriverSearching" -Force | Out-Null
+        Set-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\DriverSearching" -Name "DontPromptForWindowsUpdate" -Type DWord -Value 1
+        Set-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\DriverSearching" -Name "DontSearchWindowsUpdate" -Type DWord -Value 1
+        Set-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\DriverSearching" -Name "DriverUpdateWizardWuSearchEnabled" -Type DWord -Value 0
+
+        New-Item -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate" -Force | Out-Null
+        Set-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate" -Name "ExcludeWUDriversInQualityUpdate" -Type DWord -Value 1
+
+        Write-Output "Deferring feature updates (365 days) and quality updates (4 days)..."
+
+        New-Item -Path "HKLM:\SOFTWARE\Microsoft\WindowsUpdate\UX\Settings" -Force | Out-Null
+        Set-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\WindowsUpdate\UX\Settings" -Name "BranchReadinessLevel" -Type DWord -Value 20
+        Set-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\WindowsUpdate\UX\Settings" -Name "DeferFeatureUpdatesPeriodInDays" -Type DWord -Value 365
+        Set-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\WindowsUpdate\UX\Settings" -Name "DeferQualityUpdatesPeriodInDays" -Type DWord -Value 4
+
+        Write-Output "Disabling Windows Update automatic restart..."
+
+        New-Item -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU" -Force | Out-Null
+        Set-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU" -Name "NoAutoRebootWithLoggedOnUsers" -Type DWord -Value 1
+        Set-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU" -Name "AUPowerManagement" -Type DWord -Value 0
+
+        Write-Output "================================="
+        Write-Output "-- Updates Set to Recommended ---"
+        Write-Output "================================="
+        "#;
+
+    run_powershell_elevated_capture(script)
 }

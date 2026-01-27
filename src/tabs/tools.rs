@@ -104,7 +104,7 @@ pub fn show_tools(
         ui.label("Maintenance");
         ui.horizontal_wrapped(|ui| {
             // Disk Cleanup
-            let resp = ui.add_enabled(!global_busy, egui::Button::new("🗑 Disk Cleanup"));
+            let resp = ui.add_enabled(!global_busy, egui::Button::new("🗑 Disk Cleanup C:"));
             resp.clone().on_hover_ui(|ui| {
                 ui.vertical(|ui| {
                     ui.colored_label(egui::Color32::from_rgb(255, 165, 0), "Runs Windows Disk Cleanup");
@@ -124,6 +124,30 @@ pub fn show_tools(
                     });
                 }
             }
+
+            // Disk Cleanup (ALL partitions)
+            let resp = ui.add_enabled(!global_busy, egui::Button::new("🗑 Disk Cleanup (All Partitions)"));
+            resp.clone().on_hover_ui(|ui| {
+                ui.vertical(|ui| {
+                    ui.colored_label(egui::Color32::from_rgb(255, 165, 0), "Runs Windows Disk Cleanup on ALL fixed drives");
+                    ui.label("• Cleans system junk files on every partition (C:, D:, etc.)");
+                    ui.label("• Uses cleanmgr.exe /verylowdisk");
+                    ui.colored_label(egui::Color32::YELLOW, "⚠ Requires Administrator for best results");
+                    ui.colored_label(egui::Color32::YELLOW, "⚠ May take several minutes per partition");
+                });
+            });
+            if resp.clicked() {
+                if let Some(guard) = commands::try_start_global_op("Disk Cleanup (All Partitions)", log) {
+                    let log_clone = log.clone();
+                    thread::spawn(move || {
+                        let _guard = guard;
+                        let result = commands::disk_cleanup_all_partitions();
+                        let mut lg = log_clone.lock().unwrap();
+                        if lg.is_empty() { *lg = result; } else { *lg = format!("{}\n{}", lg, result); }
+                    });
+                }
+            }
+
 
             // Empty Recycle Bin
             let resp = ui.add_enabled(!global_busy, egui::Button::new("🗑 Empty Recycle Bin"));
@@ -167,6 +191,28 @@ pub fn show_tools(
                     });
                 }
             }
+
+            // Empty Prefetch files
+            let resp = ui.add_enabled(!global_busy, egui::Button::new("🗑 Empty Prefetch files"));
+            resp.clone().on_hover_ui(|ui| {
+                ui.vertical(|ui| {
+                    ui.colored_label(egui::Color32::from_rgb(255, 165, 0), "Deletes Windows Prefetch files");
+                    ui.label("• Clears C:\\Windows\\Prefetch");
+                    ui.colored_label(egui::Color32::YELLOW, "⚠ Usually requires Administrator");
+                });
+            });
+            if resp.clicked() {
+                if let Some(guard) = commands::try_start_global_op("Empty Prefetch files", log) {
+                    let log_clone = log.clone();
+                    thread::spawn(move || {
+                        let _guard = guard;
+                        let result = commands::empty_prefetch_files();
+                        let mut lg = log_clone.lock().unwrap();
+                        if lg.is_empty() { *lg = result; } else { *lg = format!("{}\n{}", lg, result); }
+                    });
+                }
+            }
+
 
             // Network Reset
             let resp = ui.add_enabled(!global_busy, egui::Button::new("📶 Network Reset"));
@@ -1205,6 +1251,88 @@ pub fn show_tools(
                     thread::spawn(move || {
                         let _guard = guard;
                         let result = commands::disable_monitor();
+                        let mut lg = log_clone.lock().unwrap();
+                        if lg.is_empty() { *lg = result; } else { *lg = format!("{}\n{}", lg, result); }
+                    });
+                }
+            }
+        });
+    });
+
+    ui.add_space(6.0);
+
+    // ---- Updates ----
+    ui.group(|ui| {
+        ui.label("Updates Settings - Use with caution");
+        ui.horizontal_wrapped(|ui| {
+            // Default settings
+            let resp = ui.add_enabled(!global_busy, egui::Button::new("🔄 Default settings"));
+            resp.clone().on_hover_ui(|ui| {
+                ui.vertical(|ui| {
+                    ui.colored_label(egui::Color32::from_rgb(57, 255, 20), "Resets Windows Update settings to default");
+                    ui.label("• Removes Windows Update policy registry keys");
+                    ui.label("• Restores update-related services startup types");
+                    ui.label("• Re-enables update-related scheduled tasks");
+                    ui.colored_label(egui::Color32::YELLOW, "⚠ Restart required for all changes to take effect");
+                });
+            });
+            if resp.clicked() {
+                if let Some(guard) = commands::try_start_global_op("Updates: Default settings", log) {
+                    let log_clone = log.clone();
+                    thread::spawn(move || {
+                        let _guard = guard;
+                        let result = commands::updates_default_settings();
+                        let mut lg = log_clone.lock().unwrap();
+                        if lg.is_empty() { *lg = result; } else { *lg = format!("{}\n{}", lg, result); }
+                    });
+                }
+            }
+
+            // Security settings
+            let resp = ui.add_enabled(!global_busy, egui::Button::new("🛡 Security Settings"));
+            resp.clone().on_hover_ui(|ui| {
+                ui.vertical(|ui| {
+                    ui.colored_label(egui::Color32::from_rgb(57, 255, 20), "Sets Windows Update to recommended/security-focused settings");
+                    ui.label("• Disables driver offering via Windows Update");
+                    ui.label("• Prevents automatic restart while a user is logged on");
+                    ui.label("• Defers feature updates (365 days) and quality updates (4 days)");
+                    ui.colored_label(egui::Color32::LIGHT_BLUE, "ℹ Uses registry policy keys (HKLM)");
+                });
+            });
+            if resp.clicked() {
+                if let Some(guard) = commands::try_start_global_op("Updates: Security settings", log) {
+                    let log_clone = log.clone();
+                    thread::spawn(move || {
+                        let _guard = guard;
+                        let result = commands::updates_security_settings();
+                        let mut lg = log_clone.lock().unwrap();
+                        if lg.is_empty() { *lg = result; } else { *lg = format!("{}\n{}", lg, result); }
+                    });
+                }
+            }
+
+            // Disable all updates (danger)
+            let danger_btn = egui::Button::new("⛔ Disable All Updates")
+                .fill(egui::Color32::from_rgb(180, 0, 0))
+                .stroke(egui::Stroke::new(1.0, egui::Color32::from_rgb(120, 0, 0)));
+            let resp = ui.add_enabled(!global_busy, danger_btn);
+            resp.clone().on_hover_ui(|ui| {
+                ui.vertical(|ui| {
+                    ui.colored_label(egui::Color32::RED, "Disables Windows Update (advanced users only)");
+                    ui.label("• Sets Windows Update policy: NoAutoUpdate + AUOptions");
+                    ui.label("• Disables services: BITS, wuauserv, UsoSvc, WaaSMedicSvc");
+                    ui.label("• Clears SoftwareDistribution");
+                    ui.label("• Disables update-related scheduled tasks");
+                    ui.colored_label(egui::Color32::YELLOW, "⚠ Not recommended. May reduce security and stability.");
+                    ui.colored_label(egui::Color32::YELLOW, "⚠ Restart required for all changes to take effect");
+                });
+            });
+            if resp.clicked() {
+                if let Some(guard) = commands::try_start_global_op("Updates: Disable all updates", log) {
+                    let log_clone = log.clone();
+                    thread::spawn(move || {
+                        let _guard = guard;
+                        let result = commands::updates_disable_all();
                         let mut lg = log_clone.lock().unwrap();
                         if lg.is_empty() { *lg = result; } else { *lg = format!("{}\n{}", lg, result); }
                     });

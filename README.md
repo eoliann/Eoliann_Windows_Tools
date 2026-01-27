@@ -36,7 +36,7 @@ Now install it on your system!
 <img width="1402" height="932" alt="update-1 1 7-to-1 1 8" src="https://github.com/user-attachments/assets/4d442ac3-679d-4c51-9f00-8f6383eea4b6" />
 
 ### INFO
-<img width="1368" height="800" alt="Info-1 2 3" src="https://github.com/user-attachments/assets/78dade2a-b843-42fc-888b-78f333f6e6fb" />
+<img width="1915" height="1018" alt="info" src="https://github.com/user-attachments/assets/c04deeed-4f71-4250-b057-922f8d0df085" />
 
 - `whoami` → displays the current user
 - `ipconfig` → display network settings
@@ -46,14 +46,16 @@ Now install it on your system!
 - `About` → all about application: developer, version, website
 
 ### TOOLS
-<img width="1368" height="800" alt="Tools-1 2 3" src="https://github.com/user-attachments/assets/ab46b710-ea6a-4d0e-9b02-e675f19ac7e5" />
+<img width="1915" height="1018" alt="tools" src="https://github.com/user-attachments/assets/12eff562-56c8-4b58-8196-dbabb300851b" />
 
 #### Context menu
 - `Toggle Context Menu` → instantly switch between the **Win11 ↔ Classic** context menu (with Explorer restart)
 #### Maintenance
-- `Disk Cleanup` → start disk cleanup
+- `Disk Cleanup C:` → start disk cleanup only C: partition
+- `Disk CleanUp all Partitions` → start disk cleanup for all partitions
 - `Empty Recycle Bin` → initiates emptying of the trash bin
 - `Clean Temporary Files` → launches temporary file cleanup
+- `Empty Prefetch files` → initiates emptying prefetch files
 - `Network Reset` → completely reset the network (Winsock + IP)
 - `Verify System Integrity (SFC + DSIM)` → checks whether the system integrity is correct and, if not, repairs corrupted files
 #### Essential Tweaks
@@ -96,9 +98,13 @@ Now install it on your system!
 - `Disable Sleep` → prevents Windows from going into sleep mode
 - `Disable HDD/SSD Timeout` → prevents hard drives and SSDs from powering down after inactivity
 - `Disable Monitor Timeout` → prevents the monitor from turning off automatically
+#### Updates Settings
+- `Default Settings`  → resets Windows Update settings to default
+- `Security Settings`  → sets Windows Update to recommended/security-focused settings
+- `Disable All Updates`  → disables Windows Update (advanced users only)
 
 ### INSTALL
-<img width="1368" height="906" alt="Install-1 2 3" src="https://github.com/user-attachments/assets/10eeec4e-90ad-4240-ac60-f2a3247b0867" />
+<img width="1915" height="1018" alt="install" src="https://github.com/user-attachments/assets/904b3d8e-0863-4b34-95b2-f14c84afadd9" />
 
 #### Install application
 ![install-app](https://github.com/user-attachments/assets/1d50fdc2-eea6-4b72-863f-e3e7f44a330f)
@@ -122,7 +128,7 @@ For Google Chrome users:
 - `Install Chrome extensions` → install Chrome extensions from the Chrome Web Store
   
 ### WINDOWS APP REMOVAL
-<img width="2048" height="1104" alt="WinApp_Removal-1 2 3" src="https://github.com/user-attachments/assets/9d20a9d9-f99e-4f61-8300-5d02a7f78da4" />
+<img width="1915" height="1018" alt="winapp_removal" src="https://github.com/user-attachments/assets/837c6090-fb5e-40c0-9635-132faad82b17" />
 
 - `Communication` → remove default applications that come with Windows installation, such as: Outlook for Windows, Skype, Teams, GroupMe, To-Do, Your Phone, CommsPhone, Messaging, Mail & Calendar, and others.
 - `Media & Creativity` → removes default applications that come with Windows installation, such as: Climpchamp, Camera, MS Paint, 3D Builder, 3D Viewer, Mixed Reality Portal
@@ -133,18 +139,20 @@ For Google Chrome users:
 - `Other` → remove default applications that come with Windows installation, such as: Print 3D, Office-related
 
 ### CUSTOMIZE PREFERENCES
-<img width="1368" height="828" alt="Customize_Preferences-1 2 3" src="https://github.com/user-attachments/assets/ae538329-ae77-49f9-ab4e-a0c1870cb9bd" />
+<img width="1915" height="1018" alt="customize_preferences" src="https://github.com/user-attachments/assets/d33e2f4d-7ea6-41f6-86aa-23739394aeaa" />
 
 - `General Preferences` → Start with Windows, Enable advanced tooltips, Auto-check for updates
 - `Features / Tweaks` → Mouse Acceleration, NumLock on startup, Taskbar Search Button, Taskbar Widgets, Snap Windows on startup, Sticky Keys on startup, Task View button, Verbose Logon Messages (system), BitLocker protection
+- `Bitlocker on/off all partition` → activate/deactivate Bitlocker for one or all partition
 
 ### SETTINGS
-<img width="1368" height="828" alt="Settings-1 2 3" src="https://github.com/user-attachments/assets/e8e530ed-d60f-4bf6-a455-ee0c66a4bad9" />
+<img width="1915" height="1018" alt="settings" src="https://github.com/user-attachments/assets/07b37239-b074-4e14-ad78-ab405ec86fe8" />
 
 - `Switch to Light Mode / Switch to Dark Mode` → switch between Windows Light and Dark themes
 - `Display Current alignment` → Display Current alignment of taskbar elements (Center or Left)
 - `Center Taskbar Items` → center the taskbar items (Windows 11)
 - `Left Taskbar Items` → align the taskbar items to the left (classic)
+- `Create new local user account` - create local account for new user
 - `About` → version information + GitHub link
 
 ---

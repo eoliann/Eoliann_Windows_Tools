@@ -20,6 +20,9 @@
 A quick toolkit for Windows 11, written in Rust + egui, with a retro hacker fluorescent green UI 🟩.  
 Includes useful administration commands and tweaks for Windows 11.
 
+#### New design:
+- Yellow color in titles
+- Icons in the menu
 
 Now install it on your system!
 
@@ -36,7 +39,7 @@ Now install it on your system!
 <img width="1402" height="932" alt="update-1 1 7-to-1 1 8" src="https://github.com/user-attachments/assets/4d442ac3-679d-4c51-9f00-8f6383eea4b6" />
 
 ### INFO
-<img width="1915" height="1018" alt="info" src="https://github.com/user-attachments/assets/c04deeed-4f71-4250-b057-922f8d0df085" />
+<img width="1920" height="1032" alt="info" src="https://github.com/user-attachments/assets/143381ae-53ce-4cc5-8bff-dd2ecf8de5a4" />
 
 - `whoami` → displays the current user
 - `ipconfig` → display network settings
@@ -46,7 +49,7 @@ Now install it on your system!
 - `About` → all about application: developer, version, website
 
 ### TOOLS
-<img width="1915" height="1018" alt="tools" src="https://github.com/user-attachments/assets/12eff562-56c8-4b58-8196-dbabb300851b" />
+<img width="1920" height="1032" alt="tools" src="https://github.com/user-attachments/assets/3c2497b9-24cd-4411-8faf-e5758d35dd3b" />
 
 #### Context menu
 - `Toggle Context Menu` → instantly switch between the **Win11 ↔ Classic** context menu (with Explorer restart)
@@ -103,8 +106,13 @@ Now install it on your system!
 - `Security Settings`  → sets Windows Update to recommended/security-focused settings
 - `Disable All Updates`  → disables Windows Update (advanced users only)
 
+### DISK HEALTH
+<img width="1920" height="1032" alt="disk_health" src="https://github.com/user-attachments/assets/59bab635-fa82-4213-9a71-ad346f365a91" />
+
+Displays storage memory information such as: temperature, health, performance, Power on time (total number of hours of use), Estimated remaining lifetime, Lifetime writes in GB and bytes.
+
 ### INSTALL
-<img width="1915" height="1018" alt="install" src="https://github.com/user-attachments/assets/904b3d8e-0863-4b34-95b2-f14c84afadd9" />
+<img width="1920" height="1032" alt="install" src="https://github.com/user-attachments/assets/62cbdb04-a858-4ca1-a146-4c358c4c0455" />
 
 #### Install application
 ![install-app](https://github.com/user-attachments/assets/1d50fdc2-eea6-4b72-863f-e3e7f44a330f)
@@ -128,7 +136,7 @@ For Google Chrome users:
 - `Install Chrome extensions` → install Chrome extensions from the Chrome Web Store
   
 ### WINDOWS APP REMOVAL
-<img width="1915" height="1018" alt="winapp_removal" src="https://github.com/user-attachments/assets/837c6090-fb5e-40c0-9635-132faad82b17" />
+<img width="1920" height="1032" alt="winapp_removal" src="https://github.com/user-attachments/assets/3a84e710-8a3e-46e9-b2d0-a501b6027705" />
 
 - `Communication` → remove default applications that come with Windows installation, such as: Outlook for Windows, Skype, Teams, GroupMe, To-Do, Your Phone, CommsPhone, Messaging, Mail & Calendar, and others.
 - `Media & Creativity` → removes default applications that come with Windows installation, such as: Climpchamp, Camera, MS Paint, 3D Builder, 3D Viewer, Mixed Reality Portal
@@ -146,7 +154,7 @@ For Google Chrome users:
 - `Bitlocker on/off all partition` → activate/deactivate Bitlocker for one or all partition
 
 ### SETTINGS
-<img width="1915" height="1018" alt="settings" src="https://github.com/user-attachments/assets/07b37239-b074-4e14-ad78-ab405ec86fe8" />
+<img width="1920" height="1032" alt="settings" src="https://github.com/user-attachments/assets/d52ff3bc-8a09-41fe-8ecc-c06022fd2e00" />
 
 - `Switch to Light Mode / Switch to Dark Mode` → switch between Windows Light and Dark themes
 - `Display Current alignment` → Display Current alignment of taskbar elements (Center or Left)

@@ -5,7 +5,7 @@ use eframe::egui;
 use crate::tabs::info::InfoState;
 use egui::{Color32, RichText, Vec2};
 
-use crate::tabs::{info, tools, install, winapp_removal, customize_preferences, settings};
+use crate::tabs::{info, tools, disk_health, install, winapp_removal, customize_preferences, settings};
 use eframe::egui::TextureHandle;
 
 fn apply_neon_theme(ctx: &egui::Context) {
@@ -46,6 +46,7 @@ fn apply_neon_theme(ctx: &egui::Context) {
 enum Page {
     Info,
     Tools,
+    DiskHealth,
     Install,
     WinAppRemoval,
     CustomizePreferences,
@@ -89,6 +90,9 @@ pub struct App {
     // Info tab state
     pub info_state: Arc<Mutex<InfoState>>,
 
+    // Disk Health tab state
+    pub disk_health_state: disk_health::DiskHealthState,
+
     // Icons: textures loaded lazily at first `update` call
     pub icons: HashMap<String, TextureHandle>,
 
@@ -126,6 +130,7 @@ impl Default for App {
             bitlocker_protection_on: false,
             bitlocker_prefs_loaded: false,
             info_state: Arc::new(Mutex::new(InfoState::new())),
+            disk_health_state: disk_health::DiskHealthState::default(),
             icons: HashMap::new(),
             general_prefs_loaded: false,
         }
@@ -161,13 +166,11 @@ impl App {
         }
     }
 
-    /// Ensure icons are loaded into `self.icons`. Called from `update` once `ctx` is available.
     fn ensure_icons_loaded(&mut self, ctx: &egui::Context) {
         if !self.icons.is_empty() {
             return;
         }
 
-        // helper defined below (load_png_from_bytes)
         macro_rules! try_insert {
             ($key:expr, $bytes:expr) => {
                 if let Some(tx) = load_png_from_bytes(ctx, $key, $bytes) {
@@ -178,7 +181,6 @@ impl App {
             };
         }
 
-        // Paths are relative to src/, so include_bytes!("../assets/icons/...")
         try_insert!("windows", include_bytes!("../assets/icons/windows.png") as &'static [u8]);
         try_insert!("system", include_bytes!("../assets/icons/system.png") as &'static [u8]);
         try_insert!("processor", include_bytes!("../assets/icons/processor.png") as &'static [u8]);
@@ -192,7 +194,6 @@ impl App {
         try_insert!("performance", include_bytes!("../assets/icons/performance.png") as &'static [u8]);
     }
 
-    // -------------- SIDEBAR --------------
     fn sidebar(&mut self, ui: &mut egui::Ui) {
         ui.add_space(6.0);
         ui.heading(RichText::new("Eoliann Windows Tools").color(Color32::from_rgb(0, 255, 140)));
@@ -229,22 +230,53 @@ impl App {
             ui.selectable_label(selected, text)
         };
 
-        if btn(ui, "Info", self.page == Page::Info).clicked() {
+        // if btn(ui, "Info", self.page == Page::Info).clicked() {
+        //     self.page = Page::Info;
+        // }
+        // if btn(ui, "🛠 Tools", self.page == Page::Tools).clicked() {
+        //     self.page = Page::Tools;
+        // }
+        // if btn(ui, "💽 Disk Health", self.page == Page::DiskHealth).clicked() {
+        //     self.page = Page::DiskHealth;
+        // }
+        // if btn(ui, "Install", self.page == Page::Install).clicked() {
+        //     self.page = Page::Install;
+        // }
+        // if btn(ui, "WinApp Removal", self.page == Page::WinAppRemoval).clicked() {
+        //     self.page = Page::WinAppRemoval;
+        // }
+        // if btn(ui, "Customize Preferences", self.page == Page::CustomizePreferences).clicked() {
+        //     self.page = Page::CustomizePreferences;
+        // }
+        // if btn(ui, "Settings", self.page == Page::Settings).clicked() {
+        //     self.page = Page::Settings;
+        // }
+
+        if btn(ui, "❓ Info", self.page == Page::Info).clicked() {
             self.page = Page::Info;
         }
-        if btn(ui, "Tools", self.page == Page::Tools).clicked() {
+
+        if btn(ui, "🛠 Tools", self.page == Page::Tools).clicked() {
             self.page = Page::Tools;
         }
-        if btn(ui, "Install", self.page == Page::Install).clicked() {
+
+        if btn(ui, "💽 Disk Health", self.page == Page::DiskHealth).clicked() {
+            self.page = Page::DiskHealth;
+        }
+
+        if btn(ui, "📦 Install", self.page == Page::Install).clicked() {
             self.page = Page::Install;
         }
-        if btn(ui, "WinApp Removal", self.page == Page::WinAppRemoval).clicked() {
+
+        if btn(ui, "🗑 WinApp Removal", self.page == Page::WinAppRemoval).clicked() {
             self.page = Page::WinAppRemoval;
         }
-        if btn(ui, "Customize Preferences", self.page == Page::CustomizePreferences).clicked() {
+
+        if btn(ui, "🔍 Customize Preferences", self.page == Page::CustomizePreferences).clicked() {
             self.page = Page::CustomizePreferences;
         }
-        if btn(ui, "Settings", self.page == Page::Settings).clicked() {
+
+        if btn(ui, "🔧 Settings", self.page == Page::Settings).clicked() {
             self.page = Page::Settings;
         }
 
@@ -265,7 +297,6 @@ impl App {
         });
     }
 
-    // -------------- LOG VIEW (cu scroll & auto-scroll) --------------
     fn log_view(&self, ui: &mut egui::Ui) {
         let text = { self.log.lock().unwrap().clone() };
 
@@ -281,8 +312,6 @@ impl App {
 impl eframe::App for App {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         apply_neon_theme(ctx);
-
-        // Ensure icons are loaded once ctx is available
         self.ensure_icons_loaded(ctx);
 
         egui::SidePanel::left("side_panel").show(ctx, |ui| {
@@ -352,6 +381,9 @@ impl eframe::App for App {
                                 reset_aggressive: false,
                                 last_message: String::new(),
                             });
+                        }
+                        Page::DiskHealth => {
+                            disk_health::show_disk_health(ui, &self.log, &mut self.disk_health_state);
                         }
                         Page::Install => { install::show_install(ui, &self.log); }
                         Page::WinAppRemoval => {
@@ -428,7 +460,6 @@ impl eframe::App for App {
 // top of file
 use image;
 
-// ---- helper: load PNG bytes (include_bytes!) into an egui texture ----
 fn load_png_from_bytes(
     ctx: &egui::Context,
     name: &str,

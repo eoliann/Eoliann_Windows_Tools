@@ -640,12 +640,14 @@ pub fn show_customize_preferences(
     // Persist any edits back into egui memory each frame
     ui.ctx().data_mut(|d| d.insert_temp(bl_state_id, bl_vols.clone()));
 
+    let yellow_title = egui::Color32::YELLOW;
+
     // ---------------- General Preferences ----------------
     egui::CollapsingHeader::new("General Preferences")
         .default_open(true)
         .show(ui, |ui| {
             ui.vertical(|ui| {
-                ui.label(RichText::new("General Preferences").heading());
+                ui.label(RichText::new("General Preferences").heading().color(yellow_title));
                 ui.add_space(6.0);
 
                 ui.checkbox(enable_tooltips, "Enable advanced tooltips");
@@ -790,7 +792,7 @@ pub fn show_customize_preferences(
         .default_open(true)
         .show(ui, |ui| {
             ui.vertical(|ui| {
-                ui.label(RichText::new("Features / Tweaks").heading());
+                ui.label(RichText::new("Features / Tweaks").heading().color(yellow_title));
                 ui.add_space(6.0);
 
                 if !*mouse_prefs_loaded {

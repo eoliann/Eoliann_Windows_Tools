@@ -4,6 +4,7 @@ use std::thread;
 use std::time::Duration;
 use crate::utils;
 use crate::commands;
+
  // must export run_powershell_cmd(...) and is_elevated()
 
 // -------------------- Data model --------------------
@@ -93,8 +94,23 @@ const ITEMS: &[Item] = &[
     Item { group: "Other", label: "Office-related (Hub/OneNote/ToDo)", pattern: "office|onenote|microsoft.office.onenote|microsoft.office.sway|microsoft.todos" },
 ];
 
-const COL0_GROUPS: &[&str] = &["Communication", "Media & Creativity", "Microsoft Apps", "Other"];
-const COL1_GROUPS: &[&str] = &["Bing Apps", "Games", "Systems & Misc", "Store & System"];
+// const COL0_GROUPS: &[&str] = &["Communication", "Media & Creativity", "Microsoft Apps", "Other"];
+// const COL1_GROUPS: &[&str] = &["Bing Apps", "Games", "Systems & Misc", "Store & System"];
+
+// Grupurile – le folosim direct în render_column
+const COL0_GROUPS: &[&str] = &[
+    "Communication",
+    "Media & Creativity",
+    "Microsoft Apps",
+    "Other",
+];
+
+const COL1_GROUPS: &[&str] = &[
+    "Bing Apps",
+    "Games",
+    "Systems & Misc",
+    "Store & System",
+];
 
 // -------------------- Persistent states --------------------
 static SELECTION: OnceLock<Mutex<Vec<bool>>> = OnceLock::new();
@@ -681,37 +697,75 @@ pub fn show_winapp_removal(
 
 }
 
+// fn render_column(ui: &mut egui::Ui, groups: &[&str], _log: &Arc<Mutex<String>>) {
+//     for &g in groups {
+//         ui.group(|ui| {
+//             ui.label(egui::RichText::new(g).size(16.0));
+//             let mut sel = selection_state().lock().unwrap();
+//             let inst = installed_state().lock().unwrap();
+//             for (i, it) in ITEMS.iter().enumerate().filter(|(_, it)| it.group == g) {
+//                 let mut v = sel[i];
+//                 // create label with installed hint if available
+//                 let mut label = it.label.to_string();
+//                 if i < inst.len() && inst[i] {
+//                     label.push_str(" ");
+//                     // append small green installed marker
+//                     label.push_str("(installed)");
+//                 }
+//                 // draw checkbox with rich text display if installed
+//                 if inst.get(i).copied().unwrap_or(false) {
+//                     if ui.checkbox(&mut v, egui::RichText::new(label).color(egui::Color32::from_rgb(0, 255, 140))).clicked() {
+//                         sel[i] = v;
+//                     }
+//                 } else {
+//                     if ui.checkbox(&mut v, label).clicked() {
+//                         sel[i] = v;
+//                     }
+//                 }
+//             }
+//         });
+//         ui.add_space(6.0);
+//     }
+// }
+
+// ← Aici schimbăm esențialul: grupurile galbene
 fn render_column(ui: &mut egui::Ui, groups: &[&str], _log: &Arc<Mutex<String>>) {
+    let yellow = egui::Color32::from_rgb(255, 220, 80);     // galben plăcut, nu prea strident
+    // sau mai intens: egui::Color32::from_rgb(255, 240, 60);
+    // sau bright: egui::Color32::YELLOW;
+
     for &g in groups {
         ui.group(|ui| {
-            ui.label(egui::RichText::new(g).size(16.0));
+            // Titlul grupului – galben, puțin mai mare
+            ui.label(
+                egui::RichText::new(g)
+                    .size(17.0)               // puțin mai mare decât textul normal
+                    .color(yellow)
+                    .strong(),                // opțional: mai bold / mai vizibil
+            );
+
             let mut sel = selection_state().lock().unwrap();
             let inst = installed_state().lock().unwrap();
+
             for (i, it) in ITEMS.iter().enumerate().filter(|(_, it)| it.group == g) {
                 let mut v = sel[i];
-                // create label with installed hint if available
-                let mut label = it.label.to_string();
+
+                let label_text = it.label.to_string();
+                let mut rt = egui::RichText::new(label_text);
+
                 if i < inst.len() && inst[i] {
-                    label.push_str(" ");
-                    // append small green installed marker
-                    label.push_str("(installed)");
+                    // Aplicație instalată → marcaj verde + bold
+                    rt = rt.color(egui::Color32::from_rgb(0, 255, 140)).strong();
                 }
-                // draw checkbox with rich text display if installed
-                if inst.get(i).copied().unwrap_or(false) {
-                    if ui.checkbox(&mut v, egui::RichText::new(label).color(egui::Color32::from_rgb(0, 255, 140))).clicked() {
-                        sel[i] = v;
-                    }
-                } else {
-                    if ui.checkbox(&mut v, label).clicked() {
-                        sel[i] = v;
-                    }
+
+                if ui.checkbox(&mut v, rt).clicked() {
+                    sel[i] = v;
                 }
             }
         });
         ui.add_space(6.0);
     }
 }
-
 // -------------------- Task runners --------------------
 
 fn spawn_bulk(force: bool, log: Arc<Mutex<String>>) {

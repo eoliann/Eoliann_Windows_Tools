@@ -33,3 +33,4 @@ pub fn draw_icon(
         ui.label(RichText::new(fallback).size(size));
     }
 }
+

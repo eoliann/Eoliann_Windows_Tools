@@ -2,6 +2,7 @@
 
 use crate::utils::run_command; // păstrează utilitarul tău existent
 
+
 use std::io::{self, BufReader};
 use std::process::{Command as StdCommand, Stdio};
 use std::sync::{Arc, Mutex};
@@ -3398,3 +3399,448 @@ pub fn updates_security_settings() -> String {
 
     run_powershell_elevated_capture(script)
 }
+
+
+
+
+#[cfg(windows)]
+pub fn disk_health_report_json() -> String {
+    use crate::utils::run_powershell;
+
+    let ps = r#"
+$ErrorActionPreference = 'SilentlyContinue'
+
+function BytesToUInt64([byte[]]$b, [int]$offset){
+    [BitConverter]::ToUInt64($b, $offset)
+}
+
+function Parse-SmartVendorSpecific([byte[]]$data){
+    # vendor data length should be 512 for MSStorageDriver_FailurePredictData
+    # SMART attributes are 30 bytes each, starting at offset 2, 12 bytes per attribute entry in some layouts.
+    # MSStorageDriver_FailurePredictData uses 12-byte entries starting at offset 2 for 30 attributes (total 362 bytes),
+    # but common parsing for this WMI class: each attribute is 12 bytes: Id, Flags(2), Value, Worst, Raw(6), Reserved.
+    $attrs = @()
+    if (-not $data -or $data.Length -lt 362) { return $attrs }
+
+    $offset = 2
+    for ($i = 0; $i -lt 30; $i++){
+        $id = [int]$data[$offset]
+        if ($id -eq 0){
+            $offset += 12
+            continue
+        }
+        $value = [int]$data[$offset + 3]
+        $worst = [int]$data[$offset + 4]
+        $raw6 = $data[($offset + 5)..($offset + 10)]
+        # raw6 is 6 bytes little-endian
+        $raw = 0
+        for ($j=0; $j -lt 6; $j++){
+            $raw += [uint64]$raw6[$j] -shl (8*$j)
+        }
+
+        $attrs += [PSCustomObject]@{
+            id = $id
+            name = $null
+            current = $value
+            worst = $worst
+            threshold = $null
+            raw = $raw
+        }
+
+        $offset += 12
+    }
+
+    # Minimal name mapping for common SMART attributes (optional)
+    $nameMap = @{
+        5   = 'Reallocated Sectors Count'
+        9   = 'Power-On Hours'
+        12  = 'Power Cycle Count'
+        170 = 'Available Reserved Space'
+        171 = 'Program Fail Count'
+        172 = 'Erase Fail Count'
+        173 = 'Wear Leveling Count'
+        174 = 'Unexpected Power Loss Count'
+        177 = 'Wear Range Delta'
+        179 = 'Used Reserved Block Count Total'
+        180 = 'Unused Reserved Block Count Total'
+        181 = 'Program Fail Count Total'
+        182 = 'Erase Fail Count Total'
+        183 = 'Runtime Bad Block'
+        184 = 'End-to-End Error'
+        187 = 'Reported Uncorrectable Errors'
+        188 = 'Command Timeout'
+        190 = 'Airflow Temperature'
+        194 = 'Temperature'
+        196 = 'Reallocation Event Count'
+        197 = 'Current Pending Sector Count'
+        198 = 'Uncorrectable Sector Count'
+        199 = 'UltraDMA CRC Error Count'
+        202 = 'Percent Lifetime Used'
+        231 = 'Temperature'
+        233 = 'Media Wearout Indicator'
+        241 = 'Total LBAs Written'
+        242 = 'Total LBAs Read'
+    }
+
+    foreach ($a in $attrs){
+        if ($nameMap.ContainsKey($a.id)){
+            $a.name = $nameMap[$a.id]
+        }
+    }
+
+    return $attrs
+}
+
+$smart = @()
+try {
+    $pred = Get-CimInstance -Namespace root\wmi -ClassName MSStorageDriver_FailurePredictStatus
+    $data = Get-CimInstance -Namespace root\wmi -ClassName MSStorageDriver_FailurePredictData
+
+    foreach ($p in $pred){
+        $inst = $p.InstanceName
+        $pd = $data | Where-Object { $_.InstanceName -eq $inst } | Select-Object -First 1
+        $attrs = $null
+        if ($pd -and $pd.VendorSpecific){
+            $attrs = Parse-SmartVendorSpecific -data $pd.VendorSpecific
+        }
+        $smart += [PSCustomObject]@{
+            instance_name = $inst
+            predict_failure = [bool]$p.PredictFailure
+            reason = $null
+            attributes = $attrs
+        }
+    }
+} catch {
+    # ignore
+}
+
+$disks = @()
+try {
+    $pd = Get-PhysicalDisk
+    foreach ($d in $pd) {
+        $rel = $null
+        try { $rel = Get-StorageReliabilityCounter -PhysicalDisk $d } catch { $rel = $null }
+
+        # Wear: prefer % used (Wear). If only PercentLifeRemaining exists, convert to % used.
+        $wearUsed = $null
+        if ($rel -and $rel.Wear -ne $null) {
+            $wearUsed = [int]$rel.Wear
+        } elseif ($rel -and $rel.PercentLifeRemaining -ne $null) {
+            $wearUsed = 100 - [int]$rel.PercentLifeRemaining
+        }
+
+        $health = $null
+        if ($wearUsed -ne $null) { $health = 100 - [int]$wearUsed }
+
+        $powerOn = $null
+        if ($rel -and $rel.PowerOnHours -ne $null) { $powerOn = [uint64]$rel.PowerOnHours }
+
+        $temp = $null
+        if ($rel -and $rel.Temperature -ne $null) { $temp = [double]$rel.Temperature }
+
+        $totalWritten = $null
+        if ($rel -and $rel.TotalBytesWritten -ne $null) { $totalWritten = [string]$rel.TotalBytesWritten }
+
+        $disks += [PSCustomObject]@{
+            device_id = [string]$d.DeviceId
+            friendly_name = [string]$d.FriendlyName
+            serial_number = [string]$d.SerialNumber
+            model = [string]$d.Model
+            media_type = [string]$d.MediaType
+            bus_type = [string]$d.BusType
+            size_bytes = [uint64]$d.Size
+
+            wear_percent_used = $wearUsed
+            health_percent = $health
+            power_on_hours = $powerOn
+            temperature_c = $temp
+            total_bytes_written = $totalWritten
+        }
+    }
+} catch {
+    # ignore
+}
+
+$report = [PSCustomObject]@{
+    generated_at = (Get-Date).ToString('s')
+    smart_devices = $smart
+    physical_disks = $disks
+}
+
+$report | ConvertTo-Json -Depth 7
+"#;
+
+    run_powershell(ps)
+}
+
+
+
+// ========================= Disk Health: NVMe SMART/Health log (0x02) enrichment =========================
+// Requires dependency in Cargo.toml:
+// windows-sys = { version = "0.59", features = ["Win32_Foundation","Win32_Storage_FileSystem","Win32_System_IO","Win32_System_Ioctl"] }
+
+// #[cfg(windows)]
+// #[derive(Debug, Clone)]
+// struct NvmeHealthInfo {
+//     critical_warning: u8,
+//     composite_temp_k: u16,
+//     available_spare: u8,
+//     available_spare_threshold: u8,
+//     percentage_used: u8,
+//     power_on_hours: u64,
+//     unsafe_shutdowns: u64,
+//     media_errors: u64,
+//     num_err_info_log_entries: u64,
+// }
+
+// #[cfg(windows)]
+// fn u64_from_le_16(bytes16: &[u8]) -> u64 {
+//     // NVMe uses 128-bit counters in some fields; for UI we take the lower 64 bits.
+//     let mut b = [0u8; 8];
+//     b.copy_from_slice(&bytes16[..8]);
+//     u64::from_le_bytes(b)
+// }
+
+// #[cfg(windows)]
+// fn nvme_smart_health_log_physical_drive(drive_index: u32) -> Result<NvmeHealthInfo, String> {
+//     use std::ffi::OsStr;
+//     use std::iter::once;
+//     use std::os::windows::ffi::OsStrExt;
+//     use std::ptr::{null, null_mut};
+
+//     use windows_sys::Win32::Foundation::{CloseHandle, GetLastError, INVALID_HANDLE_VALUE};
+//     use windows_sys::Win32::Storage::FileSystem::{
+//         CreateFileW, FILE_ATTRIBUTE_NORMAL, FILE_SHARE_READ, FILE_SHARE_WRITE, GENERIC_READ,
+//         OPEN_EXISTING,
+//     };
+//     use windows_sys::Win32::System::IO::DeviceIoControl;
+//     use windows_sys::Win32::System::Ioctl::IOCTL_STORAGE_QUERY_PROPERTY;
+
+//     const STORAGE_DEVICE_PROTOCOL_SPECIFIC_PROPERTY: u32 = 50; // StorageDeviceProtocolSpecificProperty
+//     const PROPERTY_STANDARD_QUERY: u32 = 0; // PropertyStandardQuery
+//     const PROTOCOL_TYPE_NVME: u32 = 3; // ProtocolTypeNvme
+//     const NVME_DATA_TYPE_LOG_PAGE: u32 = 2; // NVMeDataTypeLogPage
+//     const NVME_LOG_PAGE_HEALTH_INFO: u32 = 0x02;
+//     const NVME_LOG_LEN: usize = 512;
+
+//     #[repr(C)]
+//     struct StoragePropertyQuery {
+//         property_id: u32,
+//         query_type: u32,
+//         additional_parameters: [u8; 1], // variable length
+//     }
+
+//     #[repr(C)]
+//     struct StorageProtocolSpecificData {
+//         protocol_type: u32,
+//         data_type: u32,
+//         protocol_data_request_value: u32,
+//         protocol_data_request_sub_value: u32,
+//         protocol_data_offset: u32,
+//         protocol_data_length: u32,
+//         fixed_protocol_return_data: u32,
+//         protocol_data_request_sub_value2: u32,
+//         protocol_data_request_sub_value3: u32,
+//         protocol_data_request_sub_value4: u32,
+//     }
+
+//     #[repr(C)]
+//     struct StorageProtocolDataDescriptor {
+//         version: u32,
+//         size: u32,
+//         protocol_specific_data: StorageProtocolSpecificData,
+//     }
+
+//     let path = format!(r"\\.\PhysicalDrive{drive_index}");
+//     let wide: Vec<u16> = OsStr::new(&path).encode_wide().chain(once(0)).collect();
+
+//     let handle = unsafe {
+//         CreateFileW(
+//             wide.as_ptr(),
+//             GENERIC_READ,
+//             FILE_SHARE_READ | FILE_SHARE_WRITE,
+//             null(),
+//             OPEN_EXISTING,
+//             FILE_ATTRIBUTE_NORMAL,
+//             0,
+//         )
+//     };
+
+//     if handle == INVALID_HANDLE_VALUE {
+//         let err = unsafe { GetLastError() };
+//         return Err(format!("CreateFileW failed for {path} (GetLastError={err})"));
+//     }
+
+//     // input/output buffer (same buffer, as recommended by Microsoft)
+//     let header_size = 8usize; // PropertyId + QueryType (4 + 4)
+//     let psd_size = std::mem::size_of::<StorageProtocolSpecificData>();
+//     let mut buf = vec![0u8; header_size + psd_size + NVME_LOG_LEN];
+
+//     unsafe {
+//         let q = buf.as_mut_ptr() as *mut StoragePropertyQuery;
+//         (*q).property_id = STORAGE_DEVICE_PROTOCOL_SPECIFIC_PROPERTY;
+//         (*q).query_type = PROPERTY_STANDARD_QUERY;
+
+//         let psd = buf.as_mut_ptr().add(header_size) as *mut StorageProtocolSpecificData;
+//         (*psd).protocol_type = PROTOCOL_TYPE_NVME;
+//         (*psd).data_type = NVME_DATA_TYPE_LOG_PAGE;
+//         (*psd).protocol_data_request_value = NVME_LOG_PAGE_HEALTH_INFO;
+//         (*psd).protocol_data_request_sub_value = 0;
+//         (*psd).fixed_protocol_return_data = 0;
+//         (*psd).protocol_data_request_sub_value2 = 0;
+//         (*psd).protocol_data_request_sub_value3 = 0;
+//         (*psd).protocol_data_request_sub_value4 = 0;
+
+//         (*psd).protocol_data_offset = psd_size as u32;
+//         (*psd).protocol_data_length = NVME_LOG_LEN as u32;
+//     }
+
+//     let mut returned: u32 = 0;
+//     let ok = unsafe {
+//         DeviceIoControl(
+//             handle,
+//             IOCTL_STORAGE_QUERY_PROPERTY,
+//             buf.as_mut_ptr() as *mut _,
+//             buf.len() as u32,
+//             buf.as_mut_ptr() as *mut _,
+//             buf.len() as u32,
+//             &mut returned as *mut u32,
+//             null_mut(),
+//         )
+//     };
+
+//     unsafe { CloseHandle(handle) };
+
+//     if ok == 0 || returned == 0 {
+//         let err = unsafe { GetLastError() };
+//         return Err(format!(
+//             "DeviceIoControl(IOCTL_STORAGE_QUERY_PROPERTY) failed (GetLastError={err})"
+//         ));
+//     }
+
+//     if buf.len() < std::mem::size_of::<StorageProtocolDataDescriptor>() {
+//         return Err("Returned buffer too small for STORAGE_PROTOCOL_DATA_DESCRIPTOR".to_string());
+//     }
+
+//     let desc = unsafe { &*(buf.as_ptr() as *const StorageProtocolDataDescriptor) };
+
+//     if desc.size as usize  < std::mem::size_of::<StorageProtocolDataDescriptor>() {
+//         return Err(format!(
+//             "Invalid descriptor header: version={}, size={}",
+//             desc.version, desc.size
+//         ));
+//     }
+
+//     let psd = &desc.protocol_specific_data;
+//     let off = psd.protocol_data_offset as usize;
+//     let len = psd.protocol_data_length as usize;
+
+//     if off < std::mem::size_of::<StorageProtocolSpecificData>() || len < NVME_LOG_LEN {
+//         return Err(format!(
+//             "Invalid ProtocolDataOffset/Length: off={off}, len={len}"
+//         ));
+//     }
+
+//     let psd_base = psd as *const StorageProtocolSpecificData as *const u8;
+//     let data_ptr = unsafe { psd_base.add(off) };
+//     let data = unsafe { std::slice::from_raw_parts(data_ptr, NVME_LOG_LEN) };
+
+//     // Parse NVMe SMART / Health log (Log Identifier 0x02)
+//     let critical_warning = data[0];
+//     let composite_temp_k = u16::from_le_bytes([data[1], data[2]]);
+//     let available_spare = data[3];
+//     let available_spare_threshold = data[4];
+//     let percentage_used = data[5];
+
+//     // Offsets per NVMe Base Specification (SMART/Health Information Log)
+//     let power_on_hours = u64_from_le_16(&data[128..144]);
+//     let unsafe_shutdowns = u64_from_le_16(&data[144..160]);
+//     let media_errors = u64_from_le_16(&data[160..176]);
+//     let num_err_info_log_entries = u64_from_le_16(&data[176..192]);
+
+//     Ok(NvmeHealthInfo {
+//         critical_warning,
+//         composite_temp_k,
+//         available_spare,
+//         available_spare_threshold,
+//         percentage_used,
+//         power_on_hours,
+//         unsafe_shutdowns,
+//         media_errors,
+//         num_err_info_log_entries,
+//     })
+// }
+
+// #[cfg(windows)]
+// fn augment_disk_health_json_with_nvme(mut json: String) -> String {
+//     let mut v: serde_json::Value = match serde_json::from_str(&json) {
+//         Ok(v) => v,
+//         Err(_) => return json,
+//     };
+
+//     let physical = match v.get_mut("physical_disks").and_then(|x| x.as_array_mut()) {
+//         Some(a) => a,
+//         None => return json,
+//     };
+
+//     for disk in physical.iter_mut() {
+//         let bus = disk
+//             .get("bus_type")
+//             .and_then(|x| x.as_str())
+//             .unwrap_or("")
+//             .to_ascii_lowercase();
+
+//         if bus != "nvme" {
+//             continue;
+//         }
+
+//         let dev_id = match disk.get("device_id").and_then(|x| x.as_u64()) {
+//             Some(x) => x as u32,
+//             None => continue,
+//         };
+
+//         if let Ok(nvme) = nvme_smart_health_log_physical_drive(dev_id) {
+//             let temp_c = if nvme.composite_temp_k >= 273 {
+//                 Some((nvme.composite_temp_k as u32).saturating_sub(273))
+//             } else {
+//                 None
+//             };
+
+//             // HDSentinel-style health for NVMe: Health = 100 - PercentageUsed
+//             let hp = 100u32.saturating_sub((nvme.percentage_used as u32).min(100));
+
+//             disk["nvme_critical_warning"] = serde_json::Value::from(nvme.critical_warning as u32);
+//             disk["nvme_composite_temperature_k"] =
+//                 serde_json::Value::from(nvme.composite_temp_k as u32);
+//             if let Some(tc) = temp_c {
+//                 disk["nvme_composite_temperature_c"] = serde_json::Value::from(tc);
+//             }
+//             disk["nvme_available_spare"] = serde_json::Value::from(nvme.available_spare as u32);
+//             disk["nvme_available_spare_threshold"] =
+//                 serde_json::Value::from(nvme.available_spare_threshold as u32);
+//             disk["nvme_percentage_used"] = serde_json::Value::from(nvme.percentage_used as u32);
+//             disk["nvme_power_on_hours"] = serde_json::Value::from(nvme.power_on_hours);
+//             disk["nvme_unsafe_shutdowns"] = serde_json::Value::from(nvme.unsafe_shutdowns);
+//             disk["nvme_media_errors"] = serde_json::Value::from(nvme.media_errors);
+//             disk["nvme_error_info_log_entries"] =
+//                 serde_json::Value::from(nvme.num_err_info_log_entries);
+
+//             // Prefer NVMe log for PowerOnHours and HealthPercent if present.
+//             disk["power_on_hours"] = serde_json::Value::from(nvme.power_on_hours);
+//             disk["health_percent"] = serde_json::Value::from(hp);
+
+//             // Optional: performance is typically 100%
+//             if disk.get("performance_percent").is_none() {
+//                 disk["performance_percent"] = serde_json::Value::from(100u32);
+//             }
+//         }
+//     }
+
+//     match serde_json::to_string(&v) {
+//         Ok(s) => {
+//             json = s;
+//             json
+//         }
+//         Err(_) => json,
+//     }
+// }

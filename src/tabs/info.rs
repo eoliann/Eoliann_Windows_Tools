@@ -248,8 +248,9 @@ pub fn show_info(
 
     ui.label(RichText::new(ascii_logo).monospace().color(Color32::from_rgb(57, 255, 20)).size(16.0));
     ui.separator();
-    ui.heading("Info");
+    ui.heading("❓ Info");
     ui.add_space(8.0);
+    let yellow_title = egui::Color32::YELLOW;
 
     // update banner (same)
     if update_available {
@@ -304,6 +305,7 @@ pub fn show_info(
     {
         let neon_green = egui::Color32::from_rgb(0, 255, 140);
         let normal_stroke = egui::Color32::from_gray(160);
+        
 
         // helper that draws a styled button and shows a tooltip on hover
         let draw_action_btn = |ui: &mut egui::Ui, _id_suffix: &str, label: &str, tooltip: &str| -> egui::Response {
@@ -312,7 +314,7 @@ pub fn show_info(
 
             let visuals = ui.style().visuals.clone();
             let normal_bg = visuals.widgets.inactive.bg_fill;
-            let hover_bg  = egui::Color32::WHITE;
+            let hover_bg  = egui::Color32::YELLOW;
 
             let bg_fill   = if resp.hovered() { hover_bg } else { normal_bg };
             let stroke_col= if resp.hovered() { neon_green } else { normal_stroke };
@@ -414,7 +416,8 @@ pub fn show_info(
     // System information section
     ui.add_space(6.0);
     egui::Frame::group(ui.style()).show(ui, |ui| {
-        ui.heading("System information");
+        // ui.heading("System information");
+        ui.heading(RichText::new("System information").color(yellow_title));
         ui.add_space(6.0);
 
         // Start collection once (non-blocking)

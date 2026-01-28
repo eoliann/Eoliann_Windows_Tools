@@ -1,6 +1,6 @@
 [package]
 name = "eoliann_windows_tools_w11"
-version = "1.2.6"
+version = "1.2.7"
 edition = "2021"
 authors = ["Eoliann Dev"]
 description = "Quick tools for Windows administration"
@@ -25,6 +25,14 @@ tiny-skia = "0.11.4"
 winreg = "0.10"
 sysinfo = "0.28"
 hostname = "0.4"
+windows-sys = { version = "0.59", features = [
+  "Win32_Foundation",
+  "Win32_Storage_FileSystem",
+  "Win32_System_IO",
+  "Win32_System_Ioctl"
+] }
+colored = "3.0"
+
 
 # Pentru integrare cu Windows API (IsUserAnAdmin, ShellExecuteW, etc.)
 windows = { version = "0.61", features = [

@@ -2,6 +2,7 @@
 // Adaptare corectă a fișierului `tools.rs` — folosește direct rezultatele funcțiilor din `commands`
 // (nu mai convertim generic Result<> -> String deoarece majoritatea funcțiilor returnează String).
 use eframe::egui;
+use egui::RichText;
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
@@ -64,11 +65,11 @@ pub fn show_tools(
 
     // consultăm flag-ul global pentru a dezactiva butoanele dacă e cazul
     let global_busy = crate::commands::GLOBAL_OP_RUNNING.load(Ordering::SeqCst);
+    let yellow_title = egui::Color32::YELLOW;
 
     // ---- Context menu ----
     ui.group(|ui| {
-        ui.label("Context menu");
-
+        ui.label(RichText::new("Context menu").color(yellow_title).size(18.0));
         let resp = ui.add_enabled(!global_busy, egui::Button::new("🖱 Toggle context menu (Win11 / Classic)"));
         resp.clone().on_hover_ui(|ui| {
             ui.vertical(|ui| {
@@ -101,7 +102,7 @@ pub fn show_tools(
 
     // ---- Maintenance ----
     ui.group(|ui| {
-        ui.label("Maintenance");
+        ui.label(RichText::new("Maintenance").color(yellow_title).size(18.0));
         ui.horizontal_wrapped(|ui| {
             // Disk Cleanup
             let resp = ui.add_enabled(!global_busy, egui::Button::new("🗑 Disk Cleanup C:"));
@@ -267,7 +268,7 @@ pub fn show_tools(
 
     // ---- Essential Tweaks ----
     ui.group(|ui| {
-        ui.label("Essential Tweaks");
+        ui.label(RichText::new("Essential Tweaks").color(yellow_title).size(18.0));
         ui.horizontal_wrapped(|ui| {
             // Disable ConsumerFeatures
             let resp = ui.add_enabled(!global_busy, egui::Button::new("🛡 Disable ConsumerFeatures"));
@@ -649,7 +650,7 @@ pub fn show_tools(
 
     // ---- Advanced Tweaks ----
     ui.group(|ui| {
-        ui.label("Advanced Tweaks");
+        ui.label(RichText::new("Advanced Tweaks").color(yellow_title).size(18.0));
         ui.horizontal_wrapped(|ui| {
             let resp = ui.add_enabled(!global_busy, egui::Button::new("🚫 Adobe Network Block"));
             resp.clone().on_hover_ui(|ui| {
@@ -1074,7 +1075,7 @@ pub fn show_tools(
 
     // ---- Power Plans ----
     ui.group(|ui| {
-        ui.label("Power Plans");
+        ui.label(RichText::new("Power Plans").color(yellow_title).size(18.0));
         ui.horizontal_wrapped(|ui| {
             // High Performance
             let resp = ui.add_enabled(!global_busy, egui::Button::new("⚡ High Performance"));
@@ -1192,7 +1193,7 @@ pub fn show_tools(
 
     // ---- Power Tweaks ----
     ui.group(|ui| {
-        ui.label("Power Tweaks");
+        ui.label(RichText::new("Power Tweaks").color(yellow_title).size(18.0));
         ui.horizontal_wrapped(|ui| {
             let resp = ui.add_enabled(!global_busy, egui::Button::new("💤 Disable Sleep"));
             resp.clone().on_hover_ui(|ui| {
@@ -1263,7 +1264,7 @@ pub fn show_tools(
 
     // ---- Updates ----
     ui.group(|ui| {
-        ui.label("Updates Settings - Use with caution");
+        ui.label(RichText::new("Updates Settings - Use with caution").color(yellow_title).size(18.0));
         ui.horizontal_wrapped(|ui| {
             // Default settings
             let resp = ui.add_enabled(!global_busy, egui::Button::new("🔄 Default settings"));

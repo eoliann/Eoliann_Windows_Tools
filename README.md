@@ -39,7 +39,7 @@ Now install it on your system!
 <img width="1402" height="932" alt="update-1 1 7-to-1 1 8" src="https://github.com/user-attachments/assets/4d442ac3-679d-4c51-9f00-8f6383eea4b6" />
 
 ### INFO
-<img width="1920" height="1032" alt="info" src="https://github.com/user-attachments/assets/143381ae-53ce-4cc5-8bff-dd2ecf8de5a4" />
+<img width="1440" height="852" alt="info_128" src="https://github.com/user-attachments/assets/3c88b095-f141-4493-913e-158c914e6a06" />
 
 - `whoami` → displays the current user
 - `ipconfig` → display network settings
@@ -49,7 +49,7 @@ Now install it on your system!
 - `About` → all about application: developer, version, website
 
 ### TOOLS
-<img width="1920" height="1032" alt="tools" src="https://github.com/user-attachments/assets/3c2497b9-24cd-4411-8faf-e5758d35dd3b" />
+<img width="1440" height="852" alt="tools_128" src="https://github.com/user-attachments/assets/2c92678f-434c-4c86-9383-103e6b9892e0" />
 
 #### Context menu
 - `Toggle Context Menu` → instantly switch between the **Win11 ↔ Classic** context menu (with Explorer restart)
@@ -91,6 +91,10 @@ Now install it on your system!
 - `Toggle Explorer Tabs` → enabling and disabling tabs in Explorer (My Computer)
 - `Run OO Shutup 10` → downloads and launches OO Shutup 10 (third-party executable)
 - `Set DNS` → set the DNS for the network card
+
+#### Network Tools
+- `Set up insecure guest logins + disable SMB signing` → RequireSecuritySignature = 0 & AllowInsecureGuestAuth = 1 (in both registry locations)
+
 #### Power Plans
 - `High Performance` → maximizes performance at the cost of higher power usage
 - `Balanced` → default Windows plan (best for most users)
@@ -106,13 +110,16 @@ Now install it on your system!
 - `Security Settings`  → sets Windows Update to recommended/security-focused settings
 - `Disable All Updates`  → disables Windows Update (advanced users only)
 
+#### Group Policy Editor (Windows Home)
+- `Enable gpedit.msc on Windows Home`  → Check your Windows version and, if it is Home, activate gpedit.msc in the system if it is not already activated. 
+
 ### DISK HEALTH
-<img width="1920" height="1032" alt="disk_health" src="https://github.com/user-attachments/assets/59bab635-fa82-4213-9a71-ad346f365a91" />
+<img width="1440" height="852" alt="disk_health_128" src="https://github.com/user-attachments/assets/7ff19fa9-d446-4731-a268-0078ff0b3236" />
 
 Displays storage memory information such as: temperature, health, performance, Power on time (total number of hours of use), Estimated remaining lifetime, Lifetime writes in GB and bytes.
 
 ### INSTALL
-<img width="1920" height="1032" alt="install" src="https://github.com/user-attachments/assets/62cbdb04-a858-4ca1-a146-4c358c4c0455" />
+<img width="1440" height="852" alt="install_128" src="https://github.com/user-attachments/assets/495a8b11-350e-4677-b092-ed1fdbff9e82" />
 
 #### Install application
 ![install-app](https://github.com/user-attachments/assets/1d50fdc2-eea6-4b72-863f-e3e7f44a330f)
@@ -136,7 +143,7 @@ For Google Chrome users:
 - `Install Chrome extensions` → install Chrome extensions from the Chrome Web Store
   
 ### WINDOWS APP REMOVAL
-<img width="1920" height="1032" alt="winapp_removal" src="https://github.com/user-attachments/assets/3a84e710-8a3e-46e9-b2d0-a501b6027705" />
+<img width="1440" height="852" alt="winapp_removal_128" src="https://github.com/user-attachments/assets/8357e15a-9192-4c7e-b2ff-b7fd432b0846" />
 
 - `Communication` → remove default applications that come with Windows installation, such as: Outlook for Windows, Skype, Teams, GroupMe, To-Do, Your Phone, CommsPhone, Messaging, Mail & Calendar, and others.
 - `Media & Creativity` → removes default applications that come with Windows installation, such as: Climpchamp, Camera, MS Paint, 3D Builder, 3D Viewer, Mixed Reality Portal
@@ -147,14 +154,19 @@ For Google Chrome users:
 - `Other` → remove default applications that come with Windows installation, such as: Print 3D, Office-related
 
 ### CUSTOMIZE PREFERENCES
-<img width="1915" height="1018" alt="customize_preferences" src="https://github.com/user-attachments/assets/d33e2f4d-7ea6-41f6-86aa-23739394aeaa" />
+<img width="1440" height="852" alt="customize_preferences_128" src="https://github.com/user-attachments/assets/0d8b3bb1-5243-4d04-9699-61783ba9a919" />
 
 - `General Preferences` → Start with Windows, Enable advanced tooltips, Auto-check for updates
 - `Features / Tweaks` → Mouse Acceleration, NumLock on startup, Taskbar Search Button, Taskbar Widgets, Snap Windows on startup, Sticky Keys on startup, Task View button, Verbose Logon Messages (system), BitLocker protection
 - `Bitlocker on/off all partition` → activate/deactivate Bitlocker for one or all partition
 
+### QUICK KEYS
+<img width="1440" height="852" alt="quick_keys_128" src="https://github.com/user-attachments/assets/9b82df7c-a386-4264-9daf-03b7666b2884" />
+
+- `Shortcuts` → Shortcuts for some important functions such as: Win + X, Win + R, Win + I, Regedit\Registry Editor, gpedit.msc\Group Policy
+
 ### SETTINGS
-<img width="1920" height="1032" alt="settings" src="https://github.com/user-attachments/assets/d52ff3bc-8a09-41fe-8ecc-c06022fd2e00" />
+<img width="1440" height="852" alt="settings_128" src="https://github.com/user-attachments/assets/ca62afa6-58b3-4d33-9562-1ec412373d18" />
 
 - `Switch to Light Mode / Switch to Dark Mode` → switch between Windows Light and Dark themes
 - `Display Current alignment` → Display Current alignment of taskbar elements (Center or Left)

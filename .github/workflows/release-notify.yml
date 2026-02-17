@@ -15,21 +15,17 @@ jobs:
       RELEASE_TAG:  ${{ github.event.release.tag_name || github.ref_name }}
       RELEASE_URL:  ${{ github.event.release.html_url || format('{0}/{1}/releases', github.server_url, github.repository) }}
       ASSET_URL:   ${{ github.event.release.assets[0].browser_download_url || '' }}
-      ASSET_URL1:   ${{ github.event.release.assets[1].browser_download_url || '' }}
 
     steps:
       - name: Send Telegram notifications
         run: |
           TEXT="📢 <b>Eoliann Windows Tools are o nouă versiune pe GitHub!</b>
           <b>${RELEASE_NAME}</b> (tag: <code>${RELEASE_TAG}</code>)
-
-          👉 Un set de instrumente rapid pentru Windows 11, scris în Rust, care include comenzi de administrare utile și ajustări pentru Windows 11.
-
-          👉 <a href='${RELEASE_URL}'>Mergi la pagina ultimei versiuni</a>"
+          👉 <a href='${RELEASE_URL}'>Mergi la pagina noii versiuni</a>"
 
           if [[ -n "${ASSET_URL}" ]]; then
             TEXT="$TEXT
-            ⬇️ <a href='${ASSET_URL}'>Descarcă fișierul <u><b>Eoliann_Windows_Tools_Installer.exe</b></u></a> instalabil sau <a href='${ASSET_URL1}'><u><b>eoliann_windows_tools_w11.exe</b></u></a> portabil.</a>"
+            ⬇️ <a href='${ASSET_URL}'>Descarcă fișierul .exe</a>"
           fi
 
           IFS=',' read -r -a CHATS <<< "${TG_CHATS}"

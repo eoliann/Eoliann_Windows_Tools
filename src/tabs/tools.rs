@@ -36,6 +36,8 @@ pub struct ToolsState {
     pub reset_in_progress: bool,
     pub reset_aggressive: bool,
     pub last_message: String,
+    pub network_status: Option<crate::commands::NetworkPolicyStatus>,
+    // pub last_network_check: Option<std::time::Instant>,
 }
 
 impl Default for ToolsState {
@@ -47,6 +49,8 @@ impl Default for ToolsState {
             last_message: String::new(),
             show_hidden_state: false,
             show_file_ext_state: false,
+            network_status: None,
+            // last_network_check: None,
         }
     }
 }
@@ -1073,6 +1077,88 @@ pub fn show_tools(
 
     ui.add_space(6.0);
 
+    // ---- Network Tools ----
+    // ---- Network Tools ----
+    ui.group(|ui| {
+        ui.label(RichText::new("Network Tools").color(yellow_title).size(18.0));
+
+        // Status actualizat (arată ambele locații)
+        if let Some(st) = app_state.network_status.as_ref() {
+            ui.label(format!("RequireSecuritySignature: {}", 
+                st.require_security_signature.map(|v| v.to_string()).unwrap_or("Not configured".into())));
+            ui.label(format!("AllowInsecureGuestAuth (Policies): {}", 
+                st.allow_insecure_guest_auth.map(|v| v.to_string()).unwrap_or("Not configured".into())));
+            if st.allow_insecure_guest_auth_legacy.is_some() {
+                ui.label(format!("AllowInsecureGuestAuth (legacy): {}", 
+                    st.allow_insecure_guest_auth_legacy.unwrap()));
+            }
+        } else {
+            ui.colored_label(egui::Color32::LIGHT_BLUE, "Status: not checked yet (click Apply / Restore)");
+        }
+
+        ui.add_space(6.0);
+
+        ui.horizontal_wrapped(|ui| {
+            // Apply
+            let resp_apply = ui.add_enabled(!global_busy, egui::Button::new("📶 Apply Network Compatibility Fix"));
+            resp_apply.clone().on_hover_ui(|ui| {
+                ui.vertical(|ui| {
+                    ui.colored_label(egui::Color32::from_rgb(57, 255, 20), "Set up insecure guest logins + disable SMB signing");
+                    ui.label("• RequireSecuritySignature = 0");
+                    ui.label("• AllowInsecureGuestAuth = 1 (in both registry locations)");
+                    ui.colored_label(egui::Color32::YELLOW, "⚠ Reduces SMB security – use only in trusted networks");
+                    ui.colored_label(egui::Color32::YELLOW, "⚠ gpedit.msc will still show \"Not Configured\" – NORMAL!");
+                    ui.colored_label(egui::Color32::YELLOW, "⚠ Full restart recommended");
+                });
+            });
+
+            if resp_apply.clicked() {
+                app_state.network_status = Some(crate::commands::check_network_policy_status());
+
+                if let Some(guard) = commands::try_start_global_op("Network Compatibility Fix", log) {
+                    let log_clone = log.clone();
+                    thread::spawn(move || {
+                        let _guard = guard;
+                        let result = commands::apply_network_compatibility_fix();
+                        let mut lg = log_clone.lock().unwrap();
+                        if lg.is_empty() { *lg = result; } else { *lg = format!("{}\n{}", lg, result); }
+                    });
+                }
+            }
+
+            // Restore
+            let restore_btn = egui::Button::new("🔒 Restore Secure Defaults")
+                .fill(egui::Color32::from_rgb(150, 0, 0))
+                .stroke(egui::Stroke::new(1.0, egui::Color32::from_rgb(100, 0, 0)));
+
+            let resp_restore = ui.add_enabled(!global_busy, restore_btn);
+            resp_restore.clone().on_hover_ui(|ui| {
+                ui.vertical(|ui| {
+                    ui.colored_label(egui::Color32::from_rgb(57, 255, 20), "Returns to Microsoft default settings");
+                    ui.label("• RequireSecuritySignature = 1");
+                    ui.label("• AllowInsecureGuestAuth deleted from both locations");
+                    ui.colored_label(egui::Color32::YELLOW, "⚠ Full restart recommended");
+                });
+            });
+
+            if resp_restore.clicked() {
+                app_state.network_status = Some(crate::commands::check_network_policy_status());
+
+                if let Some(guard) = commands::try_start_global_op("Restore Secure SMB Defaults", log) {
+                    let log_clone = log.clone();
+                    thread::spawn(move || {
+                        let _guard = guard;
+                        let result = commands::restore_secure_defaults();
+                        let mut lg = log_clone.lock().unwrap();
+                        if lg.is_empty() { *lg = result; } else { *lg = format!("{}\n{}", lg, result); }
+                    });
+                }
+            }
+        });
+    });
+
+    ui.add_space(6.0);
+
     // ---- Power Plans ----
     ui.group(|ui| {
         ui.label(RichText::new("Power Plans").color(yellow_title).size(18.0));
@@ -1341,4 +1427,37 @@ pub fn show_tools(
             }
         });
     });
+
+    ui.add_space(6.0);
+
+    // ---- Enable gpedit on Windows Home ----
+    ui.group(|ui| {
+        ui.label(RichText::new("Group Policy Editor (Windows Home)").color(yellow_title).size(18.0));
+
+        let resp = ui.add_enabled(!global_busy, egui::Button::new("🚀 Enable gpedit.msc on Windows Home"));
+
+        resp.clone().on_hover_ui(|ui| {
+            ui.vertical(|ui| {
+                ui.colored_label(egui::Color32::from_rgb(57, 255, 20), "Activates full gpedit.msc on Windows 11 Home Edition");
+                ui.label("• Uses only built-in Microsoft packages (no downloads)");
+                ui.label("• Works on 22H2 / 23H2 / 24H2 / 25H2");
+                ui.colored_label(egui::Color32::YELLOW, "⚠ Requires Administrator rights");
+                ui.colored_label(egui::Color32::YELLOW, "⚠ Requires restart after running");
+                ui.colored_label(egui::Color32::RED, "⚠ Make a System Restore Point first (recommended)");
+            });
+        });
+
+        if resp.clicked() {
+            if let Some(guard) = commands::try_start_global_op("Enable gpedit on Home", log) {
+                let log_clone = log.clone();
+                thread::spawn(move || {
+                    let _guard = guard;
+                    let result = commands::enable_group_policy_editor();
+                    let mut lg = log_clone.lock().unwrap();
+                    if lg.is_empty() { *lg = result; } else { *lg = format!("{}\n{}", lg, result); }
+                });
+            }
+        }
+    });
+
 }

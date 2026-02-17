@@ -22,9 +22,9 @@ jobs:
           ASSET_URL2: ${{ github.event.release.assets[1].browser_download_url || '' }}
         run: |
           # Construim textul pas cu pas
-          TEXT="📢 <b>Eoliann Windows Tools are o nouă versiune pe GitHub!</b>\n"
-          TEXT+="<b>${RELEASE_NAME}</b> (tag: <code>${RELEASE_TAG}</code>)\n\n"
-          TEXT+="👉 <a href=\"${RELEASE_URL}\">Mergi la pagina noii versiuni</a>\n"
+          TEXT="📢 <b>Eoliann Windows Tools are o nouă versiune pe GitHub!</b><br>"
+          TEXT+="<b>${RELEASE_NAME}</b> (tag: <code>${RELEASE_TAG}</code>)<br><br>"
+          TEXT+="👉 <a href=\"${RELEASE_URL}\">Mergi la pagina noii versiuni</a><br>"
 
           # Adăugăm link-urile de descărcare doar dacă există
           if [ -n "$ASSET_URL1" ]; then
@@ -61,3 +61,4 @@ jobs:
                 --data-urlencode "text=${TEXT}"
             fi
           done
+

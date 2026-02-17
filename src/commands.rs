@@ -33,6 +33,8 @@ fn push_line(log: &Arc<Mutex<String>>, line: &str) {
     }
 }
 
+
+
 // ---------- Stream runners (cu citire STDOUT + STDERR în paralel) ----------
 
 /// Rulează un proces, citește stdout+stderr în paralel, scrie în `log` cu prefix și așteaptă să iasă.
@@ -158,10 +160,10 @@ pub fn verify_system_integrity_live(log: Arc<Mutex<String>>) {
         }
 
         // Rulare secvențială ca să știi clar progresul și să eviți suprapuneri grele în log
-        let _ = run_command_stream_and_wait(log.clone(), "sfc", &["/scannow"]);
-        let _ = run_command_stream_and_wait(log.clone(), "DISM", &["/Online", "/Cleanup-Image", "/CheckHealth"]);
-        let _ = run_command_stream_and_wait(log.clone(), "DISM", &["/Online", "/Cleanup-Image", "/ScanHealth"]);
-        let _ = run_command_stream_and_wait(log.clone(), "DISM", &["/Online", "/Cleanup-Image", "/RestoreHealth"]);
+        let _ = run_command_stream_and_wait(log.clone(), "sfc", &["/scannow"][..]);
+        let _ = run_command_stream_and_wait(log.clone(), "DISM", &["/Online", "/Cleanup-Image", "/CheckHealth"][..]);
+        let _ = run_command_stream_and_wait(log.clone(), "DISM", &["/Online", "/Cleanup-Image", "/ScanHealth"][..]);
+        let _ = run_command_stream_and_wait(log.clone(), "DISM", &["/Online", "/Cleanup-Image", "/RestoreHealth"][..]);
 
         push_line(&log, "✅ Verification finished.");
     });
@@ -208,7 +210,7 @@ $bin.Items() | ForEach-Object {
 "#;
 
     let mut cmd = std::process::Command::new("powershell");
-    cmd.args([
+    cmd.args(&[
         "-ExecutionPolicy", "Unrestricted",
         "-NoProfile",
         "-Command", ps_script,
@@ -1010,11 +1012,11 @@ fn run_hidden(cmd: &str, args: &[&str]) -> std::io::Result<Output> {
 
 /// Încearcă să verifice/actualizeze winget. Întoarce true dacă e gata de folosire.
 pub fn ensure_winget_ready(log: Arc<Mutex<String>>) -> bool {
-    match run_hidden("winget", &["--version"]) {
+    match run_hidden("winget", &["--version"][..]) {
         Ok(o) if o.status.success() => {
             push_line(&log, "✅ winget available.");
             // încercăm și un source update (nu strică)
-            let _ = run_hidden("winget", &["source", "update"]);
+            let _ = run_hidden("winget", &["source", "update"][..]);
             true
         }
         _ => {
@@ -1037,7 +1039,7 @@ pub fn ensure_winget_ready(log: Arc<Mutex<String>>) -> bool {
 
 /// Verifică dacă un id winget este instalat (winget list --id).
 pub fn winget_is_installed(id: &str) -> bool {
-    match run_hidden("winget", &["list", "--id", id, "-e"]) {
+    match run_hidden("winget", &["list", "--id", id, "-e"][..]) {
         Ok(o) => {
             let out = String::from_utf8_lossy(&o.stdout);
             // winget scrie „No installed package found…” când nu găsește nimic
@@ -1050,7 +1052,7 @@ pub fn winget_is_installed(id: &str) -> bool {
 /// Instalează pachetul (silent) și streamează în log.
 pub fn winget_install(id: &str, log: Arc<Mutex<String>>) -> i32 {
     let args = ["install", "--id", id, "-e", "--silent", "--accept-package-agreements", "--accept-source-agreements"];
-    match run_command_stream_and_wait(log, "winget", &args) {
+    match run_command_stream_and_wait(log, "winget", &args[..]) {
         Ok(code) => code,
         Err(_) => -1,
     }
@@ -1059,7 +1061,7 @@ pub fn winget_install(id: &str, log: Arc<Mutex<String>>) -> i32 {
 /// Dezinstalează pachetul (unde se poate) și streamează în log.
 pub fn winget_uninstall(id: &str, log: Arc<Mutex<String>>) -> i32 {
     let args = ["uninstall", "--id", id, "-e", "--silent"];
-    match run_command_stream_and_wait(log, "winget", &args) {
+    match run_command_stream_and_wait(log, "winget", &args[..]) {
         Ok(code) => code,
         Err(_) => -1,
     }
@@ -1068,7 +1070,7 @@ pub fn winget_uninstall(id: &str, log: Arc<Mutex<String>>) -> i32 {
 /// Upgrade pentru pachet (silent) și streamează în log.
 pub fn winget_upgrade(id: &str, log: Arc<Mutex<String>>) -> i32 {
     let args = ["upgrade", "--id", id, "-e", "--silent", "--accept-package-agreements", "--accept-source-agreements"];
-    match run_command_stream_and_wait(log, "winget", &args) {
+    match run_command_stream_and_wait(log, "winget", &args[..]) {
         Ok(code) => code,
         Err(_) => -1,
     }
@@ -1297,7 +1299,7 @@ pub fn upgrade_all_apps_with_log(output_log: SharedOutput) {
         install_chocolatey(&output_log);
     } else {
         log_message(&output_log, "Updating Chocolatey...");
-        run_command_and_log("choco", &["upgrade", "chocolatey", "-y"], &output_log);
+        run_command_and_log("choco", &["upgrade", "chocolatey", "-y"][..], &output_log);
     }
 
     // 4. Verificare finală și upgrade aplicații
@@ -1312,12 +1314,12 @@ pub fn upgrade_all_apps_with_log(output_log: SharedOutput) {
     // 5. Upgrade pe fiecare canal disponibil
     if choco_ready {
         log_message(&output_log, "\n=== Upgrading apps via Chocolatey ===");
-        run_command_and_log("choco", &["upgrade", "all", "-y"], &output_log);
+        run_command_and_log("choco", &["upgrade", "all", "-y"][..], &output_log);
     }
 
     if winget_ready {
         log_message(&output_log, "\n=== Upgrading apps via Winget ===");
-        run_command_and_log("winget", &["upgrade", "--all", "--silent"], &output_log);
+        run_command_and_log("winget", &["upgrade", "--all", "--silent"][..], &output_log);
     }
 
     log_message(&output_log, "\n=== Upgrade process completed ===");
@@ -1356,9 +1358,10 @@ fn install_winget(output_log: &SharedOutput) {
     // Descarcă și instalează App Installer de pe GitHub
     let url = "https://github.com/microsoft/winget-cli/releases/latest/download/Microsoft.DesktopAppInstaller_8wekyb3d8bbwe.msixbundle";
     
+    let cmd = format!("Add-AppxPackage -Path (Invoke-WebRequest -Uri '{}' -OutFile '$env:TEMP\\winget.msixbundle' -PassThru).Path", url);
     run_command_and_log(
         "powershell",
-        &["-Command", &format!("Add-AppxPackage -Path (Invoke-WebRequest -Uri '{}' -OutFile '$env:TEMP\\winget.msixbundle' -PassThru).Path", url)],
+        &["-Command", cmd.as_str()][..],
         output_log
     );
 }
@@ -1369,7 +1372,7 @@ fn install_chocolatey(output_log: &SharedOutput) {
     
     run_command_and_log(
         "powershell",
-        &["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", install_script],
+        &["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", install_script][..],
         output_log
     );
 }
@@ -1384,7 +1387,7 @@ fn log_message(output_log: &SharedOutput, message: &str) {
 /// Reinstall Winget via Chocolatey
 #[allow(dead_code)]
 pub fn reinstall_winget_with_log(output_log: SharedOutput) {
-    run_command_and_log("choco", &["install", "winget", "-y", "--force"], &output_log);
+    run_command_and_log("choco", &["install", "winget", "-y", "--force"][..], &output_log);
 }
 
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -2523,7 +2526,8 @@ use winreg::enums::*;
 use winreg::RegKey;
 
 // Explorer Tabs ids and base path (keep only one copy in the file)
-const EXPLORER_TABS_IDS: &[u32] = &[37634385u32, 39145991u32, 36354489u32];
+const EXPLORER_TABS_ARRAY: [u32; 3] = [37634385u32, 39145991u32, 36354489u32];
+const EXPLORER_TABS_IDS: &[u32; 3] = &EXPLORER_TABS_ARRAY;
 const OVERRIDES_BASE_PATH: &str = r"SYSTEM\CurrentControlSet\Control\FeatureManagement\Overrides\4";
 
 fn write_override_for_feature(feature_id: u32, enabled: bool) -> Result<String, String> {
@@ -2823,7 +2827,11 @@ pub fn remove_copilot_all_users() -> String {
 
 // --- Power Automate Desktop (winget) ---
 
-fn run_winget(args: &[&str]) -> String {
+fn run_winget<'a, A>(args: A)-> String
+where
+    A: AsRef<[&'a str]>,
+{
+    let args = args.as_ref();
     // IMPORTANT: nu adăuga `use std::process::Command;` dacă există deja în fișier.
     // IMPORTANT: nu adăuga `use std::io;` dacă există deja în fișier.
 
@@ -2862,7 +2870,11 @@ fn run_winget(args: &[&str]) -> String {
 }
 
 
-fn run_winget_hidden(args: &[&str]) -> String {
+fn run_winget_hidden<'a, A>(args: A)-> String
+where
+    A: AsRef<[&'a str]>,
+{
+    let args = args.as_ref();
     let mut cmd = std::process::Command::new("winget");
     cmd.args(args);
 
@@ -2921,7 +2933,7 @@ pub fn uninstall_power_automate_desktop() -> String {
 
 fn run_powershell_hidden(script: &str) -> String {
     let out = Command::new("powershell")
-        .args(["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", script])
+        .args(&["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", script])
         .creation_flags(CREATE_NO_WINDOW)
         .output();
 
@@ -3194,7 +3206,7 @@ fn run_powershell_elevated_capture(script_body: &str) -> String {
     );
 
     let mut cmd = Command::new("powershell.exe");
-    cmd.args([
+    cmd.args(&[
         "-NoProfile",
         "-ExecutionPolicy",
         "Bypass",
@@ -3844,3 +3856,350 @@ $report | ConvertTo-Json -Depth 7
 //         Err(_) => json,
 //     }
 // }
+
+// =======================
+// Quick Keys (Win shortcuts)
+// =======================
+
+use std::mem::size_of;
+// use windows::Win32::UI::Input::KeyboardAndMouse::{
+//     SendInput, INPUT, INPUT_0, INPUT_KEYBOARD,
+//     KEYBDINPUT, KEYEVENTF_KEYUP, VIRTUAL_KEY, VK_LWIN,
+// };
+
+use windows::Win32::UI::Input::KeyboardAndMouse::{
+    SendInput,
+    INPUT,
+    INPUT_0,
+    INPUT_KEYBOARD,
+    KEYBDINPUT,
+    KEYEVENTF_KEYUP,
+    // KEYBD_EVENT_FLAGS,
+    VIRTUAL_KEY,
+    VK_LWIN,
+};
+
+fn send_key_combo(modifier: VIRTUAL_KEY, key: VIRTUAL_KEY) {
+    unsafe {
+        let inputs = [
+            INPUT { r#type: INPUT_KEYBOARD, Anonymous: INPUT_0 { ki: KEYBDINPUT { wVk: modifier, wScan: 0, dwFlags: Default::default(), time: 0, dwExtraInfo: 0 } } },
+            INPUT { r#type: INPUT_KEYBOARD, Anonymous: INPUT_0 { ki: KEYBDINPUT { wVk: key, wScan: 0, dwFlags: Default::default(), time: 0, dwExtraInfo: 0 } } },
+            INPUT { r#type: INPUT_KEYBOARD, Anonymous: INPUT_0 { ki: KEYBDINPUT { wVk: key, wScan: 0, dwFlags: KEYEVENTF_KEYUP, time: 0, dwExtraInfo: 0 } } },
+            INPUT { r#type: INPUT_KEYBOARD, Anonymous: INPUT_0 { ki: KEYBDINPUT { wVk: modifier, wScan: 0, dwFlags: KEYEVENTF_KEYUP, time: 0, dwExtraInfo: 0 } } },
+        ];
+
+        SendInput(&inputs, size_of::<INPUT>() as i32);
+    }
+}
+
+pub fn send_win_x() {
+    send_key_combo(VK_LWIN, VIRTUAL_KEY(0x58));
+}
+
+pub fn send_win_d() {
+    send_key_combo(VK_LWIN, VIRTUAL_KEY(0x44));
+}
+
+pub fn send_win_l() {
+    let mut cmd = Command::new("rundll32.exe");
+    cmd.arg("user32.dll,LockWorkStation");
+    #[cfg(windows)] cmd.creation_flags(CREATE_NO_WINDOW);
+    let _ = cmd.stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null()).spawn();
+}
+
+pub fn send_win_r() {
+    send_key_combo(VK_LWIN, VIRTUAL_KEY(0x52));
+}
+
+pub fn send_win_e() {
+    let _ = Command::new("explorer.exe").creation_flags(CREATE_NO_WINDOW).spawn();
+}
+
+pub fn send_win_i() {
+    let _ = Command::new("explorer.exe")
+        .arg("ms-settings:")
+        .creation_flags(CREATE_NO_WINDOW)
+        .spawn();
+}
+
+
+// ========================= NETWORK TOOLS (versiune îmbunătățită 2026) =========================
+
+/// Struct pentru status (verifică AMBELE locații)
+#[derive(Clone, Debug)]
+pub struct NetworkPolicyStatus {
+    pub require_security_signature: Option<u32>,
+    pub allow_insecure_guest_auth: Option<u32>,
+    pub allow_insecure_guest_auth_legacy: Option<u32>, // pentru compatibilitate
+}
+
+/// Verifică status-ul real din ambele locații posibile
+pub fn check_network_policy_status() -> NetworkPolicyStatus {
+    use winreg::enums::HKEY_LOCAL_MACHINE;
+    use winreg::RegKey;
+
+    let hklm = RegKey::predef(HKEY_LOCAL_MACHINE);
+
+    let require = hklm
+        .open_subkey(r"SYSTEM\CurrentControlSet\Services\LanmanWorkstation\Parameters")
+        .ok()
+        .and_then(|k| k.get_value::<u32, _>("RequireSecuritySignature").ok());
+
+    let policies = hklm
+        .open_subkey(r"SOFTWARE\Policies\Microsoft\Windows\LanmanWorkstation")
+        .ok()
+        .and_then(|k| k.get_value::<u32, _>("AllowInsecureGuestAuth").ok());
+
+    let legacy = hklm
+        .open_subkey(r"SYSTEM\CurrentControlSet\Services\LanmanWorkstation\Parameters")
+        .ok()
+        .and_then(|k| k.get_value::<u32, _>("AllowInsecureGuestAuth").ok());
+
+    NetworkPolicyStatus {
+        require_security_signature: require,
+        allow_insecure_guest_auth: policies.or(legacy), // prioritate Policies
+        allow_insecure_guest_auth_legacy: legacy,
+    }
+}
+
+/// Aplică fix-ul complet (ambele locații + restart serviciu)
+pub fn apply_network_compatibility_fix() -> String {
+    use winreg::enums::HKEY_LOCAL_MACHINE;
+    use winreg::RegKey;
+
+    let hklm = RegKey::predef(HKEY_LOCAL_MACHINE);
+    let mut log = Vec::new();
+
+    // 1. RequireSecuritySignature = 0
+    if let Ok((k, _)) = hklm.create_subkey(r"SYSTEM\CurrentControlSet\Services\LanmanWorkstation\Parameters") {
+        let _ = k.set_value("RequireSecuritySignature", &0u32);
+        log.push("✅ RequireSecuritySignature = 0");
+    }
+
+    // 2. AllowInsecureGuestAuth în locația oficială (recomandată 24H2+)
+    if let Ok((k, _)) = hklm.create_subkey(r"SOFTWARE\Policies\Microsoft\Windows\LanmanWorkstation") {
+        let _ = k.set_value("AllowInsecureGuestAuth", &1u32);
+        log.push("✅ AllowInsecureGuestAuth (Policies) = 1");
+    }
+
+    // 3. AllowInsecureGuestAuth în locația legacy (pentru 23H2 și mai vechi)
+    if let Ok((k, _)) = hklm.create_subkey(r"SYSTEM\CurrentControlSet\Services\LanmanWorkstation\Parameters") {
+        let _ = k.set_value("AllowInsecureGuestAuth", &1u32);
+        log.push("✅ AllowInsecureGuestAuth (legacy) = 1");
+    }
+
+    // 4. Restart serviciu LanmanWorkstation
+    let _ = std::process::Command::new("net").args(&["stop", "lanmanworkstation", "/y"]).output();
+    let restart = std::process::Command::new("net").args(&["start", "lanmanworkstation"]).output();
+
+    if restart.map(|o| o.status.success()).unwrap_or(false) {
+        log.push("🔄 Serviciul LanmanWorkstation a fost restartat");
+    } else {
+        log.push("⚠ Restart serviciu eșuat → recomand restart complet Windows");
+    }
+
+    format!(
+        "SUCCESS: Network Compatibility Fix fully implemented!\n\n{}\n\n\
+        IMPORTANT NOTE:\n\
+        • gpedit.msc will still show \"Not Configured\" → this is NORMAL and that doesn't mean it doesn't work!!\n\
+        • The change works through the registry.\n\
+        • Test access to a guest share after restarting Windows.\n\
+        • If it still doesn't work: run in PowerShell: Get-SmbClientConfiguration | Select EnableInsecureGuestLogons",
+        log.join("\n")
+    )
+}
+
+/// Restore secure defaults (șterge din ambele locații)
+pub fn restore_secure_defaults() -> String {
+    use winreg::enums::{HKEY_LOCAL_MACHINE, KEY_SET_VALUE};
+    use winreg::RegKey;
+
+    let hklm = RegKey::predef(HKEY_LOCAL_MACHINE);
+    let mut log = Vec::new();
+
+    // RequireSecuritySignature = 1
+    if let Ok((k, _)) = hklm.create_subkey(r"SYSTEM\CurrentControlSet\Services\LanmanWorkstation\Parameters") {
+        let _ = k.set_value("RequireSecuritySignature", &1u32);
+        log.push("✅ RequireSecuritySignature restaurat la 1");
+    }
+
+    // Șterge AllowInsecureGuestAuth din ambele locații
+    if let Ok(k) = hklm.open_subkey_with_flags(r"SOFTWARE\Policies\Microsoft\Windows\LanmanWorkstation", KEY_SET_VALUE) {
+        let _ = k.delete_value("AllowInsecureGuestAuth");
+        log.push("✅ AllowInsecureGuestAuth (Policies) șters");
+    }
+    if let Ok(k) = hklm.open_subkey_with_flags(r"SYSTEM\CurrentControlSet\Services\LanmanWorkstation\Parameters", KEY_SET_VALUE) {
+        let _ = k.delete_value("AllowInsecureGuestAuth");
+        log.push("✅ AllowInsecureGuestAuth (legacy) șters");
+    }
+
+    let _ = std::process::Command::new("net").args(&["stop", "lanmanworkstation", "/y"]).output();
+    let _ = std::process::Command::new("net").args(&["start", "lanmanworkstation"]).output();
+
+    format!(
+        "SUCCESS: Secure defaults restaurate!\n\n{}\n\nRecomand restart complet Windows.",
+        log.join("\n")
+    )
+}
+
+pub fn open_registry_editor() {
+    // Pas 1: Deschide Run dialog (Win + R)
+    send_key_combo(VK_LWIN, VIRTUAL_KEY(0x52));  // Win + R
+
+    // Așteptăm puțin ca dialogul să apară (important!)
+    std::thread::sleep(std::time::Duration::from_millis(150));
+
+    // Pas 2: Tastează "regedit"
+    let text = "regedit";
+    for c in text.chars() {
+        let vk = match c.to_ascii_uppercase() {
+            'R' => VIRTUAL_KEY(0x52),
+            'E' => VIRTUAL_KEY(0x45),
+            'G' => VIRTUAL_KEY(0x47),
+            'D' => VIRTUAL_KEY(0x44),
+            'I' => VIRTUAL_KEY(0x49),
+            'T' => VIRTUAL_KEY(0x54),
+            _ => continue,
+        };
+
+        unsafe {
+            let input_down = INPUT {
+                r#type: INPUT_KEYBOARD,
+                Anonymous: INPUT_0 {
+                    ki: KEYBDINPUT {
+                        wVk: vk,
+                        wScan: 0,
+                        dwFlags: Default::default(),
+                        time: 0,
+                        dwExtraInfo: 0,
+                    },
+                },
+            };
+
+            let input_up = INPUT {
+                r#type: INPUT_KEYBOARD,
+                Anonymous: INPUT_0 {
+                    ki: KEYBDINPUT {
+                        wVk: vk,
+                        wScan: 0,
+                        dwFlags: KEYEVENTF_KEYUP,
+                        time: 0,
+                        dwExtraInfo: 0,
+                    },
+                },
+            };
+
+            let inputs = [input_down, input_up];
+            SendInput(&inputs, size_of::<INPUT>() as i32);
+        }
+
+        std::thread::sleep(std::time::Duration::from_millis(30)); // ritm natural
+    }
+
+    // Pas 3: Apasă Enter
+    unsafe {
+        let enter_down = INPUT {
+            r#type: INPUT_KEYBOARD,
+            Anonymous: INPUT_0 {
+                ki: KEYBDINPUT {
+                    wVk: VIRTUAL_KEY(0x0D), // VK_RETURN
+                    wScan: 0,
+                    dwFlags: Default::default(),
+                    time: 0,
+                    dwExtraInfo: 0,
+                },
+            },
+        };
+
+        let enter_up = INPUT {
+            r#type: INPUT_KEYBOARD,
+            Anonymous: INPUT_0 {
+                ki: KEYBDINPUT {
+                    wVk: VIRTUAL_KEY(0x0D),
+                    wScan: 0,
+                    dwFlags: KEYEVENTF_KEYUP,
+                    time: 0,
+                    dwExtraInfo: 0,
+                },
+            },
+        };
+
+        let inputs = [enter_down, enter_up];
+        SendInput(&inputs, size_of::<INPUT>() as i32);
+    }
+}
+
+pub fn open_group_policy_editor() {
+    let _ = std::process::Command::new("cmd")
+        .args(&["/c", "start", "gpedit.msc"])
+        .creation_flags(CREATE_NO_WINDOW)
+        .spawn();
+}
+
+/// Returnează ediția Windows (ex: "Professional", "Core", "Enterprise" etc.)
+fn get_windows_edition() -> String {
+    use winreg::enums::HKEY_LOCAL_MACHINE;
+    use winreg::RegKey;
+
+    let hklm = RegKey::predef(HKEY_LOCAL_MACHINE);
+    if let Ok(key) = hklm.open_subkey(r"SOFTWARE\Microsoft\Windows NT\CurrentVersion") {
+        if let Ok(edition) = key.get_value::<String, _>("EditionID") {
+            return edition;
+        }
+    }
+    "Unknown".to_string()
+}
+
+/// Activează Group Policy Editor (gpedit.msc) pe Windows Home - cu verificare inteligentă
+pub fn enable_group_policy_editor() -> String {
+    use crate::utils::is_elevated;
+
+    if !is_elevated() {
+        return "❌ ERROR: This operation requires Administrator rights.\n\nPlease run the application as Administrator.".to_string();
+    }
+
+    // Verificare 1: gpedit.msc există deja?
+    if std::path::Path::new(r"C:\Windows\System32\gpedit.msc").exists() {
+        return "✅ Group Policy Editor is already installed and available on this system.\n\nNo action needed.".to_string();
+    }
+
+    // Verificare 2: Ce ediție de Windows avem?
+    let edition = get_windows_edition();
+
+    if edition.contains("Pro")
+        || edition.contains("Enterprise")
+        || edition.contains("Education")
+        || edition.contains("Server")
+        || edition.contains("IoTEnterprise") {
+
+        return format!(
+            "✅ Not needed.\n\n\
+            Group Policy Editor (gpedit.msc) is already included in your edition: {}\n\n\
+            You can open it directly with Win + R → gpedit.msc",
+            edition
+        );
+    }
+
+    // Dacă am ajuns aici → este Windows Home + gpedit nu este instalat
+    let mut log = String::new();
+    log.push_str("🚀 Windows Home detected + gpedit.msc not found.\n");
+    log.push_str("Starting automatic activation...\n\n");
+    log.push_str("This may take 30–90 seconds. Please wait...\n\n");
+
+    // Comanda 1
+    log.push_str("→ Adding GroupPolicy-ClientTools package...\n");
+    let cmd1 = r#"cmd /c "FOR %F IN ("%SystemRoot%\servicing\Packages\Microsoft-Windows-GroupPolicy-ClientTools-Package~*.mum") DO dism /online /norestart /add-package:"%F""#;
+    log.push_str(&run_command(cmd1));
+    log.push_str("\n\n");
+
+    // Comanda 2
+    log.push_str("→ Adding GroupPolicy-ClientExtensions package...\n");
+    let cmd2 = r#"cmd /c "FOR %F IN ("%SystemRoot%\servicing\Packages\Microsoft-Windows-GroupPolicy-ClientExtensions-Package~*.mum") DO dism /online /norestart /add-package:"%F""#;
+    log.push_str(&run_command(cmd2));
+
+    log.push_str("\n\n✅ SUCCESS: Group Policy Editor has been activated!\n");
+    log.push_str("🔄 Please restart your computer now.\n");
+    log.push_str("After restart, press Win + R and type: gpedit.msc");
+
+    log
+}

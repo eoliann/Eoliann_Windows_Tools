@@ -50,6 +50,7 @@ enum Page {
     Install,
     WinAppRemoval,
     CustomizePreferences,
+    QuickKeys,
     Settings,
 }
 
@@ -97,6 +98,8 @@ pub struct App {
     pub icons: HashMap<String, TextureHandle>,
 
     pub general_prefs_loaded: bool,
+    pub tools_state: tools::ToolsState,
+
 }
 
 impl Default for App {
@@ -133,6 +136,7 @@ impl Default for App {
             disk_health_state: disk_health::DiskHealthState::default(),
             icons: HashMap::new(),
             general_prefs_loaded: false,
+            tools_state: tools::ToolsState::default(),
         }
     }
 }
@@ -276,6 +280,10 @@ impl App {
             self.page = Page::CustomizePreferences;
         }
 
+        if btn(ui, "⌨ Quick Keys", self.page == Page::QuickKeys).clicked() {
+            self.page = Page::QuickKeys;
+        }
+
         if btn(ui, "🔧 Settings", self.page == Page::Settings).clicked() {
             self.page = Page::Settings;
         }
@@ -372,15 +380,26 @@ impl eframe::App for App {
                 .max_height(avail_h)
                 .show(ui, |ui| {
                     match self.page {
+                        // Page::Tools => {
+                        //     tools::show_tools(ui, &self.log, &mut self.show_popup, &mut self.popup_message, &mut tools::ToolsState {
+                        //         show_hidden_state: false,
+                        //         show_file_ext_state: false,
+                        //         pending_reset_rx: None,
+                        //         reset_in_progress: false,
+                        //         reset_aggressive: false,
+                        //         last_message: String::new(),
+                        //         network_status: None,
+                        //         last_network_check: None,
+                        //     });
+                        // }
                         Page::Tools => {
-                            tools::show_tools(ui, &self.log, &mut self.show_popup, &mut self.popup_message, &mut tools::ToolsState {
-                                show_hidden_state: false,
-                                show_file_ext_state: false,
-                                pending_reset_rx: None,
-                                reset_in_progress: false,
-                                reset_aggressive: false,
-                                last_message: String::new(),
-                            });
+                            tools::show_tools(
+                                ui,
+                                &self.log,
+                                &mut self.show_popup,
+                                &mut self.popup_message,
+                                &mut self.tools_state,
+                            );
                         }
                         Page::DiskHealth => {
                             disk_health::show_disk_health(ui, &self.log, &mut self.disk_health_state);
@@ -417,6 +436,9 @@ impl eframe::App for App {
                                 &mut self.bitlocker_protection_on,
                                 &mut self.bitlocker_prefs_loaded,
                             );
+                        }
+                        Page::QuickKeys => {
+                            crate::tabs::quick_keys::show_quick_keys(ui, &self.log);
                         }
                         Page::Info => {
                             info::show_info(ui, &self.log, self.update_available, self.latest_release.as_ref(), &self.info_state, &self.icons);

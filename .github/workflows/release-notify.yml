@@ -22,16 +22,21 @@ jobs:
           ASSET_URL1: ${{ github.event.release.assets && github.event.release.assets[0] && github.event.release.assets[0].browser_download_url || '' }}
           ASSET_URL2: ${{ github.event.release.assets && github.event.release.assets[1] && github.event.release.assets[1].browser_download_url || '' }}
         run: |
-          TEXT="📢 <b>Eoliann Windows Tools are o nouă versiune pe GitHub!</b>\n"
-          TEXT+="<b>${RELEASE_NAME}</b> (tag: <code>${RELEASE_TAG}</code>)\n\n"
-          TEXT+="👉 <a href=\"${RELEASE_URL}\">Mergi la pagina noii versiuni</a>\n"
-
+          # Construim textul cu newline-uri reale (Telegram HTML nu acceptă <br>)
+          TEXT="$(printf '%s\n' \
+            '📢 <b>Eoliann Windows Tools are o nouă versiune pe GitHub!</b>' \
+            "<b>${RELEASE_NAME}</b> (tag: <code>${RELEASE_TAG}</code>)" \
+            "" \
+            "👉 <a href=\"${RELEASE_URL}\">Mergi la pagina noii versiuni</a>" \
+          )"
+          
+          # Adăugăm link-urile de descărcare doar dacă există
           if [ -n "$ASSET_URL1" ]; then
-            TEXT+="\n⬇️ <a href=\"${ASSET_URL1}\">Descarcă fișierul de instalare</a>"
+            TEXT+=$'\n'"⬇️ <a href=\"${ASSET_URL1}\">Descarcă fișierul de instalare</a>"
           fi
-
+          
           if [ -n "$ASSET_URL2" ]; then
-            TEXT+="\n⬇️ <a href=\"${ASSET_URL2}\">Descarcă fișierul portabil</a>"
+            TEXT+=$'\n'"⬇️ <a href=\"${ASSET_URL2}\">Descarcă fișierul portabil</a>"
           fi
 
           IFS=',' read -r -a CHAT_ARRAY <<< "${TG_CHATS}"
@@ -58,5 +63,6 @@ jobs:
                 --data-urlencode "text=${TEXT}"
             fi
           done
+
 
 

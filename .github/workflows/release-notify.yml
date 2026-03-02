@@ -17,7 +17,7 @@ jobs:
       RELEASE_URL: ${{ github.event.release.html_url || format('{0}/{1}/releases/latest', github.server_url, github.repository) }}
 
     steps:
-        name: Send Telegram notifications
+      - name: Send Telegram notifications
         env:
           ASSET_URL1: ${{ github.event.release.assets && github.event.release.assets[0] && github.event.release.assets[0].browser_download_url || '' }}
           ASSET_URL2: ${{ github.event.release.assets && github.event.release.assets[1] && github.event.release.assets[1].browser_download_url || '' }}

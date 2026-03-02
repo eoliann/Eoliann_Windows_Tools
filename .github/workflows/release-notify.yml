@@ -1,4 +1,5 @@
-- name: Debug secrets
+name: Debug secrets
   run: |
     echo "TG_BOT_TOKEN length: ${#TG_BOT_TOKEN}"
     echo "TG_CHATS: $TG_CHATS"
+

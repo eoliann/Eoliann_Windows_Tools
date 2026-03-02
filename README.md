@@ -39,7 +39,7 @@ Now install it on your system!
 <img width="1402" height="932" alt="update-1 1 7-to-1 1 8" src="https://github.com/user-attachments/assets/4d442ac3-679d-4c51-9f00-8f6383eea4b6" />
 
 ### INFO
-<img width="1440" height="852" alt="info_128" src="https://github.com/user-attachments/assets/3c88b095-f141-4493-913e-158c914e6a06" />
+<img width="1920" height="1032" alt="info1" src="https://github.com/user-attachments/assets/c55d1933-c707-487c-aace-54459490d10c" />
 
 - `whoami` → displays the current user
 - `ipconfig` → display network settings
@@ -49,7 +49,7 @@ Now install it on your system!
 - `About` → all about application: developer, version, website
 
 ### TOOLS
-<img width="1440" height="852" alt="tools_128" src="https://github.com/user-attachments/assets/2c92678f-434c-4c86-9383-103e6b9892e0" />
+<img width="1920" height="1032" alt="tools" src="https://github.com/user-attachments/assets/3d66ee27-8ee1-4aa8-97ff-cd9dcba76b94" />
 
 #### Context menu
 - `Toggle Context Menu` → instantly switch between the **Win11 ↔ Classic** context menu (with Explorer restart)
@@ -111,15 +111,18 @@ Now install it on your system!
 - `Disable All Updates`  → disables Windows Update (advanced users only)
 
 #### Group Policy Editor (Windows Home)
-- `Enable gpedit.msc on Windows Home`  → Check your Windows version and, if it is Home, activate gpedit.msc in the system if it is not already activated. 
+- `Enable gpedit.msc on Windows Home`  → Check your Windows version and, if it is Home, activate gpedit.msc in the system if it is not already activated.
+
+#### Security
+- `Password Expire`  → Enable/Disable Password Expire on Windows 10/11 Pro & Windows 10/11 Home. 
 
 ### DISK HEALTH
-<img width="1440" height="852" alt="disk_health_128" src="https://github.com/user-attachments/assets/7ff19fa9-d446-4731-a268-0078ff0b3236" />
+<img width="1920" height="1032" alt="disk-health" src="https://github.com/user-attachments/assets/7757c599-542e-4365-b160-a192c90eb59b" />
 
 Displays storage memory information such as: temperature, health, performance, Power on time (total number of hours of use), Estimated remaining lifetime, Lifetime writes in GB and bytes.
 
 ### INSTALL
-<img width="1440" height="852" alt="install_128" src="https://github.com/user-attachments/assets/495a8b11-350e-4677-b092-ed1fdbff9e82" />
+<img width="1920" height="1032" alt="install" src="https://github.com/user-attachments/assets/c27d1119-2d14-4908-98b1-5de636191913" />
 
 #### Install application
 ![install-app](https://github.com/user-attachments/assets/1d50fdc2-eea6-4b72-863f-e3e7f44a330f)
@@ -143,7 +146,7 @@ For Google Chrome users:
 - `Install Chrome extensions` → install Chrome extensions from the Chrome Web Store
   
 ### WINDOWS APP REMOVAL
-<img width="1440" height="852" alt="winapp_removal_128" src="https://github.com/user-attachments/assets/8357e15a-9192-4c7e-b2ff-b7fd432b0846" />
+<img width="1920" height="1032" alt="winapp_removal" src="https://github.com/user-attachments/assets/a8542ce0-bfbe-4f50-80b4-e99001b5f702" />
 
 - `Communication` → remove default applications that come with Windows installation, such as: Outlook for Windows, Skype, Teams, GroupMe, To-Do, Your Phone, CommsPhone, Messaging, Mail & Calendar, and others.
 - `Media & Creativity` → removes default applications that come with Windows installation, such as: Climpchamp, Camera, MS Paint, 3D Builder, 3D Viewer, Mixed Reality Portal
@@ -154,19 +157,19 @@ For Google Chrome users:
 - `Other` → remove default applications that come with Windows installation, such as: Print 3D, Office-related
 
 ### CUSTOMIZE PREFERENCES
-<img width="1440" height="852" alt="customize_preferences_128" src="https://github.com/user-attachments/assets/0d8b3bb1-5243-4d04-9699-61783ba9a919" />
+<img width="1920" height="1032" alt="customize_preferences" src="https://github.com/user-attachments/assets/c06a654e-912f-47df-a2aa-bca55274f698" />
 
 - `General Preferences` → Start with Windows, Enable advanced tooltips, Auto-check for updates
 - `Features / Tweaks` → Mouse Acceleration, NumLock on startup, Taskbar Search Button, Taskbar Widgets, Snap Windows on startup, Sticky Keys on startup, Task View button, Verbose Logon Messages (system), BitLocker protection
 - `Bitlocker on/off all partition` → activate/deactivate Bitlocker for one or all partition
 
 ### QUICK KEYS
-<img width="1440" height="852" alt="quick_keys_128" src="https://github.com/user-attachments/assets/9b82df7c-a386-4264-9daf-03b7666b2884" />
+<img width="1920" height="1032" alt="custom_keys" src="https://github.com/user-attachments/assets/e93f8348-4164-45ef-bde2-96a6160dce7a" />
 
 - `Shortcuts` → Shortcuts for some important functions such as: Win + X, Win + R, Win + I, Regedit\Registry Editor, gpedit.msc\Group Policy
 
 ### SETTINGS
-<img width="1440" height="852" alt="settings_128" src="https://github.com/user-attachments/assets/ca62afa6-58b3-4d33-9562-1ec412373d18" />
+<img width="1920" height="1032" alt="settings" src="https://github.com/user-attachments/assets/dde79bde-8b11-4233-a6af-08dbeeba41dd" />
 
 - `Switch to Light Mode / Switch to Dark Mode` → switch between Windows Light and Dark themes
 - `Display Current alignment` → Display Current alignment of taskbar elements (Center or Left)

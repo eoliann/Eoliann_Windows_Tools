@@ -114,7 +114,7 @@ Now install it on your system!
 - `Enable gpedit.msc on Windows Home`  → Check your Windows version and, if it is Home, activate gpedit.msc in the system if it is not already activated.
 
 #### Security
-- `Password Expire`  → Enable/Disable Password Expire on Windows 10/11 Pro & Windows 10/11 Home. 
+- `Password Expire`  → Enable/Disable Password Expire on Windows 10/11 Pro & Windows 10/11 Home.
 
 ### DISK HEALTH
 <img width="1920" height="1032" alt="disk-health" src="https://github.com/user-attachments/assets/7757c599-542e-4365-b160-a192c90eb59b" />

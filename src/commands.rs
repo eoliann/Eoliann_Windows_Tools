@@ -160,10 +160,10 @@ pub fn verify_system_integrity_live(log: Arc<Mutex<String>>) {
         }
 
         // Rulare secvențială ca să știi clar progresul și să eviți suprapuneri grele în log
-        let _ = run_command_stream_and_wait(log.clone(), "sfc", &["/scannow"][..]);
         let _ = run_command_stream_and_wait(log.clone(), "DISM", &["/Online", "/Cleanup-Image", "/CheckHealth"][..]);
         let _ = run_command_stream_and_wait(log.clone(), "DISM", &["/Online", "/Cleanup-Image", "/ScanHealth"][..]);
         let _ = run_command_stream_and_wait(log.clone(), "DISM", &["/Online", "/Cleanup-Image", "/RestoreHealth"][..]);
+        let _ = run_command_stream_and_wait(log.clone(), "sfc", &["/scannow"][..]);
 
         push_line(&log, "✅ Verification finished.");
     });
@@ -4203,3 +4203,218 @@ pub fn enable_group_policy_editor() -> String {
 
     log
 }
+
+// ============================
+// SECURITY: Password expiration / admin / domain / users
+// ============================
+
+/// Fast: read Windows ProductName from registry (e.g., "Windows 11 Pro").
+pub fn security_windows_product_name() -> String {
+    #[cfg(windows)]
+    {
+        use winreg::enums::HKEY_LOCAL_MACHINE;
+        use winreg::RegKey;
+
+        let hklm = RegKey::predef(HKEY_LOCAL_MACHINE);
+        if let Ok(key) = hklm.open_subkey(r"SOFTWARE\Microsoft\Windows NT\CurrentVersion") {
+            if let Ok(product) = key.get_value::<String, _>("ProductName") {
+                return product;
+            }
+        }
+    }
+    "Unknown".to_string()
+}
+
+/// Reliable admin check without PowerShell (works even if quoting/locale changes).
+/// Uses `net session` which requires admin; non-admin returns non-zero.
+pub fn security_is_running_as_admin() -> bool {
+    let status = StdCommand::new("cmd")
+        .args(["/C", "net session >nul 2>&1"])
+        .status();
+
+    match status {
+        Ok(s) => s.success(),
+        Err(_) => false,
+    }
+}
+
+/// Domain join info (best-effort). Returns (part_of_domain, domain_name).
+pub fn security_domain_info() -> (bool, String) {
+    // Try WMIC first (fast enough; may be missing in future builds).
+    let out = StdCommand::new("cmd")
+        .args(["/C", "wmic computersystem get PartOfDomain,Domain /value"])
+        .output();
+
+    if let Ok(o) = out {
+        let text = String::from_utf8_lossy(&o.stdout).to_string() + &String::from_utf8_lossy(&o.stderr);
+        let mut part = None;
+        let mut dom = None;
+
+        for line in text.lines() {
+            let l = line.trim();
+            if let Some(v) = l.strip_prefix("PartOfDomain=") {
+                part = Some(v.trim().eq_ignore_ascii_case("TRUE"));
+            } else if let Some(v) = l.strip_prefix("Domain=") {
+                let v = v.trim();
+                if !v.is_empty() {
+                    dom = Some(v.to_string());
+                }
+            }
+        }
+
+        if let Some(p) = part {
+            return (p, dom.unwrap_or_default());
+        }
+    }
+
+    // Fallback PowerShell (slower)
+    let ps = r#"$cs=Get-CimInstance Win32_ComputerSystem; "PartOfDomain=$($cs.PartOfDomain)"; "Domain=$($cs.Domain)""#;
+    let text = run_powershell_command(ps);
+
+    let mut part = false;
+    let mut dom = String::new();
+    for line in text.lines() {
+        let l = line.trim();
+        if let Some(v) = l.strip_prefix("PartOfDomain=") {
+            part = v.trim().eq_ignore_ascii_case("True");
+        } else if let Some(v) = l.strip_prefix("Domain=") {
+            dom = v.trim().to_string();
+        }
+    }
+    (part, dom)
+}
+
+/// List local users (clean): excludes common system accounts; returns only enabled accounts where possible.
+/// Uses PowerShell once (background-thread friendly; not used in UI thread).
+pub fn security_list_local_users_clean() -> Vec<String> {
+    // Single PS call for deterministic list
+    let ps = r#"
+Get-LocalUser |
+Where-Object { $_.Enabled -eq $true } |
+Select-Object -ExpandProperty Name
+"#;
+    let out = run_powershell_command(ps);
+    let mut users: Vec<String> = out
+        .lines()
+        .map(|l| l.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .collect();
+
+    // Remove system accounts
+    let deny = ["administrator", "defaultaccount", "guest", "wdagutilityaccount"];
+    users.retain(|u| !deny.iter().any(|d| u.eq_ignore_ascii_case(d)));
+
+    users.sort();
+    users.dedup();
+    users
+}
+
+/// Best-effort Microsoft account detection for a local user.
+pub fn security_is_microsoft_account(username: &str) -> bool {
+    if username.trim().is_empty() {
+        return false;
+    }
+
+    let ps = format!(
+        r#"$u=Get-LocalUser -Name "{}"; "PS="+$u.PrincipalSource"#,
+        username.replace('"', r#"\""#)
+    );
+    let out = run_powershell_command(&ps);
+    out.lines().any(|l| l.trim().eq_ignore_ascii_case("PS=MicrosoftAccount"))
+}
+
+/// Read PasswordNeverExpires (true => expiration disabled).
+pub fn security_password_never_expires(username: &str) -> Result<bool, String> {
+    if username.trim().is_empty() {
+        return Err("Empty username".into());
+    }
+
+    // One PS call, parse stable tokens
+    let ps = format!(
+        r#"$u=Get-LocalUser -Name "{}"; "PNE="+$u.PasswordNeverExpires"#,
+        username.replace('"', r#"\""#)
+    );
+    let out = run_powershell_command(&ps);
+
+    for line in out.lines() {
+        let l = line.trim();
+        if let Some(v) = l.strip_prefix("PNE=") {
+            let v = v.trim();
+            if v.eq_ignore_ascii_case("True") {
+                return Ok(true);
+            }
+            if v.eq_ignore_ascii_case("False") {
+                return Ok(false);
+            }
+        }
+    }
+
+    // Fallback WMIC (opposite semantics: PasswordExpires)
+    let wmic = format!(
+        "wmic UserAccount where Name='{}' get PasswordExpires /value",
+        username.replace('\'', "''")
+    );
+
+    let o = StdCommand::new("cmd")
+        .args(["/C", &wmic])
+        .output()
+        .map_err(|e| format!("Failed to run WMIC: {}", e))?;
+
+    let text = String::from_utf8_lossy(&o.stdout).to_string() + &String::from_utf8_lossy(&o.stderr);
+    for line in text.lines() {
+        let l = line.trim();
+        if let Some(v) = l.strip_prefix("PasswordExpires=") {
+            let v = v.trim();
+            if v.eq_ignore_ascii_case("TRUE") {
+                return Ok(false);
+            }
+            if v.eq_ignore_ascii_case("FALSE") {
+                return Ok(true);
+            }
+        }
+    }
+
+    Err(format!("Cannot determine status. Raw: {}", out.trim()))
+}
+
+/// Set PasswordNeverExpires to target.
+/// target=true => disable expiration; target=false => enable expiration.
+pub fn security_set_password_never_expires(username: &str, target: bool) -> Result<(), String> {
+    if username.trim().is_empty() {
+        return Err("Empty username".into());
+    }
+
+    let value = if target { "$true" } else { "$false" };
+
+    let ps = format!(
+        r#"Set-LocalUser -Name "{}" -PasswordNeverExpires {}"#,
+        username.replace('"', r#"\""#),
+        value
+    );
+
+    let mut c = StdCommand::new(r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe");
+    c.args(["-NoProfile","-NonInteractive","-ExecutionPolicy","Bypass","-Command", &ps]);
+    #[cfg(windows)]
+    { c.creation_flags(CREATE_NO_WINDOW); }
+
+    match c.status() {
+        Ok(st) if st.success() => Ok(()),
+        _ => {
+            // Fallback WMIC (PasswordExpires is inverse)
+            let wmic_value = if target { "False" } else { "True" };
+            let cmd = format!(
+                "wmic UserAccount where Name='{}' set PasswordExpires={}",
+                username.replace('\'', "''"),
+                wmic_value
+            );
+
+            let st = StdCommand::new("cmd")
+                .args(["/C", &cmd])
+                .status()
+                .map_err(|e| format!("Failed to run WMIC: {}", e))?;
+
+            if st.success() { Ok(()) } else { Err("Failed to update password expiration.".into()) }
+        }
+    }
+}
+

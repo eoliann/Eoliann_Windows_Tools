@@ -28,6 +28,19 @@ fn wait_for_live_completion(log: &Arc<Mutex<String>>, timeout_secs: u64) -> bool
     }
 }
 
+#[derive(Clone, Debug)]
+pub struct SecurityInfo {
+    windows_product: String,
+    is_admin: bool,
+    part_of_domain: bool,
+    domain_name: String,
+    local_users: Vec<String>,
+    selected_user: String,
+    is_ms_account: bool,
+    password_never_expires: Option<bool>,
+    error: Option<String>,
+}
+
 #[allow(dead_code)]
 pub struct ToolsState {
     pub show_hidden_state: bool,
@@ -38,6 +51,20 @@ pub struct ToolsState {
     pub last_message: String,
     pub network_status: Option<crate::commands::NetworkPolicyStatus>,
     // pub last_network_check: Option<std::time::Instant>,
+    pub security_loaded: bool,
+    pub security_loading: bool,
+    pub security_rx: Option<std::sync::mpsc::Receiver<SecurityInfo>>,
+    pub security_error: Option<String>,
+    pub windows_product: String,
+    pub is_admin: bool,
+    pub part_of_domain: bool,
+    pub domain_name: String,
+    pub selected_user: String,
+    pub local_users: Vec<String>,
+    pub is_ms_account: bool,
+    pub password_never_expires: Option<bool>,
+    pub confirm_toggle: bool,
+    pub security_toggle_rx: Option<std::sync::mpsc::Receiver<Result<bool, String>>>,
 }
 
 impl Default for ToolsState {
@@ -50,6 +77,22 @@ impl Default for ToolsState {
             show_hidden_state: false,
             show_file_ext_state: false,
             network_status: None,
+            // last_network_check: None,
+            // --- Security panel ---
+            security_loaded: false,
+            security_loading: false,
+            security_rx: None,
+            security_error: None,
+            windows_product: String::new(),
+            is_admin: false,
+            part_of_domain: false,
+            domain_name: String::new(),
+            selected_user: String::new(),
+            local_users: Vec::new(),
+            is_ms_account: false,
+            password_never_expires: None,
+            confirm_toggle: false,
+            security_toggle_rx: None,
             // last_network_check: None,
         }
     }
@@ -66,6 +109,34 @@ pub fn show_tools(
 ) {
     ui.heading("🛠 Windows Tools");
     ui.add_space(6.0);
+
+    // --- SECURITY: poll background result (non-blocking) ---
+    if let Some(rx) = &app_state.security_rx {
+        if let Ok(info) = rx.try_recv() {
+            app_state.windows_product = info.windows_product;
+            app_state.is_admin = info.is_admin;
+            app_state.part_of_domain = info.part_of_domain;
+            app_state.domain_name = info.domain_name;
+            app_state.local_users = info.local_users;
+            app_state.selected_user = info.selected_user;
+            app_state.is_ms_account = info.is_ms_account;
+            app_state.password_never_expires = info.password_never_expires;
+            app_state.security_error = info.error;
+            app_state.security_loaded = true;
+            app_state.security_loading = false;
+            app_state.security_rx = None;
+        }
+    }
+
+    // --- SECURITY: poll toggle result (non-blocking) ---
+    if let Some(rx) = &app_state.security_toggle_rx {
+        if let Ok(res) = rx.try_recv() {
+            if let Ok(v) = res {
+                app_state.password_never_expires = Some(v);
+            }
+            app_state.security_toggle_rx = None;
+        }
+    }
 
     // consultăm flag-ul global pentru a dezactiva butoanele dacă e cazul
     let global_busy = crate::commands::GLOBAL_OP_RUNNING.load(Ordering::SeqCst);
@@ -1078,7 +1149,6 @@ pub fn show_tools(
     ui.add_space(6.0);
 
     // ---- Network Tools ----
-    // ---- Network Tools ----
     ui.group(|ui| {
         ui.label(RichText::new("Network Tools").color(yellow_title).size(18.0));
 
@@ -1458,6 +1528,220 @@ pub fn show_tools(
                 });
             }
         }
+    });
+
+    // ---- Security (after Set DNS) ----
+    ui.group(|ui| {
+        ui.label(RichText::new("Security").color(yellow_title).size(18.0));
+
+        // Start initial (or refresh) async load
+        if (!app_state.security_loaded) && (!app_state.security_loading) {
+            app_state.security_loading = true;
+            app_state.security_error = None;
+
+            let (tx, rx) = std::sync::mpsc::channel::<SecurityInfo>();
+            app_state.security_rx = Some(rx);
+
+            thread::spawn(move || {
+                let windows_product = commands::security_windows_product_name();
+                let is_admin = commands::security_is_running_as_admin();
+                let (part_of_domain, domain_name) = commands::security_domain_info();
+
+                let mut local_users = commands::security_list_local_users_clean();
+                // ensure deterministic order
+                local_users.sort();
+
+                let current_user = std::env::var("USERNAME").unwrap_or_default();
+                let selected_user = if !current_user.is_empty() && local_users.iter().any(|u| u.eq_ignore_ascii_case(&current_user)) {
+                    current_user
+                } else {
+                    local_users.get(0).cloned().unwrap_or_default()
+                };
+
+                let mut is_ms_account = false;
+                let mut pne: Option<bool> = None;
+                let mut error: Option<String> = None;
+
+                if selected_user.is_empty() {
+                    error = Some("No local user detected.".to_string());
+                } else {
+                    // Microsoft account detection (best effort)
+                    is_ms_account = commands::security_is_microsoft_account(&selected_user);
+
+                    if is_ms_account {
+                        pne = None;
+                    } else {
+                        match commands::security_password_never_expires(&selected_user) {
+                            Ok(v) => pne = Some(v),
+                            Err(e) => {
+                                pne = None;
+                                error = Some(e);
+                            }
+                        }
+                    }
+                }
+
+                let _ = tx.send(SecurityInfo {
+                    windows_product,
+                    is_admin,
+                    part_of_domain,
+                    domain_name,
+                    local_users,
+                    selected_user,
+                    is_ms_account,
+                    password_never_expires: pne,
+                    error,
+                });
+            });
+        }
+
+        // Header badges
+        ui.horizontal(|ui| {
+            ui.label(format!("Windows: {}", if app_state.windows_product.is_empty() { "..." } else { app_state.windows_product.as_str() }));
+
+            if app_state.is_admin {
+                ui.colored_label(egui::Color32::GREEN, "ADMIN: OK");
+            } else {
+                ui.colored_label(egui::Color32::RED, "ADMIN: NO");
+            }
+
+            if app_state.part_of_domain {
+                ui.colored_label(egui::Color32::YELLOW, format!("DOMAIN: {}", if app_state.domain_name.is_empty() { "joined" } else { app_state.domain_name.as_str() }));
+            } else {
+                ui.colored_label(egui::Color32::GREEN, "DOMAIN: NO");
+            }
+        });
+
+        if app_state.security_loading && !app_state.security_loaded {
+            ui.add_space(6.0);
+            ui.horizontal(|ui| {
+                ui.spinner();
+                ui.label("Checking security status...");
+            });
+            return;
+        }
+
+        if let Some(err) = &app_state.security_error {
+            ui.colored_label(egui::Color32::YELLOW, format!("Info: {}", err));
+        }
+
+        ui.add_space(6.0);
+
+        // User selector
+        if !app_state.local_users.is_empty() {
+            egui::ComboBox::from_label("User")
+                .selected_text(if app_state.selected_user.is_empty() { "(none)" } else { app_state.selected_user.as_str() })
+                .show_ui(ui, |ui| {
+                    for u in app_state.local_users.clone() {
+                        if ui.selectable_label(app_state.selected_user.eq_ignore_ascii_case(&u), &u).clicked() {
+                            app_state.selected_user = u.clone();
+                            app_state.is_ms_account = commands::security_is_microsoft_account(&app_state.selected_user);
+                            app_state.password_never_expires = commands::security_password_never_expires(&app_state.selected_user).ok();
+                        }
+                    }
+                });
+        } else {
+            ui.colored_label(egui::Color32::YELLOW, "No local users list available.");
+        }
+
+        if app_state.is_ms_account {
+            ui.colored_label(egui::Color32::YELLOW, "Microsoft account detected: local password expiration cannot be managed here.");
+        }
+
+        // Status line
+        let status = app_state.password_never_expires;
+        match status {
+            Some(true) => { ui.colored_label(egui::Color32::GREEN, "Password expiration: DISABLED (never expires)"); }
+            Some(false) => { ui.colored_label(egui::Color32::RED, "Password expiration: ENABLED (expires)"); }
+            None => { ui.colored_label(egui::Color32::YELLOW, "Password expiration: UNKNOWN"); }
+        };
+
+        // Action button (red)
+        let can_change = app_state.is_admin
+            && !app_state.part_of_domain
+            && !app_state.is_ms_account
+            && app_state.password_never_expires.is_some()
+            && !global_busy;
+
+        if app_state.part_of_domain {
+            ui.colored_label(egui::Color32::YELLOW, "Domain-joined PC: local policy may be overridden by Active Directory.");
+        }
+        if !app_state.is_admin {
+            ui.colored_label(egui::Color32::RED, "Run the app as Administrator to change this setting.");
+        }
+
+        let button_label = match app_state.password_never_expires {
+            Some(true) => "Enable Password Expiration",
+            Some(false) => "Disable Password Expiration",
+            None => "Toggle Password Expiration",
+        };
+
+        let btn = egui::Button::new(button_label)
+            .fill(egui::Color32::from_rgb(150, 0, 0))
+            .stroke(egui::Stroke::new(1.0, egui::Color32::from_rgb(100, 0, 0)));
+
+        if ui.add_enabled(can_change, btn).clicked() {
+            app_state.confirm_toggle = true;
+        }
+
+        // Confirm dialog
+        if app_state.confirm_toggle {
+            egui::Window::new("Confirm Change")
+                .collapsible(false)
+                .resizable(false)
+                .show(ui.ctx(), |ui| {
+                    ui.label("Change password expiration for selected user?");
+                    ui.add_space(6.0);
+
+                    ui.horizontal(|ui| {
+                        if ui.button("Confirm").clicked() {
+                            app_state.confirm_toggle = false;
+
+                            let user = app_state.selected_user.clone();
+                            let current = app_state.password_never_expires.unwrap_or(false);
+                            let target = !current;
+
+                            let (tx, rx) = std::sync::mpsc::channel::<Result<bool, String>>();
+                            app_state.security_toggle_rx = Some(rx);
+
+                            if let Some(guard) = commands::try_start_global_op("Toggle Password Expiration", log) {
+                                let log_clone = log.clone();
+                                thread::spawn(move || {
+                                    let _guard = guard;
+
+                                    let res = commands::security_set_password_never_expires(&user, target)
+                                        .and_then(|_| commands::security_password_never_expires(&user));
+
+                                    // log
+                                    let mut lg = log_clone.lock().unwrap();
+                                    match &res {
+                                        Ok(v) => {
+                                            *lg = format!("SUCCESS: Password expiration updated. PasswordNeverExpires={}", v);
+                                        }
+                                        Err(e) => {
+                                            *lg = format!("ERROR: {}", e);
+                                        }
+                                    }
+
+                                    let _ = tx.send(res);
+                                });
+                            }
+                        }
+
+                        if ui.button("Cancel").clicked() {
+                            app_state.confirm_toggle = false;
+                        }
+                    });
+                });
+        }
+
+        ui.add_space(6.0);
+
+        ui.horizontal(|ui| {
+            if ui.add_enabled(!app_state.security_loading && !global_busy, egui::Button::new("🔄 Refresh Security Status")).clicked() {
+                app_state.security_loaded = false;
+            }
+        });
     });
 
 }

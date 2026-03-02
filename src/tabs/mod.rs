@@ -5,3 +5,4 @@ pub mod settings;
 pub mod winapp_removal;
 pub mod customize_preferences;
 pub mod install;
+pub mod quick_keys;

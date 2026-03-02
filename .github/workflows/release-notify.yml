@@ -36,6 +36,8 @@ jobs:
 
           IFS=',' read -r -a CHAT_ARRAY <<< "${TG_CHATS}"
 
+          echo "TG_CHATS raw: >${TG_CHATS}<"
+
           for ITEM in "${CHAT_ARRAY[@]}"; do
             ITEM_TRIM=$(echo "$ITEM" | xargs)
             [ -z "$ITEM_TRIM" ] && continue
@@ -56,3 +58,4 @@ jobs:
                 --data-urlencode "text=${TEXT}"
             fi
           done
+

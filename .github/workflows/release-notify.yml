@@ -27,7 +27,7 @@ jobs:
             '📢 <b>Eoliann Windows Tools are o nouă versiune pe GitHub!</b>' \
             "<b>${RELEASE_NAME}</b> (tag: <code>${RELEASE_TAG}</code>)" \
             "" \
-            "👉 Un set de instrumente rapid pentru Windows 11, scris în Rust, care include comenzi de administrare utile și ajustări pentru Windows 11." \
+            "👉 Un set de instrumente rapid pentru Windows 11, scris în Rust, care include comenzi de administrare utile și ajustări pentru optimizare Windows 10/11." \
             "Cod gratuit și curat, fără spyware, malware sau reclame." \
             "" \
             "👉 <a href=\"${RELEASE_URL}\">Mergi la pagina noii versiuni</a>" \
@@ -66,6 +66,7 @@ jobs:
                 --data-urlencode "text=${TEXT}"
             fi
           done
+
 
 
 

@@ -165,6 +165,37 @@ pub fn verify_system_integrity_live(log: Arc<Mutex<String>>) {
         let _ = run_command_stream_and_wait(log.clone(), "DISM", &["/Online", "/Cleanup-Image", "/RestoreHealth"][..]);
         let _ = run_command_stream_and_wait(log.clone(), "sfc", &["/scannow"][..]);
 
+        // log.lock().unwrap().push_str("\n→ Fixing SysWOW64 compatibility...\n");
+        if let Ok(mut log_guard) = log.lock() {
+            log_guard.push_str("\n→ Fixing SysWOW64 compatibility...\n");
+        }
+
+        // let fix_cmd = r#"cmd /c "
+        // if exist %windir%\System32\GroupPolicy (
+        // xcopy %windir%\System32\GroupPolicy %windir%\SysWOW64\GroupPolicy /E /I /Y
+        // )
+        // if exist %windir%\System32\GroupPolicyUsers (
+        // xcopy %windir%\System32\GroupPolicyUsers %windir%\SysWOW64\GroupPolicyUsers /E /I /Y
+        // )
+        // if exist %windir%\System32\gpedit.msc (
+        // xcopy %windir%\System32\gpedit.msc %windir%\SysWOW64\ /Y
+        // )
+        // "#;
+
+        // log.lock().unwrap().push_str(&run_command(fix_cmd));
+
+
+        // let cmd = r#"cmd /c "
+        //     dir /b %SystemRoot%\servicing\Packages\Microsoft-Windows-GroupPolicy-ClientTools-Package~*.mum > %TEMP%\gpedit.txt
+        //     dir /b %SystemRoot%\servicing\Packages\Microsoft-Windows-GroupPolicy-ClientExtensions-Package~*.mum >> %TEMP%\gpedit.txt
+        //     for /f %%i in ('findstr /i . %TEMP%\gpedit.txt 2^>nul') do dism /online /norestart /add-package:"%SystemRoot%\servicing\Packages\%%i"
+        //     del %TEMP%\gpedit.txt
+        //     "#;        
+
+        let cmd = r#"cmd /c "dir /b %SystemRoot%\servicing\Packages\Microsoft-Windows-GroupPolicy-ClientTools-Package~*.mum > %TEMP%\gpedit.txt && dir /b %SystemRoot%\servicing\Packages\Microsoft-Windows-GroupPolicy-ClientExtensions-Package~*.mum >> %TEMP%\gpedit.txt && for /f %%i in ('findstr /i . %TEMP%\gpedit.txt 2^>nul') do dism /online /norestart /add-package:"%SystemRoot%\servicing\Packages\%%i" && del %TEMP%\gpedit.txt""#;
+
+        log.lock().unwrap().push_str(&run_command(cmd));
+
         push_line(&log, "✅ Verification finished.");
     });
 }
@@ -4188,13 +4219,13 @@ pub fn enable_group_policy_editor() -> String {
 
     // Comanda 1
     log.push_str("→ Adding GroupPolicy-ClientTools package...\n");
-    let cmd1 = r#"cmd /c "FOR %F IN ("%SystemRoot%\servicing\Packages\Microsoft-Windows-GroupPolicy-ClientTools-Package~*.mum") DO dism /online /norestart /add-package:"%F""#;
+    let cmd1 = r#"cmd /c "FOR %%F IN ("%SystemRoot%\servicing\Packages\Microsoft-Windows-GroupPolicy-ClientTools-Package~*.mum") DO dism /online /norestart /add-package:"%F""#;
     log.push_str(&run_command(cmd1));
     log.push_str("\n\n");
 
     // Comanda 2
     log.push_str("→ Adding GroupPolicy-ClientExtensions package...\n");
-    let cmd2 = r#"cmd /c "FOR %F IN ("%SystemRoot%\servicing\Packages\Microsoft-Windows-GroupPolicy-ClientExtensions-Package~*.mum") DO dism /online /norestart /add-package:"%F""#;
+    let cmd2 = r#"cmd /c "FOR %%F IN ("%SystemRoot%\servicing\Packages\Microsoft-Windows-GroupPolicy-ClientExtensions-Package~*.mum") DO dism /online /norestart /add-package:"%F""#;
     log.push_str(&run_command(cmd2));
 
     log.push_str("\n\n✅ SUCCESS: Group Policy Editor has been activated!\n");
@@ -4417,4 +4448,3 @@ pub fn security_set_password_never_expires(username: &str, target: bool) -> Resu
         }
     }
 }
-

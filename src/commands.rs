@@ -10,6 +10,12 @@ use std::thread;
 
 use std::process::Command;
 
+use serde::Deserialize;
+use std::ffi::c_void;
+use winreg::enums::HKEY_LOCAL_MACHINE;
+use winreg::RegKey;
+use winreg::HKEY;
+
 #[cfg(windows)]
 use std::os::windows::process::CommandExt;
 
@@ -24,6 +30,103 @@ pub fn run_powershell_command(cmd: &str) -> String {
     String::from_utf8_lossy(&out.stdout).to_string() + &String::from_utf8_lossy(&out.stderr)
 }
 
+// fn run_powershell_stdout(cmd: &str) -> Result<String, String> {
+//     let mut c = Command::new(r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe");
+//     c.args(&[
+//         "-NoProfile",
+//         "-NonInteractive",
+//         "-ExecutionPolicy",
+//         "Bypass",
+//         "-Command",
+//         cmd,
+//     ]);
+
+//     #[cfg(windows)]
+//     {
+//         c.creation_flags(CREATE_NO_WINDOW);
+//     }
+
+//     let out = c
+//         .output()
+//         .map_err(|e| format!("Failed to spawn PowerShell: {}", e))?;
+
+//     if !out.status.success() {
+//         let stderr = String::from_utf8_lossy(&out.stderr).trim().to_string();
+//         let stdout = String::from_utf8_lossy(&out.stdout).trim().to_string();
+
+//         if !stderr.is_empty() {
+//             return Err(stderr);
+//         }
+
+//         if !stdout.is_empty() {
+//             return Err(stdout);
+//         }
+
+//         return Err(format!(
+//             "PowerShell exited with code {:?}",
+//             out.status.code()
+//         ));
+//     }
+
+//     Ok(String::from_utf8_lossy(&out.stdout).trim().to_string())
+// }
+
+fn run_powershell_stdout(cmd: &str) -> Result<String, String> {
+    let mut c = Command::new(r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe");
+    c.args(&[
+        "-NoProfile",
+        "-NonInteractive",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-Command",
+        cmd,
+    ]);
+
+    #[cfg(windows)]
+    {
+        c.creation_flags(CREATE_NO_WINDOW);
+    }
+
+    let out = c
+        .output()
+        .map_err(|e| format!("Failed to spawn PowerShell: {}", e))?;
+
+    if !out.status.success() {
+        let stderr = String::from_utf8_lossy(&out.stderr).trim().to_string();
+        let stdout = String::from_utf8_lossy(&out.stdout).trim().to_string();
+
+        if !stderr.is_empty() {
+            return Err(stderr);
+        }
+
+        if !stdout.is_empty() {
+            return Err(stdout);
+        }
+
+        return Err(format!(
+            "PowerShell exited with code {:?}",
+            out.status.code()
+        ));
+    }
+
+    Ok(String::from_utf8_lossy(&out.stdout).trim().to_string())
+}
+
+fn get_documents_dir() -> Result<PathBuf, String> {
+    let ps = "[Environment]::GetFolderPath('MyDocuments')";
+    let docs = run_powershell_stdout(ps)?.trim().to_string();
+
+    if !docs.is_empty() {
+        return Ok(PathBuf::from(docs));
+    }
+
+    if let Ok(userprofile) = std::env::var("USERPROFILE") {
+        return Ok(PathBuf::from(userprofile).join("Documents"));
+    }
+
+    Err("Failed to resolve the Documents folder.".to_string())
+}
+
 use std::io::BufRead; // Import BufRead aici
 // ---------- Helper logging ----------
 fn push_line(log: &Arc<Mutex<String>>, line: &str) {
@@ -33,7 +136,27 @@ fn push_line(log: &Arc<Mutex<String>>, line: &str) {
     }
 }
 
+#[cfg(windows)]
+#[link(name = "kernel32")]
+unsafe extern "system" {
+    fn LoadLibraryW(lp_lib_file_name: *const u16) -> *mut c_void;
+    fn GetProcAddress(h_module: *mut c_void, lp_proc_name: *const u8) -> *mut c_void;
+    fn FreeLibrary(h_lib_module: *mut c_void) -> i32;
+}
 
+#[derive(Debug, Clone, Deserialize)]
+pub struct RestorePointInfo {
+    #[serde(rename = "SequenceNumber")]
+    pub sequence_number: u32,
+    #[serde(rename = "Description")]
+    pub description: String,
+    #[serde(rename = "Created")]
+    pub created: String,
+    #[serde(rename = "RestorePointType")]
+    pub restore_point_type: String,
+    #[serde(rename = "EventType")]
+    pub event_type: String,
+}
 
 // ---------- Stream runners (cu citire STDOUT + STDERR în paralel) ----------
 
@@ -2554,7 +2677,7 @@ pub fn wpftweaks_disable_edge() -> String {
 // use std::thread;
 use std::time::{Duration, UNIX_EPOCH};
 use winreg::enums::*;
-use winreg::RegKey;
+// use winreg::RegKey;
 
 // Explorer Tabs ids and base path (keep only one copy in the file)
 const EXPLORER_TABS_ARRAY: [u32; 3] = [37634385u32, 39145991u32, 36354489u32];
@@ -4302,6 +4425,47 @@ pub fn security_domain_info() -> (bool, String) {
     let ps = r#"$cs=Get-CimInstance Win32_ComputerSystem; "PartOfDomain=$($cs.PartOfDomain)"; "Domain=$($cs.Domain)""#;
     let text = run_powershell_command(ps);
 
+    fn run_powershell_stdout(cmd: &str) -> Result<String, String> {
+        let mut c = Command::new(r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe");
+        c.args(&[
+            "-NoProfile",
+            "-NonInteractive",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-Command",
+            cmd,
+        ]);
+
+        #[cfg(windows)]
+        {
+            c.creation_flags(CREATE_NO_WINDOW);
+        }
+
+        let out = c
+            .output()
+            .map_err(|e| format!("Failed to spawn PowerShell: {}", e))?;
+
+        if !out.status.success() {
+            let stderr = String::from_utf8_lossy(&out.stderr).trim().to_string();
+            let stdout = String::from_utf8_lossy(&out.stdout).trim().to_string();
+
+            if !stderr.is_empty() {
+                return Err(stderr);
+            }
+
+            if !stdout.is_empty() {
+                return Err(stdout);
+            }
+
+            return Err(format!(
+                "PowerShell exited with code {:?}",
+                out.status.code()
+            ));
+        }
+
+        Ok(String::from_utf8_lossy(&out.stdout).trim().to_string())
+    }
+
     let mut part = false;
     let mut dom = String::new();
     for line in text.lines() {
@@ -4446,5 +4610,799 @@ pub fn security_set_password_never_expires(username: &str, target: bool) -> Resu
 
             if st.success() { Ok(()) } else { Err("Failed to update password expiration.".into()) }
         }
+    }
+}
+
+
+
+#[allow(dead_code)]
+pub fn is_hibernation_enabled() -> Result<bool, String> {
+    let hklm = RegKey::predef(HKEY_LOCAL_MACHINE);
+    let key = hklm
+        .open_subkey(r"SYSTEM\CurrentControlSet\Control\Power")
+        .map_err(|e| format!("Failed to open power registry key: {}", e))?;
+
+    let value: u32 = key
+        .get_value("HibernateEnabled")
+        .map_err(|e| format!("Failed to read HibernateEnabled: {}", e))?;
+
+    Ok(value != 0)
+}
+
+#[allow(dead_code)]
+pub fn enable_hibernation() -> String {
+    let out = run_command("powercfg /hibernate on");
+    if out.trim().is_empty() {
+        "Hibernation enabled.".to_string()
+    } else {
+        out
+    }
+}
+
+#[allow(dead_code)]
+pub fn disable_hibernation() -> String {
+    let out = run_command("powercfg /hibernate off");
+    if out.trim().is_empty() {
+        "Hibernation disabled.".to_string()
+    } else {
+        out
+    }
+}
+
+#[allow(dead_code)]
+pub fn open_storage_settings() -> String {
+    let out = run_command("explorer ms-settings:storagesense");
+    if out.trim().is_empty() {
+        "Storage settings opened.".to_string()
+    } else {
+        out
+    }
+}
+
+#[allow(dead_code)]
+pub fn get_system_restore_used_space_gb() -> Result<f64, String> {
+    let script = r#"
+$sum = (Get-CimInstance Win32_ShadowStorage -ErrorAction SilentlyContinue |
+    Measure-Object -Property UsedSpace -Sum).Sum
+if ($null -eq $sum) { '0' } else { [string]$sum }
+"#;
+
+    let stdout = run_powershell_command(script);
+    let bytes: f64 = stdout
+        .trim()
+        .parse()
+        .map_err(|e| format!("Failed to parse shadow storage size '{}': {}", stdout, e))?;
+
+    Ok(bytes / 1024.0 / 1024.0 / 1024.0)
+}
+
+#[allow(dead_code)]
+pub fn list_restore_points() -> Result<Vec<RestorePointInfo>, String> {
+    let script = r#"
+$points = Get-ComputerRestorePoint -ErrorAction SilentlyContinue |
+    Sort-Object SequenceNumber -Descending |
+    Select-Object `
+        SequenceNumber,
+        Description,
+        @{Name='Created';Expression={[System.Management.ManagementDateTimeConverter]::ToDateTime($_.CreationTime).ToString('yyyy-MM-dd HH:mm:ss')}},
+        @{Name='RestorePointType';Expression={[string]$_.RestorePointType}},
+        @{Name='EventType';Expression={[string]$_.EventType}}
+
+if ($null -eq $points) {
+    '[]'
+} else {
+    $points | ConvertTo-Json -Compress
+}
+"#;
+
+    let stdout = run_powershell_stdout(script)?;
+    let trimmed = stdout.trim();
+
+    if trimmed.is_empty() || trimmed == "null" {
+        return Ok(Vec::new());
+    }
+
+    let value: serde_json::Value =
+        serde_json::from_str(trimmed).map_err(|e| format!("Invalid restore point JSON: {}", e))?;
+
+    match value {
+        serde_json::Value::Array(_) => serde_json::from_value(value)
+            .map_err(|e| format!("Failed to parse restore point array: {}", e)),
+        serde_json::Value::Object(_) => {
+            let single: RestorePointInfo = serde_json::from_value(value)
+                .map_err(|e| format!("Failed to parse restore point object: {}", e))?;
+            Ok(vec![single])
+        }
+        serde_json::Value::Null => Ok(Vec::new()),
+        other => Err(format!("Unexpected restore point payload: {}", other)),
+    }
+}
+
+#[allow(dead_code)]
+pub fn delete_restore_point(sequence_number: u32) -> Result<String, String> {
+    #[cfg(windows)]
+    unsafe {
+        type SrRemoveRestorePointFn = unsafe extern "system" fn(u32) -> u32;
+
+        let dll_name: Vec<u16> = "SrClient.dll"
+            .encode_utf16()
+            .chain(std::iter::once(0))
+            .collect();
+
+        let module = LoadLibraryW(dll_name.as_ptr());
+        if module.is_null() {
+            return Err("Failed to load SrClient.dll.".to_string());
+        }
+
+        let proc = GetProcAddress(module, b"SRRemoveRestorePoint\0".as_ptr());
+        if proc.is_null() {
+            FreeLibrary(module);
+            return Err("Failed to locate SRRemoveRestorePoint.".to_string());
+        }
+
+        let sr_remove: SrRemoveRestorePointFn = std::mem::transmute(proc);
+        let status = sr_remove(sequence_number);
+
+        FreeLibrary(module);
+
+        match status {
+            0 => Ok(format!("Restore point #{} deleted.", sequence_number)),
+            13 => Err(format!(
+                "Restore point #{} does not exist or could not be removed (ERROR_INVALID_DATA).",
+                sequence_number
+            )),
+            code => Err(format!(
+                "SRRemoveRestorePoint failed for restore point #{} with code {}.",
+                sequence_number, code
+            )),
+        }
+    }
+
+    #[cfg(not(windows))]
+    {
+        let _ = sequence_number;
+        Err("System Restore point deletion is supported only on Windows.".to_string())
+    }
+}
+
+#[allow(dead_code)]
+pub fn generate_battery_report() -> Result<String, String> {
+    let docs_dir = get_documents_dir()?;
+    let report_path = docs_dir.join("Eoliann_Windows_Tools_Battery_Report.html");
+    let report_path_str = report_path.to_string_lossy().to_string();
+
+    let mut cmd = Command::new("powercfg");
+    cmd.args(["/batteryreport", "/output", &report_path_str]);
+
+    #[cfg(windows)]
+    {
+        cmd.creation_flags(CREATE_NO_WINDOW);
+    }
+
+    let out = cmd
+        .output()
+        .map_err(|e| format!("Failed to generate battery report: {}", e))?;
+
+    if !out.status.success() {
+        let stderr = String::from_utf8_lossy(&out.stderr).trim().to_string();
+        let stdout = String::from_utf8_lossy(&out.stdout).trim().to_string();
+
+        if !stderr.is_empty() {
+            return Err(stderr);
+        }
+
+        if !stdout.is_empty() {
+            return Err(stdout);
+        }
+
+        return Err(format!(
+            "powercfg exited with code {:?}",
+            out.status.code()
+        ));
+    }
+
+    Ok(report_path_str)
+}
+
+#[allow(dead_code)]
+pub fn open_battery_report(path: &str) -> Result<String, String> {
+    let mut cmd = Command::new("cmd");
+    cmd.args(["/C", "start", "", path]);
+
+    let _child = cmd
+        .spawn()
+        .map_err(|e| format!("Failed to open battery report: {}", e))?;
+
+    Ok(format!("Battery report opened:\n{}", path))
+}
+
+#[allow(dead_code)]
+pub fn launch_memory_diagnostic() -> String {
+    let out = run_command("mdsched.exe");
+    if out.trim().is_empty() {
+        "Windows Memory Diagnostic launched.".to_string()
+    } else {
+        out
+    }
+}
+
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct StartupAppEntry {
+    #[serde(rename = "Name")]
+    pub name: String,
+    #[serde(rename = "Command")]
+    pub command: String,
+    #[serde(rename = "Scope")]
+    pub scope: String,
+    #[serde(rename = "Enabled")]
+    pub enabled: bool,
+}
+
+const EWT_ULTIMATE_SOURCE_GUID: &str = "e9a42b02-d5df-448d-aa00-03f14749eb61";
+const EWT_ULTIMATE_APP_GUID: &str = "de0c2b65-6fdb-44d0-b9e5-2d48c7e6f9ab";
+const WINDOWS_BALANCED_GUID: &str = "381b4222-f694-41f0-9685-ff5bb260df2e";
+
+fn ps_quote(s: &str) -> String {
+    s.replace('\'', "''")
+}
+
+fn read_dword_or(root: HKEY, path: &str, name: &str, default: u32) -> u32 {
+    let key = RegKey::predef(root);
+    key.open_subkey(path)
+        .ok()
+        .and_then(|k| k.get_value::<u32, _>(name).ok())
+        .unwrap_or(default)
+}
+
+fn write_dword(root: HKEY, path: &str, name: &str, value: u32) -> Result<(), String> {
+    let root = RegKey::predef(root);
+    let (key, _) = root
+        .create_subkey(path)
+        .map_err(|e| format!("Failed to open/create key '{}': {}", path, e))?;
+
+    key.set_value(name, &value)
+        .map_err(|e| format!("Failed to set '{}\\{}': {}", path, name, e))
+}
+
+fn get_service_enabled(name: &str) -> Result<bool, String> {
+    let script = format!(
+        "$svc = Get-CimInstance Win32_Service -Filter \"Name='{}'\" -ErrorAction Stop; if ($svc.StartMode -eq 'Disabled') {{ '0' }} else {{ '1' }}",
+        name
+    );
+    let out = run_powershell_stdout(&script)?;
+    Ok(out.trim() == "1")
+}
+
+fn set_service_enabled(name: &str, enabled: bool, startup_type_when_enabled: &str) -> Result<(), String> {
+    let script = if enabled {
+        format!(
+            "Set-Service -Name '{}' -StartupType '{}' -ErrorAction Stop; Start-Service -Name '{}' -ErrorAction SilentlyContinue; 'OK'",
+            name, startup_type_when_enabled, name
+        )
+    } else {
+        format!(
+            "Stop-Service -Name '{}' -Force -ErrorAction SilentlyContinue; Set-Service -Name '{}' -StartupType Disabled -ErrorAction Stop; 'OK'",
+            name, name
+        )
+    };
+
+    let _ = run_powershell_stdout(&script)?;
+    Ok(())
+}
+
+#[allow(dead_code)]
+pub fn get_ultimate_performance_enabled() -> Result<bool, String> {
+    let out = run_hidden("powercfg", &["/getactivescheme"])
+        .map_err(|e| format!("Failed to query active power scheme: {}", e))?;
+
+    let text = String::from_utf8_lossy(&out.stdout).to_ascii_lowercase();
+    Ok(text.contains(&EWT_ULTIMATE_APP_GUID.to_ascii_lowercase()))
+}
+
+#[allow(dead_code)]
+pub fn set_ultimate_performance_enabled(enable: bool) -> String {
+    if enable {
+        let script = format!(
+            r#"
+$src = '{src}'
+$dst = '{dst}'
+$list = (powercfg /list) -join "`n"
+if ($list -notmatch [regex]::Escape($dst)) {{
+    powercfg /duplicatescheme $src $dst | Out-Null
+    powercfg /changename $dst "EWT Ultimate Performance" | Out-Null
+}}
+powercfg /setactive $dst | Out-Null
+Write-Output "Ultimate performance enabled."
+"#,
+            src = EWT_ULTIMATE_SOURCE_GUID,
+            dst = EWT_ULTIMATE_APP_GUID
+        );
+
+        run_powershell_hidden(&script)
+    } else {
+        run_command(&format!("powercfg /setactive {}", WINDOWS_BALANCED_GUID))
+    }
+}
+
+#[allow(dead_code)]
+pub fn get_hags_enabled() -> Result<bool, String> {
+    Ok(read_dword_or(
+        HKEY_LOCAL_MACHINE,
+        r"SYSTEM\CurrentControlSet\Control\GraphicsDrivers",
+        "HwSchMode",
+        1,
+    ) == 2)
+}
+
+#[allow(dead_code)]
+pub fn set_hags_enabled(enable: bool) -> String {
+    match write_dword(
+        HKEY_LOCAL_MACHINE,
+        r"SYSTEM\CurrentControlSet\Control\GraphicsDrivers",
+        "HwSchMode",
+        if enable { 2 } else { 1 },
+    ) {
+        Ok(_) => format!("HAGS {}. Restart required.", if enable { "enabled" } else { "disabled" }),
+        Err(err) => err,
+    }
+}
+
+#[allow(dead_code)]
+pub fn get_vbs_enabled() -> Result<bool, String> {
+    let dg = read_dword_or(
+        HKEY_LOCAL_MACHINE,
+        r"SYSTEM\CurrentControlSet\Control\DeviceGuard",
+        "EnableVirtualizationBasedSecurity",
+        0,
+    );
+
+    let hvci = read_dword_or(
+        HKEY_LOCAL_MACHINE,
+        r"SYSTEM\CurrentControlSet\Control\DeviceGuard\Scenarios\HypervisorEnforcedCodeIntegrity",
+        "Enabled",
+        0,
+    );
+
+    Ok(dg != 0 || hvci != 0)
+}
+
+#[allow(dead_code)]
+pub fn set_vbs_enabled(enable: bool) -> String {
+    let v = if enable { 1 } else { 0 };
+
+    let a = write_dword(
+        HKEY_LOCAL_MACHINE,
+        r"SYSTEM\CurrentControlSet\Control\DeviceGuard",
+        "EnableVirtualizationBasedSecurity",
+        v,
+    );
+
+    let b = write_dword(
+        HKEY_LOCAL_MACHINE,
+        r"SYSTEM\CurrentControlSet\Control\DeviceGuard\Scenarios\HypervisorEnforcedCodeIntegrity",
+        "Enabled",
+        v,
+    );
+
+    match (a, b) {
+        (Ok(_), Ok(_)) => format!("VBS {}. Restart required.", if enable { "enabled" } else { "disabled" }),
+        (Err(e), _) => e,
+        (_, Err(e)) => e,
+    }
+}
+
+#[allow(dead_code)]
+pub fn get_restart_apps_enabled() -> Result<bool, String> {
+    Ok(read_dword_or(
+        HKEY_CURRENT_USER,
+        r"Software\Microsoft\Windows NT\CurrentVersion\Winlogon",
+        "RestartApps",
+        1,
+    ) != 0)
+}
+
+#[allow(dead_code)]
+pub fn set_restart_apps_enabled(enable: bool) -> String {
+    match write_dword(
+        HKEY_CURRENT_USER,
+        r"Software\Microsoft\Windows NT\CurrentVersion\Winlogon",
+        "RestartApps",
+        if enable { 1 } else { 0 },
+    ) {
+        Ok(_) => format!("Restart apps {}.", if enable { "enabled" } else { "disabled" }),
+        Err(err) => err,
+    }
+}
+
+#[allow(dead_code)]
+pub fn get_background_apps_enabled() -> Result<bool, String> {
+    Ok(read_dword_or(
+        HKEY_CURRENT_USER,
+        r"Software\Microsoft\Windows\CurrentVersion\BackgroundAccessApplications",
+        "GlobalUserDisabled",
+        0,
+    ) == 0)
+}
+
+#[allow(dead_code)]
+pub fn set_background_apps_enabled(enable: bool) -> String {
+    match write_dword(
+        HKEY_CURRENT_USER,
+        r"Software\Microsoft\Windows\CurrentVersion\BackgroundAccessApplications",
+        "GlobalUserDisabled",
+        if enable { 0 } else { 1 },
+    ) {
+        Ok(_) => format!("Background apps {}.", if enable { "enabled" } else { "disabled" }),
+        Err(err) => err,
+    }
+}
+
+#[allow(dead_code)]
+pub fn get_activity_history_enabled() -> Result<bool, String> {
+    Ok(read_dword_or(
+        HKEY_LOCAL_MACHINE,
+        r"SOFTWARE\Policies\Microsoft\Windows\System",
+        "EnableActivityFeed",
+        1,
+    ) != 0)
+}
+
+#[allow(dead_code)]
+pub fn get_visual_effects_for_performance_enabled() -> Result<bool, String> {
+    Ok(read_dword_or(
+        HKEY_CURRENT_USER,
+        r"Software\Microsoft\Windows\CurrentVersion\Explorer\VisualEffects",
+        "VisualFXSetting",
+        0,
+    ) == 3)
+}
+
+#[allow(dead_code)]
+pub fn set_visual_effects_for_performance_enabled(enable: bool) -> String {
+    if enable {
+        set_display_for_performance()
+    } else {
+        let script = r#"
+New-Item -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\VisualEffects' -Force | Out-Null
+Set-ItemProperty -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\VisualEffects' -Name 'VisualFXSetting' -Value 0 -Type DWord -Force
+Set-ItemProperty -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced' -Name 'TaskbarAnimations' -Value 1 -Type DWord -Force
+Set-ItemProperty -Path 'HKCU:\Software\Microsoft\Windows\DWM' -Name 'EnableAeroPeek' -Value 1 -Type DWord -Force
+Write-Output 'Visual effects restored to Windows defaults (partial restore).'
+"#;
+        run_powershell_hidden(script)
+    }
+}
+
+#[allow(dead_code)]
+pub fn get_transparency_enabled() -> Result<bool, String> {
+    Ok(read_dword_or(
+        HKEY_CURRENT_USER,
+        r"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize",
+        "EnableTransparency",
+        1,
+    ) != 0)
+}
+
+#[allow(dead_code)]
+pub fn set_transparency_enabled(enable: bool) -> String {
+    match write_dword(
+        HKEY_CURRENT_USER,
+        r"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize",
+        "EnableTransparency",
+        if enable { 1 } else { 0 },
+    ) {
+        Ok(_) => format!("Transparency {}.", if enable { "enabled" } else { "disabled" }),
+        Err(err) => err,
+    }
+}
+
+#[allow(dead_code)]
+pub fn get_game_mode_enabled() -> Result<bool, String> {
+    let a = read_dword_or(
+        HKEY_CURRENT_USER,
+        r"Software\Microsoft\GameBar",
+        "AllowAutoGameMode",
+        1,
+    );
+    let b = read_dword_or(
+        HKEY_CURRENT_USER,
+        r"Software\Microsoft\GameBar",
+        "AutoGameModeEnabled",
+        1,
+    );
+
+    Ok(a != 0 || b != 0)
+}
+
+#[allow(dead_code)]
+pub fn set_game_mode_enabled(enable: bool) -> String {
+    let v = if enable { 1 } else { 0 };
+
+    let a = write_dword(
+        HKEY_CURRENT_USER,
+        r"Software\Microsoft\GameBar",
+        "AllowAutoGameMode",
+        v,
+    );
+
+    let b = write_dword(
+        HKEY_CURRENT_USER,
+        r"Software\Microsoft\GameBar",
+        "AutoGameModeEnabled",
+        v,
+    );
+
+    match (a, b) {
+        (Ok(_), Ok(_)) => format!("Game Mode {}.", if enable { "enabled" } else { "disabled" }),
+        (Err(e), _) => e,
+        (_, Err(e)) => e,
+    }
+}
+
+#[allow(dead_code)]
+pub fn get_windowed_optimizations_enabled() -> Result<bool, String> {
+    let hkcu = RegKey::predef(HKEY_CURRENT_USER);
+    let value = hkcu
+        .open_subkey(r"Software\Microsoft\DirectX\UserGpuPreferences")
+        .ok()
+        .and_then(|k| k.get_value::<String, _>("DirectXUserGlobalSettings").ok())
+        .unwrap_or_default();
+
+    Ok(value.contains("SwapEffectUpgradeEnable=1"))
+}
+
+#[allow(dead_code)]
+pub fn set_windowed_optimizations_enabled(enable: bool) -> String {
+    let target = if enable { "1" } else { "0" };
+
+    let script = format!(
+        r#"
+$path = 'HKCU:\Software\Microsoft\DirectX\UserGpuPreferences'
+$name = 'DirectXUserGlobalSettings'
+New-Item -Path $path -Force | Out-Null
+$current = (Get-ItemProperty -Path $path -Name $name -ErrorAction SilentlyContinue).$name
+if ([string]::IsNullOrWhiteSpace($current)) {{ $current = '' }}
+$current = [regex]::Replace($current, 'SwapEffectUpgradeEnable=\d+;?', '')
+if ($current.Length -gt 0 -and -not $current.EndsWith(';')) {{ $current += ';' }}
+$current += 'SwapEffectUpgradeEnable={};'
+Set-ItemProperty -Path $path -Name $name -Value $current -Type String -Force
+Write-Output 'Windowed game optimizations updated. Restart the affected game.'
+"#,
+        target
+    );
+
+    run_powershell_hidden(&script)
+}
+
+#[allow(dead_code)]
+pub fn get_background_recording_enabled() -> Result<bool, String> {
+    let a = read_dword_or(
+        HKEY_CURRENT_USER,
+        r"Software\Microsoft\Windows\CurrentVersion\GameDVR",
+        "AppCaptureEnabled",
+        1,
+    );
+
+    let b = read_dword_or(
+        HKEY_CURRENT_USER,
+        r"System\GameConfigStore",
+        "GameDVR_Enabled",
+        1,
+    );
+
+    Ok(a != 0 || b != 0)
+}
+
+#[allow(dead_code)]
+pub fn set_background_recording_enabled(enable: bool) -> String {
+    let v = if enable { 1 } else { 0 };
+
+    let a = write_dword(
+        HKEY_CURRENT_USER,
+        r"Software\Microsoft\Windows\CurrentVersion\GameDVR",
+        "AppCaptureEnabled",
+        v,
+    );
+
+    let b = write_dword(
+        HKEY_CURRENT_USER,
+        r"System\GameConfigStore",
+        "GameDVR_Enabled",
+        v,
+    );
+
+    match (a, b) {
+        (Ok(_), Ok(_)) => format!("Background recording {}.", if enable { "enabled" } else { "disabled" }),
+        (Err(e), _) => e,
+        (_, Err(e)) => e,
+    }
+}
+
+#[allow(dead_code)]
+pub fn get_superfetch_enabled() -> Result<bool, String> {
+    get_service_enabled("SysMain")
+}
+
+#[allow(dead_code)]
+pub fn set_superfetch_enabled(enable: bool) -> String {
+    match set_service_enabled("SysMain", enable, "Automatic") {
+        Ok(_) => format!("SysMain / Superfetch {}.", if enable { "enabled" } else { "disabled" }),
+        Err(err) => err,
+    }
+}
+
+#[allow(dead_code)]
+pub fn get_search_indexing_enabled() -> Result<bool, String> {
+    get_service_enabled("WSearch")
+}
+
+#[allow(dead_code)]
+pub fn set_search_indexing_enabled(enable: bool) -> String {
+    match set_service_enabled("WSearch", enable, "Automatic") {
+        Ok(_) => format!("Search indexing {}.", if enable { "enabled" } else { "disabled" }),
+        Err(err) => err,
+    }
+}
+
+#[allow(dead_code)]
+pub fn get_delivery_optimization_enabled() -> Result<bool, String> {
+    Ok(read_dword_or(
+        HKEY_LOCAL_MACHINE,
+        r"SOFTWARE\Microsoft\Windows\CurrentVersion\DeliveryOptimization\Config",
+        "DODownloadMode",
+        1,
+    ) != 0)
+}
+
+#[allow(dead_code)]
+pub fn set_delivery_optimization_enabled(enable: bool) -> String {
+    let reg = write_dword(
+        HKEY_LOCAL_MACHINE,
+        r"SOFTWARE\Microsoft\Windows\CurrentVersion\DeliveryOptimization\Config",
+        "DODownloadMode",
+        if enable { 1 } else { 0 },
+    );
+
+    let svc = set_service_enabled("DoSvc", enable, "Manual");
+
+    match (reg, svc) {
+        (Ok(_), Ok(_)) => format!("Delivery Optimization {}.", if enable { "enabled" } else { "disabled" }),
+        (Err(e), _) => e,
+        (_, Err(e)) => e,
+    }
+}
+
+#[allow(dead_code)]
+pub fn get_network_task_offload_enabled() -> Result<bool, String> {
+    Ok(read_dword_or(
+        HKEY_LOCAL_MACHINE,
+        r"SYSTEM\CurrentControlSet\Services\Tcpip\Parameters",
+        "DisableTaskOffload",
+        0,
+    ) == 0)
+}
+
+#[allow(dead_code)]
+pub fn set_network_task_offload_enabled(enable: bool) -> String {
+    match write_dword(
+        HKEY_LOCAL_MACHINE,
+        r"SYSTEM\CurrentControlSet\Services\Tcpip\Parameters",
+        "DisableTaskOffload",
+        if enable { 0 } else { 1 },
+    ) {
+        Ok(_) => format!("TCP task offload {}.", if enable { "enabled" } else { "disabled" }),
+        Err(err) => err,
+    }
+}
+
+#[allow(dead_code)]
+pub fn list_startup_apps() -> Result<Vec<StartupAppEntry>, String> {
+    let script = r#"
+function Get-StartupApprovedEnabled($path, $name) {
+    try {
+        $prop = Get-ItemProperty -Path $path -Name $name -ErrorAction Stop
+        $value = $prop.PSObject.Properties[$name].Value
+        if ($value -is [byte[]] -and $value.Length -gt 0) {
+            return ($value[0] -ne 3)
+        }
+    } catch {}
+    return $true
+}
+
+$items = @()
+
+$locations = @(
+    @{
+        Run='HKCU:\Software\Microsoft\Windows\CurrentVersion\Run'
+        Approved='HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run'
+        Scope='Current user'
+    },
+    @{
+        Run='HKLM:\Software\Microsoft\Windows\CurrentVersion\Run'
+        Approved='HKLM:\Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run'
+        Scope='All users'
+    }
+)
+
+foreach ($loc in $locations) {
+    if (Test-Path $loc.Run) {
+        $props = Get-ItemProperty -Path $loc.Run
+        foreach ($prop in $props.PSObject.Properties) {
+            if ($prop.Name -notin @('PSPath','PSParentPath','PSChildName','PSDrive','PSProvider')) {
+                $items += [PSCustomObject]@{
+                    Name    = [string]$prop.Name
+                    Command = [string]$prop.Value
+                    Scope   = [string]$loc.Scope
+                    Enabled = [bool](Get-StartupApprovedEnabled $loc.Approved $prop.Name)
+                }
+            }
+        }
+    }
+}
+
+if ($null -eq $items -or $items.Count -eq 0) {
+    '[]'
+} else {
+    $items | Sort-Object Scope, Name | ConvertTo-Json -Compress
+}
+"#;
+
+    let stdout = run_powershell_stdout(script)?;
+    let trimmed = stdout.trim();
+
+    if trimmed.is_empty() || trimmed == "null" {
+        return Ok(Vec::new());
+    }
+
+    let value: serde_json::Value =
+        serde_json::from_str(trimmed).map_err(|e| format!("Invalid startup app JSON: {}", e))?;
+
+    match value {
+        serde_json::Value::Array(_) => serde_json::from_value(value)
+            .map_err(|e| format!("Failed to parse startup app array: {}", e)),
+        serde_json::Value::Object(_) => {
+            let single: StartupAppEntry = serde_json::from_value(value)
+                .map_err(|e| format!("Failed to parse startup app object: {}", e))?;
+            Ok(vec![single])
+        }
+        serde_json::Value::Null => Ok(Vec::new()),
+        other => Err(format!("Unexpected startup app payload: {}", other)),
+    }
+}
+
+#[allow(dead_code)]
+pub fn set_startup_app_enabled(scope: &str, name: &str, enabled: bool) -> Result<String, String> {
+    let approved_path = match scope {
+        "Current user" => r"HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run",
+        "All users" => r"HKLM:\Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run",
+        _ => return Err(format!("Unknown startup scope: {}", scope)),
+    };
+
+    let bytes = if enabled {
+        "[byte[]](2,0,0,0,0,0,0,0,0,0,0,0)"
+    } else {
+        "[byte[]](3,0,0,0,0,0,0,0,0,0,0,0)"
+    };
+
+    let name = ps_quote(name);
+
+    let script = format!(
+        r#"
+$path = '{path}'
+New-Item -Path $path -Force | Out-Null
+Set-ItemProperty -Path $path -Name '{name}' -Type Binary -Value {bytes} -Force
+Write-Output 'Startup app state updated.'
+"#,
+        path = approved_path,
+        name = name,
+        bytes = bytes
+    );
+
+    let out = run_powershell_hidden(&script);
+    if out.trim().is_empty() {
+        Ok("Startup app state updated.".to_string())
+    } else {
+        Ok(out)
     }
 }

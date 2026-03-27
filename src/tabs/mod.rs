@@ -6,3 +6,5 @@ pub mod winapp_removal;
 pub mod customize_preferences;
 pub mod install;
 pub mod quick_keys;
+pub mod health;
+pub mod performance;

@@ -5,8 +5,34 @@ use eframe::egui;
 use crate::tabs::info::InfoState;
 use egui::{Color32, RichText, Vec2};
 
-use crate::tabs::{info, tools, disk_health, install, winapp_removal, customize_preferences, settings};
+use crate::tabs::{info, tools, disk_health, install, winapp_removal, customize_preferences, health, performance, settings};
 use eframe::egui::TextureHandle;
+
+const TERMS_AND_CONDITIONS_TEXT: &str = r#"By downloading, installing, or using Eoliann Windows Tools, you acknowledge that you have read and accepted these terms.
+
+Eoliann Windows Tools is provided "as is", without warranties of any kind. The author and contributors are not liable for any direct or indirect damages resulting from the use or misuse of this software.
+
+This application may run administrative commands, modify Windows settings, change registry values, install or remove software, and open third-party websites or tools.
+
+You are solely responsible for reviewing any action before applying it to your system. It is strongly recommended to create a restore point or backup before making important changes.
+
+Some features may rely on third-party services, websites, or software. Their availability, content, and behavior are outside the developer's control.
+
+By continuing to use Eoliann Windows Tools, you accept these terms."#;
+
+const PRIVACY_POLICY_TEXT: &str = r#"Last updated: 27/03/2026
+
+Eoliann Windows Tools is primarily a local Windows utility. Most features run on your device and display results locally in the app.
+
+The application may read system information, settings, registry values, installed apps, and command output in order to provide its features.
+
+App preferences are stored locally on your device.
+
+Some features may use an internet connection, such as update checks, package management, downloads of optional components, or opening external links.
+
+The app may open or rely on third-party services and websites. Those services are governed by their own terms and privacy policies.
+
+Based on the currently reviewed application source, the app does not intentionally collect or automatically send personal data to the developer by default."#;
 
 fn apply_neon_theme(ctx: &egui::Context) {
     let mut style = (*ctx.style()).clone();
@@ -51,6 +77,8 @@ enum Page {
     WinAppRemoval,
     CustomizePreferences,
     QuickKeys,
+    Health,
+    Performance,
     Settings,
 }
 
@@ -62,6 +90,8 @@ pub struct App {
     log: Arc<Mutex<String>>,
     show_popup: bool,
     popup_message: String,
+    show_terms_modal: bool,
+    show_privacy_modal: bool,
 
     // prefs
     pub enable_tooltips: bool,
@@ -97,14 +127,23 @@ pub struct App {
     // Icons: textures loaded lazily at first `update` call
     pub icons: HashMap<String, TextureHandle>,
 
+    // General tab state
     pub general_prefs_loaded: bool,
+    
+    // Tools tab state
     pub tools_state: tools::ToolsState,
 
+    // Health tab state
+    pub health_state: health::HealthState,
+
+    // Performance tab state
+    pub performance_state: performance::PerformanceState,
 }
 
 impl Default for App {
     fn default() -> Self {
         Self {
+            performance_state: performance::PerformanceState::default(),
             latest_release: None,
             update_available: false,
             show_update_window: false,
@@ -112,6 +151,8 @@ impl Default for App {
             log: Arc::new(Mutex::new(String::new())),
             show_popup: false,
             popup_message: String::new(),
+            show_terms_modal: false,
+            show_privacy_modal: false,
             enable_tooltips: true,
             auto_check_updates: true,
             mouse_accel_enabled: false,
@@ -137,6 +178,7 @@ impl Default for App {
             icons: HashMap::new(),
             general_prefs_loaded: false,
             tools_state: tools::ToolsState::default(),
+            health_state: health::HealthState::default(),
         }
     }
 }
@@ -168,6 +210,65 @@ impl App {
         if let Ok(mut lg) = self.log.lock() {
             lg.clear();
         }
+    }
+
+    fn show_text_modal(
+        ctx: &egui::Context,
+        title: &str,
+        open: &mut bool,
+        body: &str,
+    ) {
+        if !*open {
+            return;
+        }
+
+        let mut is_open = *open;
+        let mut close_requested = false;
+
+        egui::Window::new(title)
+            .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
+            .collapsible(false)
+            .resizable(false)
+            .movable(false)
+            .default_size([500.0, 560.0])
+            .frame(
+                egui::Frame::window(&ctx.style())
+                    .stroke(egui::Stroke::new(2.0, Color32::from_rgb(57, 255, 20)))
+            )
+            .open(&mut is_open)
+            .show(ctx, |ui| {
+                ui.add_space(6.0);
+
+                egui::ScrollArea::vertical()
+                    .auto_shrink([false, false])
+                    .max_height(460.0)
+                    .show(ui, |ui| {
+                        ui.label(
+                            egui::RichText::new(body)
+                                .size(16.0)
+                                .color(Color32::WHITE),
+                        );
+                    });
+
+                ui.add_space(12.0);
+
+                ui.horizontal_centered(|ui| {
+                    if ui
+                        .add_sized([140.0, 32.0], egui::Button::new("Close"))
+                        .clicked()
+                    {
+                        close_requested = true;
+                    }
+                });
+
+                ui.add_space(4.0);
+            });
+
+        if close_requested {
+            is_open = false;
+        }
+
+        *open = is_open;
     }
 
     fn ensure_icons_loaded(&mut self, ctx: &egui::Context) {
@@ -280,6 +381,14 @@ impl App {
             self.page = Page::CustomizePreferences;
         }
 
+        if btn(ui, "❤ Health", self.page == Page::Health).clicked() {
+            self.page = Page::Health;
+        }
+
+        if btn(ui, "⚡ Performance", self.page == Page::Performance).clicked() {
+            self.page = Page::Performance;
+        }
+
         if btn(ui, "⌨ Quick Keys", self.page == Page::QuickKeys).clicked() {
             self.page = Page::QuickKeys;
         }
@@ -287,6 +396,22 @@ impl App {
         if btn(ui, "🔧 Settings", self.page == Page::Settings).clicked() {
             self.page = Page::Settings;
         }
+
+        // ui.with_layout(egui::Layout::bottom_up(egui::Align::LEFT), |ui| {
+        //     ui.separator();
+
+        //     let button_style = egui::RichText::new("💖 Donate")
+        //         .color(egui::Color32::from_rgb(57, 255, 20))
+        //         .strong();
+
+        //     if ui.button(button_style).clicked() {
+        //         let _ = webbrowser::open("https://www.paypal.com/donate/?hosted_button_id=U9XAX3XBTU67G");
+        //     }
+
+        //     if ui.button("Clear Log").clicked() {
+        //         self.clear_log();
+        //     }
+        // });
 
         ui.with_layout(egui::Layout::bottom_up(egui::Align::LEFT), |ui| {
             ui.separator();
@@ -301,6 +426,14 @@ impl App {
 
             if ui.button("Clear Log").clicked() {
                 self.clear_log();
+            }
+
+            if ui.button("Privacy Policy").clicked() {
+                self.show_privacy_modal = true;
+            }
+
+            if ui.button("Terms & Conditions").clicked() {
+                self.show_terms_modal = true;
             }
         });
     }
@@ -440,6 +573,12 @@ impl eframe::App for App {
                         Page::QuickKeys => {
                             crate::tabs::quick_keys::show_quick_keys(ui, &self.log);
                         }
+                        Page::Health => {
+                            health::show_health(ui, &self.log, &mut self.health_state);
+                        }
+                        Page::Performance => {
+                            performance::show_performance(ui, &self.log, &mut self.performance_state);
+                        }
                         Page::Info => {
                             info::show_info(ui, &self.log, self.update_available, self.latest_release.as_ref(), &self.info_state, &self.icons);
                         }
@@ -450,11 +589,29 @@ impl eframe::App for App {
                 });
         });
 
+        Self::show_text_modal(
+            ctx,
+            "Terms of use",
+            &mut self.show_terms_modal,
+            TERMS_AND_CONDITIONS_TEXT,
+        );
+
+        Self::show_text_modal(
+            ctx,
+            "Privacy policy",
+            &mut self.show_privacy_modal,
+            PRIVACY_POLICY_TEXT,
+        );
+
         if self.show_popup {
             egui::Window::new("Confirm / Log")
                 .collapsible(false)
                 .resizable(true)
                 .default_size([800.0, 600.0])
+                .frame(
+                    egui::Frame::window(&ctx.style())
+                        .stroke(egui::Stroke::new(1.5, Color32::from_rgb(0, 255, 140)))
+                )
                 .show(ctx, |ui| {
                     ui.vertical(|ui| {
                         ui.label(&self.popup_message);

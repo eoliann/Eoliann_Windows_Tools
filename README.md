@@ -39,7 +39,8 @@ Now install it on your system!
 <img width="1402" height="932" alt="update-1 1 7-to-1 1 8" src="https://github.com/user-attachments/assets/4d442ac3-679d-4c51-9f00-8f6383eea4b6" />
 
 ### INFO
-<img width="1920" height="1032" alt="info1" src="https://github.com/user-attachments/assets/c55d1933-c707-487c-aace-54459490d10c" />
+<img width="1920" height="1032" alt="1 0" src="https://github.com/user-attachments/assets/75c2c5f9-de30-4f02-a370-8b190e9cc8db" />
+<img width="1920" height="1032" alt="1 1" src="https://github.com/user-attachments/assets/8f183082-a31e-40f3-9eeb-961619b42b0f" />
 
 - `whoami` → displays the current user
 - `ipconfig` → display network settings
@@ -49,7 +50,8 @@ Now install it on your system!
 - `About` → all about application: developer, version, website
 
 ### TOOLS
-<img width="1920" height="1032" alt="tools" src="https://github.com/user-attachments/assets/3d66ee27-8ee1-4aa8-97ff-cd9dcba76b94" />
+<img width="1920" height="1032" alt="2 1" src="https://github.com/user-attachments/assets/e4c64496-afcc-4b92-b322-2a0479213984" />
+<img width="1920" height="1032" alt="2 2" src="https://github.com/user-attachments/assets/086568ad-b1d2-4597-92ce-0fb77a85bb47" />
 
 #### Context menu
 - `Toggle Context Menu` → instantly switch between the **Win11 ↔ Classic** context menu (with Explorer restart)
@@ -117,12 +119,14 @@ Now install it on your system!
 - `Password Expire`  → Enable/Disable Password Expire on Windows 10/11 Pro & Windows 10/11 Home.
 
 ### DISK HEALTH
-<img width="1920" height="1032" alt="disk-health" src="https://github.com/user-attachments/assets/7757c599-542e-4365-b160-a192c90eb59b" />
+<img width="1920" height="1032" alt="3 0" src="https://github.com/user-attachments/assets/287f6e4a-ac04-4fc9-911f-a11d978d593f" />
+<img width="1920" height="1032" alt="3 1" src="https://github.com/user-attachments/assets/11c29734-d0e6-429e-a83b-c02ef008efbe" />
 
 Displays storage memory information such as: temperature, health, performance, Power on time (total number of hours of use), Estimated remaining lifetime, Lifetime writes in GB and bytes.
 
 ### INSTALL
-<img width="1920" height="1032" alt="install" src="https://github.com/user-attachments/assets/c27d1119-2d14-4908-98b1-5de636191913" />
+<img width="1920" height="1032" alt="4 0" src="https://github.com/user-attachments/assets/2a8c2ed2-ca82-4ee2-8e5e-2c6eebbb72f6" />
+<img width="1920" height="1032" alt="4 1" src="https://github.com/user-attachments/assets/7d088e7e-da94-45b1-95c2-83d4d31e035f" />
 
 #### Install application
 ![install-app](https://github.com/user-attachments/assets/1d50fdc2-eea6-4b72-863f-e3e7f44a330f)
@@ -146,7 +150,10 @@ For Google Chrome users:
 - `Install Chrome extensions` → install Chrome extensions from the Chrome Web Store
   
 ### WINDOWS APP REMOVAL
-<img width="1920" height="1032" alt="winapp_removal" src="https://github.com/user-attachments/assets/a8542ce0-bfbe-4f50-80b4-e99001b5f702" />
+<img width="1920" height="1032" alt="5 0" src="https://github.com/user-attachments/assets/341ddf32-3b31-4407-8176-443d809ade9c" />
+<img width="1920" height="1032" alt="5 1" src="https://github.com/user-attachments/assets/b8100f5d-7e22-4ad3-9e40-082c29987a87" />
+<img width="1920" height="1032" alt="5 2" src="https://github.com/user-attachments/assets/3188e785-2cbd-4bb0-8038-4143e4b82561" />
+<img width="1920" height="1032" alt="5 3" src="https://github.com/user-attachments/assets/eba29c8c-c281-4d84-b5a8-c666bfb0c8fe" />
 
 - `Communication` → remove default applications that come with Windows installation, such as: Outlook for Windows, Skype, Teams, GroupMe, To-Do, Your Phone, CommsPhone, Messaging, Mail & Calendar, and others.
 - `Media & Creativity` → removes default applications that come with Windows installation, such as: Climpchamp, Camera, MS Paint, 3D Builder, 3D Viewer, Mixed Reality Portal
@@ -157,19 +164,55 @@ For Google Chrome users:
 - `Other` → remove default applications that come with Windows installation, such as: Print 3D, Office-related
 
 ### CUSTOMIZE PREFERENCES
-<img width="1920" height="1032" alt="customize_preferences" src="https://github.com/user-attachments/assets/c06a654e-912f-47df-a2aa-bca55274f698" />
+<img width="1920" height="1032" alt="6 0" src="https://github.com/user-attachments/assets/8df00031-6e01-4f4f-a759-c5bae0912c50" />
 
 - `General Preferences` → Start with Windows, Enable advanced tooltips, Auto-check for updates
 - `Features / Tweaks` → Mouse Acceleration, NumLock on startup, Taskbar Search Button, Taskbar Widgets, Snap Windows on startup, Sticky Keys on startup, Task View button, Verbose Logon Messages (system), BitLocker protection
 - `Bitlocker on/off all partition` → activate/deactivate Bitlocker for one or all partition
 
+### HEALT
+#### Power, cleanup and diagnostics.
+<img width="1920" height="1032" alt="7 0" src="https://github.com/user-attachments/assets/b2288622-9082-49d6-b786-32f7a5185add" />
+
+- `Hibernation` → Enable or disable Windows hibernation.
+- `Cleanup` → Storage settings and System Restore cleanup.
+- `System restore` → Remove restore points created
+- `Battery report` → Generate the Windows battery report and save it to Documents.
+- `Memory diagnostic` → Launch Windows Memory Diagnostic.
+
+### PERFORMANCE
+#### Power, graphics and startup settings.
+<img width="1920" height="1032" alt="8 0" src="https://github.com/user-attachments/assets/b8ba27fd-e918-4bff-a655-7e89c7a5c0bd" />
+
+- `Ultimate performance power plan` → Switch between the app-managed Ultimate plan and Balanced.
+- `HAGS (hardware-accelerated GPU scheduling)` → May reduce latency and CPU overhead. Restart usually required.
+- `VBS (virtualization-based security)` → Turns VBS / memory-integrity-related registry flags on or off. Restart required.
+- `Startup apps` → Manage classic Run startup entries.
+- `Relaunch apps` → Automatically save restartable apps and relaunch them after sign-in.
+- `Background apps` → Global background-app permission switch for the current user.
+- `Activity history` → Uses the existing Activity History policies already present in the app.
+- `Visual settings`:
+  - `Optimize visual effects for performance`: Uses the existing performance visual profile from the app.;
+  - `Transparency`: Windows transparency effects for the current user.
+- `Gaming settings`:
+  - `Game mode`: Windows Game Mode.
+  - `Windowed mode optimizations`: Optimizations for windowed games. Restart the game after changes.
+  - `Background recording`: Xbox Game Bar / Game DVR background capture.
+  - `Superfetch`: Controls the SysMain service.
+
+- `Search indexing` → Controls the Windows Search indexing service.
+- `Delivery optimization` → Controls Delivery Optimization sharing behavior.
+- `Network adapter onboard processor` → Controls TCP task offload.
+
 ### QUICK KEYS
-<img width="1920" height="1032" alt="custom_keys" src="https://github.com/user-attachments/assets/e93f8348-4164-45ef-bde2-96a6160dce7a" />
+<img width="1920" height="1032" alt="9 0" src="https://github.com/user-attachments/assets/17e313e7-111c-4207-9f0b-b05cea12f6eb" />
+<img width="1920" height="1032" alt="9 1" src="https://github.com/user-attachments/assets/a1c7f9df-635a-4de6-ae74-c073a913dc2d" />
 
 - `Shortcuts` → Shortcuts for some important functions such as: Win + X, Win + R, Win + I, Regedit\Registry Editor, gpedit.msc\Group Policy
 
 ### SETTINGS
-<img width="1920" height="1032" alt="settings" src="https://github.com/user-attachments/assets/dde79bde-8b11-4233-a6af-08dbeeba41dd" />
+<img width="1920" height="1032" alt="10 0" src="https://github.com/user-attachments/assets/a9d7663e-cf5a-4138-83fb-8ff8cde08570" />
+<img width="1920" height="1032" alt="10 1" src="https://github.com/user-attachments/assets/98c2ad52-7bae-48a3-bc4c-155d977453a1" />
 
 - `Switch to Light Mode / Switch to Dark Mode` → switch between Windows Light and Dark themes
 - `Display Current alignment` → Display Current alignment of taskbar elements (Center or Left)

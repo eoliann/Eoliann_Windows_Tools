@@ -1,4 +1,4 @@
-[![Group](https://img.shields.io/badge/Group-Telegram-blue?style=plastic)]([http://revolut.me/adriannm9](https://t.me/eoliannwindowstool)?style=plastic)
+[![Group](https://img.shields.io/badge/Group-Telegram-blue?style=plastic)](https://t.me/eoliannwindowstool)
 ![Followers](https://img.shields.io/github/followers/eoliann?style=plastic&color=green)
 ![Watchers](https://img.shields.io/github/watchers/eoliann/wup-web?style=plastic)
 ![Stars](https://img.shields.io/github/stars/eoliann/Eoliann_Windows_Tools?style=plastic)

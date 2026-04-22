@@ -1,3 +1,4 @@
+[![Group](https://img.shields.io/badge/Group-Telegram-blue?style=plastic)](https://t.me/eoliannwindowstool)
 ![Followers](https://img.shields.io/github/followers/eoliann?style=plastic&color=green)
 ![Watchers](https://img.shields.io/github/watchers/eoliann/wup-web?style=plastic)
 ![Stars](https://img.shields.io/github/stars/eoliann/Eoliann_Windows_Tools?style=plastic)
@@ -36,10 +37,12 @@ Now install it on your system!
 ## 🚀 Features
 
 #### Update to new version
-<img width="1402" height="932" alt="update-1 1 7-to-1 1 8" src="https://github.com/user-attachments/assets/4d442ac3-679d-4c51-9f00-8f6383eea4b6" />
+<img width="1368" height="1104" alt="EWT-Update_notification" src="https://github.com/user-attachments/assets/318da3e4-c086-4083-9981-2f75b2afee95" />
+
 
 ### INFO
-<img width="1920" height="1032" alt="info1" src="https://github.com/user-attachments/assets/c55d1933-c707-487c-aace-54459490d10c" />
+<img width="1368" height="1104" alt="EWT_v1 3 4-Info1" src="https://github.com/user-attachments/assets/7df63204-b8d0-49e0-a453-b22502bf9254" />
+<img width="1368" height="1104" alt="EWT_v1 3 4-Info2" src="https://github.com/user-attachments/assets/aa2a1f75-b556-4669-a941-c7f97cfc2e21" />
 
 - `whoami` → displays the current user
 - `ipconfig` → display network settings
@@ -49,7 +52,11 @@ Now install it on your system!
 - `About` → all about application: developer, version, website
 
 ### TOOLS
-<img width="1920" height="1032" alt="tools" src="https://github.com/user-attachments/assets/3d66ee27-8ee1-4aa8-97ff-cd9dcba76b94" />
+<img width="1368" height="1104" alt="EWT_v1 3 4-Tools1" src="https://github.com/user-attachments/assets/881fa6ff-12c6-4f52-a002-6bffc42cf0a0" />
+<img width="1368" height="1104" alt="EWT_v1 3 4-Tools2" src="https://github.com/user-attachments/assets/881a7103-9e7d-43c2-90ff-b6fcb839669c" />
+<img width="1368" height="1104" alt="EWT_v1 3 4-Tools3" src="https://github.com/user-attachments/assets/40c3d304-0597-4a71-b321-13d86083d6bc" />
+<img width="1368" height="1104" alt="EWT_v1 3 4-Tools4" src="https://github.com/user-attachments/assets/93b9769a-3ca2-47ab-b1ae-1cd750d3587f" />
+<img width="1368" height="1104" alt="EWT_v1 3 4-Tools5" src="https://github.com/user-attachments/assets/52fbebfe-7e34-4bb1-aaf9-c46cd357c4a9" />
 
 #### Context menu
 - `Toggle Context Menu` → instantly switch between the **Win11 ↔ Classic** context menu (with Explorer restart)
@@ -116,13 +123,16 @@ Now install it on your system!
 #### Security
 - `Password Expire`  → Enable/Disable Password Expire on Windows 10/11 Pro & Windows 10/11 Home.
 
+#### VirtualBox / Hyper-V
+- `Disables Hyper-V`  → Disables Hyper-V / VBS related components that can slow down VirtualBox. 
+
 ### DISK HEALTH
-<img width="1920" height="1032" alt="disk-health" src="https://github.com/user-attachments/assets/7757c599-542e-4365-b160-a192c90eb59b" />
+<img width="1368" height="1104" alt="EWT_v1 3 4-Disk_Health1" src="https://github.com/user-attachments/assets/e3f35e97-c1c2-4077-b6cf-4dfccfa6df77" />
 
 Displays storage memory information such as: temperature, health, performance, Power on time (total number of hours of use), Estimated remaining lifetime, Lifetime writes in GB and bytes.
 
 ### INSTALL
-<img width="1920" height="1032" alt="install" src="https://github.com/user-attachments/assets/c27d1119-2d14-4908-98b1-5de636191913" />
+<img width="1368" height="1104" alt="EWT_v1 3 4-Install" src="https://github.com/user-attachments/assets/16d220a8-47bd-45d2-962a-586d4cbebb50" />
 
 #### Install application
 ![install-app](https://github.com/user-attachments/assets/1d50fdc2-eea6-4b72-863f-e3e7f44a330f)
@@ -146,7 +156,7 @@ For Google Chrome users:
 - `Install Chrome extensions` → install Chrome extensions from the Chrome Web Store
   
 ### WINDOWS APP REMOVAL
-<img width="1920" height="1032" alt="winapp_removal" src="https://github.com/user-attachments/assets/a8542ce0-bfbe-4f50-80b4-e99001b5f702" />
+<img width="1368" height="1104" alt="EWT_v1 3 4-WinApp_Removal" src="https://github.com/user-attachments/assets/ccf132ce-c22a-459a-8b44-6bf9b8500185" />
 
 - `Communication` → remove default applications that come with Windows installation, such as: Outlook for Windows, Skype, Teams, GroupMe, To-Do, Your Phone, CommsPhone, Messaging, Mail & Calendar, and others.
 - `Media & Creativity` → removes default applications that come with Windows installation, such as: Climpchamp, Camera, MS Paint, 3D Builder, 3D Viewer, Mixed Reality Portal
@@ -157,19 +167,53 @@ For Google Chrome users:
 - `Other` → remove default applications that come with Windows installation, such as: Print 3D, Office-related
 
 ### CUSTOMIZE PREFERENCES
-<img width="1920" height="1032" alt="customize_preferences" src="https://github.com/user-attachments/assets/c06a654e-912f-47df-a2aa-bca55274f698" />
+<img width="1368" height="1104" alt="EWT_v1 3 4-Customiza_Preferences" src="https://github.com/user-attachments/assets/0a84b320-3c8a-4073-8db1-a75ba75a65c2" />
 
 - `General Preferences` → Start with Windows, Enable advanced tooltips, Auto-check for updates
 - `Features / Tweaks` → Mouse Acceleration, NumLock on startup, Taskbar Search Button, Taskbar Widgets, Snap Windows on startup, Sticky Keys on startup, Task View button, Verbose Logon Messages (system), BitLocker protection
 - `Bitlocker on/off all partition` → activate/deactivate Bitlocker for one or all partition
 
+### HEALT
+#### Power, cleanup and diagnostics.
+<img width="1920" height="1032" alt="7 0" src="https://github.com/user-attachments/assets/b2288622-9082-49d6-b786-32f7a5185add" />
+
+- `Hibernation` → Enable or disable Windows hibernation.
+- `Cleanup` → Storage settings and System Restore cleanup.
+- `System restore` → Remove restore points created
+- `Battery report` → Generate the Windows battery report and save it to Documents.
+- `Memory diagnostic` → Launch Windows Memory Diagnostic.
+
+### PERFORMANCE
+#### Power, graphics and startup settings.
+<img width="1368" height="1104" alt="EWT_v1 3 4-Performance" src="https://github.com/user-attachments/assets/dde02e5f-442b-4faf-b2e0-103d5ae95b09" />
+
+- `Ultimate performance power plan` → Switch between the app-managed Ultimate plan and Balanced.
+- `HAGS (hardware-accelerated GPU scheduling)` → May reduce latency and CPU overhead. Restart usually required.
+- `VBS (virtualization-based security)` → Turns VBS / memory-integrity-related registry flags on or off. Restart required.
+- `Startup apps` → Manage classic Run startup entries.
+- `Relaunch apps` → Automatically save restartable apps and relaunch them after sign-in.
+- `Background apps` → Global background-app permission switch for the current user.
+- `Activity history` → Uses the existing Activity History policies already present in the app.
+- `Visual settings`:
+  - `Optimize visual effects for performance`: Uses the existing performance visual profile from the app.;
+  - `Transparency`: Windows transparency effects for the current user.
+- `Gaming settings`:
+  - `Game mode`: Windows Game Mode.
+  - `Windowed mode optimizations`: Optimizations for windowed games. Restart the game after changes.
+  - `Background recording`: Xbox Game Bar / Game DVR background capture.
+  - `Superfetch`: Controls the SysMain service.
+
+- `Search indexing` → Controls the Windows Search indexing service.
+- `Delivery optimization` → Controls Delivery Optimization sharing behavior.
+- `Network adapter onboard processor` → Controls TCP task offload.
+
 ### QUICK KEYS
-<img width="1920" height="1032" alt="custom_keys" src="https://github.com/user-attachments/assets/e93f8348-4164-45ef-bde2-96a6160dce7a" />
+<img width="1368" height="1104" alt="EWT_v1 3 4-Quick_Keys" src="https://github.com/user-attachments/assets/33c06372-d60b-45b0-91e3-68d587143af0" />
 
 - `Shortcuts` → Shortcuts for some important functions such as: Win + X, Win + R, Win + I, Regedit\Registry Editor, gpedit.msc\Group Policy
 
 ### SETTINGS
-<img width="1920" height="1032" alt="settings" src="https://github.com/user-attachments/assets/dde79bde-8b11-4233-a6af-08dbeeba41dd" />
+<img width="1368" height="1104" alt="EWT_v1 3 4-Settings" src="https://github.com/user-attachments/assets/25964d45-5b6d-4807-a6d6-4a9ac4c2bf46" />
 
 - `Switch to Light Mode / Switch to Dark Mode` → switch between Windows Light and Dark themes
 - `Display Current alignment` → Display Current alignment of taskbar elements (Center or Left)

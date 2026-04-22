@@ -37,11 +37,12 @@ Now install it on your system!
 ## 🚀 Features
 
 #### Update to new version
-<img width="1402" height="932" alt="update-1 1 7-to-1 1 8" src="https://github.com/user-attachments/assets/4d442ac3-679d-4c51-9f00-8f6383eea4b6" />
+<img width="1368" height="1104" alt="EWT-Update_notification" src="https://github.com/user-attachments/assets/318da3e4-c086-4083-9981-2f75b2afee95" />
+
 
 ### INFO
-<img width="1920" height="1032" alt="1 0" src="https://github.com/user-attachments/assets/75c2c5f9-de30-4f02-a370-8b190e9cc8db" />
-<img width="1920" height="1032" alt="1 1" src="https://github.com/user-attachments/assets/8f183082-a31e-40f3-9eeb-961619b42b0f" />
+<img width="1368" height="1104" alt="EWT_v1 3 4-Info1" src="https://github.com/user-attachments/assets/7df63204-b8d0-49e0-a453-b22502bf9254" />
+<img width="1368" height="1104" alt="EWT_v1 3 4-Info2" src="https://github.com/user-attachments/assets/aa2a1f75-b556-4669-a941-c7f97cfc2e21" />
 
 - `whoami` → displays the current user
 - `ipconfig` → display network settings
@@ -51,8 +52,11 @@ Now install it on your system!
 - `About` → all about application: developer, version, website
 
 ### TOOLS
-<img width="1920" height="1032" alt="2 1" src="https://github.com/user-attachments/assets/e4c64496-afcc-4b92-b322-2a0479213984" />
-<img width="1920" height="1032" alt="2 2" src="https://github.com/user-attachments/assets/086568ad-b1d2-4597-92ce-0fb77a85bb47" />
+<img width="1368" height="1104" alt="EWT_v1 3 4-Tools1" src="https://github.com/user-attachments/assets/881fa6ff-12c6-4f52-a002-6bffc42cf0a0" />
+<img width="1368" height="1104" alt="EWT_v1 3 4-Tools2" src="https://github.com/user-attachments/assets/881a7103-9e7d-43c2-90ff-b6fcb839669c" />
+<img width="1368" height="1104" alt="EWT_v1 3 4-Tools3" src="https://github.com/user-attachments/assets/40c3d304-0597-4a71-b321-13d86083d6bc" />
+<img width="1368" height="1104" alt="EWT_v1 3 4-Tools4" src="https://github.com/user-attachments/assets/93b9769a-3ca2-47ab-b1ae-1cd750d3587f" />
+<img width="1368" height="1104" alt="EWT_v1 3 4-Tools5" src="https://github.com/user-attachments/assets/52fbebfe-7e34-4bb1-aaf9-c46cd357c4a9" />
 
 #### Context menu
 - `Toggle Context Menu` → instantly switch between the **Win11 ↔ Classic** context menu (with Explorer restart)
@@ -119,15 +123,16 @@ Now install it on your system!
 #### Security
 - `Password Expire`  → Enable/Disable Password Expire on Windows 10/11 Pro & Windows 10/11 Home.
 
+#### VirtualBox / Hyper-V
+- `Disables Hyper-V`  → Disables Hyper-V / VBS related components that can slow down VirtualBox. 
+
 ### DISK HEALTH
-<img width="1920" height="1032" alt="3 0" src="https://github.com/user-attachments/assets/287f6e4a-ac04-4fc9-911f-a11d978d593f" />
-<img width="1920" height="1032" alt="3 1" src="https://github.com/user-attachments/assets/11c29734-d0e6-429e-a83b-c02ef008efbe" />
+<img width="1368" height="1104" alt="EWT_v1 3 4-Disk_Health1" src="https://github.com/user-attachments/assets/e3f35e97-c1c2-4077-b6cf-4dfccfa6df77" />
 
 Displays storage memory information such as: temperature, health, performance, Power on time (total number of hours of use), Estimated remaining lifetime, Lifetime writes in GB and bytes.
 
 ### INSTALL
-<img width="1920" height="1032" alt="4 0" src="https://github.com/user-attachments/assets/2a8c2ed2-ca82-4ee2-8e5e-2c6eebbb72f6" />
-<img width="1920" height="1032" alt="4 1" src="https://github.com/user-attachments/assets/7d088e7e-da94-45b1-95c2-83d4d31e035f" />
+<img width="1368" height="1104" alt="EWT_v1 3 4-Install" src="https://github.com/user-attachments/assets/16d220a8-47bd-45d2-962a-586d4cbebb50" />
 
 #### Install application
 ![install-app](https://github.com/user-attachments/assets/1d50fdc2-eea6-4b72-863f-e3e7f44a330f)
@@ -151,10 +156,7 @@ For Google Chrome users:
 - `Install Chrome extensions` → install Chrome extensions from the Chrome Web Store
   
 ### WINDOWS APP REMOVAL
-<img width="1920" height="1032" alt="5 0" src="https://github.com/user-attachments/assets/341ddf32-3b31-4407-8176-443d809ade9c" />
-<img width="1920" height="1032" alt="5 1" src="https://github.com/user-attachments/assets/b8100f5d-7e22-4ad3-9e40-082c29987a87" />
-<img width="1920" height="1032" alt="5 2" src="https://github.com/user-attachments/assets/3188e785-2cbd-4bb0-8038-4143e4b82561" />
-<img width="1920" height="1032" alt="5 3" src="https://github.com/user-attachments/assets/eba29c8c-c281-4d84-b5a8-c666bfb0c8fe" />
+<img width="1368" height="1104" alt="EWT_v1 3 4-WinApp_Removal" src="https://github.com/user-attachments/assets/ccf132ce-c22a-459a-8b44-6bf9b8500185" />
 
 - `Communication` → remove default applications that come with Windows installation, such as: Outlook for Windows, Skype, Teams, GroupMe, To-Do, Your Phone, CommsPhone, Messaging, Mail & Calendar, and others.
 - `Media & Creativity` → removes default applications that come with Windows installation, such as: Climpchamp, Camera, MS Paint, 3D Builder, 3D Viewer, Mixed Reality Portal
@@ -165,7 +167,7 @@ For Google Chrome users:
 - `Other` → remove default applications that come with Windows installation, such as: Print 3D, Office-related
 
 ### CUSTOMIZE PREFERENCES
-<img width="1920" height="1032" alt="6 0" src="https://github.com/user-attachments/assets/8df00031-6e01-4f4f-a759-c5bae0912c50" />
+<img width="1368" height="1104" alt="EWT_v1 3 4-Customiza_Preferences" src="https://github.com/user-attachments/assets/0a84b320-3c8a-4073-8db1-a75ba75a65c2" />
 
 - `General Preferences` → Start with Windows, Enable advanced tooltips, Auto-check for updates
 - `Features / Tweaks` → Mouse Acceleration, NumLock on startup, Taskbar Search Button, Taskbar Widgets, Snap Windows on startup, Sticky Keys on startup, Task View button, Verbose Logon Messages (system), BitLocker protection
@@ -183,7 +185,7 @@ For Google Chrome users:
 
 ### PERFORMANCE
 #### Power, graphics and startup settings.
-<img width="1920" height="1032" alt="8 0" src="https://github.com/user-attachments/assets/b8ba27fd-e918-4bff-a655-7e89c7a5c0bd" />
+<img width="1368" height="1104" alt="EWT_v1 3 4-Performance" src="https://github.com/user-attachments/assets/dde02e5f-442b-4faf-b2e0-103d5ae95b09" />
 
 - `Ultimate performance power plan` → Switch between the app-managed Ultimate plan and Balanced.
 - `HAGS (hardware-accelerated GPU scheduling)` → May reduce latency and CPU overhead. Restart usually required.
@@ -206,14 +208,12 @@ For Google Chrome users:
 - `Network adapter onboard processor` → Controls TCP task offload.
 
 ### QUICK KEYS
-<img width="1920" height="1032" alt="9 0" src="https://github.com/user-attachments/assets/17e313e7-111c-4207-9f0b-b05cea12f6eb" />
-<img width="1920" height="1032" alt="9 1" src="https://github.com/user-attachments/assets/a1c7f9df-635a-4de6-ae74-c073a913dc2d" />
+<img width="1368" height="1104" alt="EWT_v1 3 4-Quick_Keys" src="https://github.com/user-attachments/assets/33c06372-d60b-45b0-91e3-68d587143af0" />
 
 - `Shortcuts` → Shortcuts for some important functions such as: Win + X, Win + R, Win + I, Regedit\Registry Editor, gpedit.msc\Group Policy
 
 ### SETTINGS
-<img width="1920" height="1032" alt="10 0" src="https://github.com/user-attachments/assets/a9d7663e-cf5a-4138-83fb-8ff8cde08570" />
-<img width="1920" height="1032" alt="10 1" src="https://github.com/user-attachments/assets/98c2ad52-7bae-48a3-bc4c-155d977453a1" />
+<img width="1368" height="1104" alt="EWT_v1 3 4-Settings" src="https://github.com/user-attachments/assets/25964d45-5b6d-4807-a6d6-4a9ac4c2bf46" />
 
 - `Switch to Light Mode / Switch to Dark Mode` → switch between Windows Light and Dark themes
 - `Display Current alignment` → Display Current alignment of taskbar elements (Center or Left)

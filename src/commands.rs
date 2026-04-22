@@ -5406,3 +5406,577 @@ Write-Output 'Startup app state updated.'
         Ok(out)
     }
 }
+
+// ---------- VirtualBox / Hyper-V helpers (no PowerShell) ----------
+
+const EWT_VIRTUALBOX_DG_GUID: &str = "{0cb3b571-2f2e-4343-a879-d86a476d7215}";
+
+fn virtualbox_run_capture(exe: &str, args: &[String]) -> Result<(bool, String), String> {
+    let output = Command::new(exe)
+        .args(args)
+        .output()
+        .map_err(|e| format!("Failed to start {}: {}", exe, e))?;
+
+    let mut text = String::new();
+    text.push_str(&String::from_utf8_lossy(&output.stdout));
+
+    if !output.stderr.is_empty() {
+        if !text.is_empty() && !text.ends_with('\n') {
+            text.push('\n');
+        }
+        text.push_str(&String::from_utf8_lossy(&output.stderr));
+    }
+
+    Ok((output.status.success(), text.trim().to_string()))
+}
+
+fn virtualbox_run_log(log: &mut String, exe: &str, args: &[String], fatal: bool) -> bool {
+    log.push_str(&format!("> {} {}\n", exe, args.join(" ")));
+
+    match virtualbox_run_capture(exe, args) {
+        Ok((ok, out)) => {
+            if !out.is_empty() {
+                log.push_str(&out);
+                if !out.ends_with('\n') {
+                    log.push('\n');
+                }
+            }
+
+            if ok {
+                log.push_str("[OK]\n\n");
+                true
+            } else {
+                log.push_str("[FAILED]\n\n");
+                !fatal
+            }
+        }
+        Err(e) => {
+            log.push_str(&format!("{}\n[FAILED]\n\n", e));
+            !fatal
+        }
+    }
+}
+
+fn virtualbox_reg_add_dword(log: &mut String, key: &str, name: &str, value: u32) -> bool {
+    virtualbox_run_log(
+        log,
+        "reg",
+        &[
+            "add".to_string(),
+            key.to_string(),
+            "/v".to_string(),
+            name.to_string(),
+            "/t".to_string(),
+            "REG_DWORD".to_string(),
+            "/d".to_string(),
+            value.to_string(),
+            "/f".to_string(),
+        ],
+        true,
+    )
+}
+
+fn virtualbox_reg_delete_value(log: &mut String, key: &str, name: &str) -> bool {
+    virtualbox_run_log(
+        log,
+        "reg",
+        &[
+            "delete".to_string(),
+            key.to_string(),
+            "/v".to_string(),
+            name.to_string(),
+            "/f".to_string(),
+        ],
+        false,
+    )
+}
+
+fn virtualbox_reg_query_value(key: &str, name: &str) -> Option<String> {
+    let args = vec![
+        "query".to_string(),
+        key.to_string(),
+        "/v".to_string(),
+        name.to_string(),
+    ];
+
+    let (_, out) = virtualbox_run_capture("reg", &args).ok()?;
+
+    for line in out.lines() {
+        if line.contains(name) && line.contains("REG_") {
+            let parts: Vec<&str> = line.split_whitespace().collect();
+            if let Some(last) = parts.last() {
+                return Some((*last).to_string());
+            }
+        }
+    }
+
+    None
+}
+
+fn virtualbox_bcd_hypervisorlaunchtype() -> String {
+    let args = vec!["/enum".to_string()];
+
+    if let Ok((_, out)) = virtualbox_run_capture("bcdedit", &args) {
+        for line in out.lines() {
+            let l = line.trim();
+            if l.to_ascii_lowercase().starts_with("hypervisorlaunchtype") {
+                let parts: Vec<&str> = l.split_whitespace().collect();
+                if let Some(v) = parts.get(1) {
+                    return (*v).to_string();
+                }
+            }
+        }
+    }
+
+    "Unknown".to_string()
+}
+
+fn virtualbox_dism_feature_state(name: &str) -> String {
+    let args = vec![
+        "/Online".to_string(),
+        "/English".to_string(),
+        "/Get-FeatureInfo".to_string(),
+        format!("/FeatureName:{}", name),
+    ];
+
+    if let Ok((_, out)) = virtualbox_run_capture("dism", &args) {
+        for line in out.lines() {
+            let l = line.trim();
+            if let Some(rest) = l.strip_prefix("State :") {
+                return rest.trim().to_string();
+            }
+        }
+    }
+
+    "Unavailable".to_string()
+}
+
+fn virtualbox_wmic_value(class_name: &str, property: &str) -> String {
+    let args = vec![
+        class_name.to_string(),
+        "get".to_string(),
+        property.to_string(),
+        "/value".to_string(),
+    ];
+
+    match virtualbox_run_capture("wmic", &args) {
+        Ok((true, out)) => {
+            for line in out.lines() {
+                if let Some(v) = line.strip_prefix(&format!("{}=", property)) {
+                    return v.trim().to_string();
+                }
+            }
+            "Unknown".to_string()
+        }
+        _ => "Unknown".to_string(),
+    }
+}
+
+fn virtualbox_find_free_drive_letter() -> Option<String> {
+    for ch in ('S'..='Z').rev() {
+        let root = format!("{}:\\", ch);
+        if !std::path::Path::new(&root).exists() {
+            return Some(format!("{}:", ch));
+        }
+    }
+
+    None
+}
+
+fn virtualbox_copy_secconfig_to_efi(log: &mut String) -> Result<(), String> {
+    let free_drive = virtualbox_find_free_drive_letter()
+        .ok_or_else(|| "No free drive letter available from S: to Z:.".to_string())?;
+
+    if !virtualbox_run_log(
+        log,
+        "mountvol",
+        &[free_drive.clone(), "/s".to_string()],
+        true,
+    ) {
+        return Err("Failed to mount the EFI system partition.".to_string());
+    }
+
+    let boot_dir = format!(r"{}\EFI\Microsoft\Boot", free_drive);
+    if let Err(e) = std::fs::create_dir_all(&boot_dir) {
+        let _ = virtualbox_run_log(
+            log,
+            "mountvol",
+            &[free_drive.clone(), "/d".to_string()],
+            false,
+        );
+        return Err(format!("Failed to create EFI boot directory: {}", e));
+    }
+
+    let src = std::path::PathBuf::from(r"C:\Windows\System32\SecConfig.efi");
+    if !src.exists() {
+        let _ = virtualbox_run_log(
+            log,
+            "mountvol",
+            &[free_drive.clone(), "/d".to_string()],
+            false,
+        );
+        return Err(format!("Required file not found: {}", src.display()));
+    }
+
+    let dst = std::path::PathBuf::from(format!(r"{}\SecConfig.efi", boot_dir));
+    if let Err(e) = std::fs::copy(&src, &dst) {
+        let _ = virtualbox_run_log(
+            log,
+            "mountvol",
+            &[free_drive.clone(), "/d".to_string()],
+            false,
+        );
+        return Err(format!("Failed to copy SecConfig.efi: {}", e));
+    }
+
+    log.push_str(&format!(
+        "Copied {} -> {}\n\n",
+        src.display(),
+        dst.display()
+    ));
+
+    let _ = virtualbox_run_log(
+        log,
+        "bcdedit",
+        &[
+            "/delete".to_string(),
+            EWT_VIRTUALBOX_DG_GUID.to_string(),
+            "/f".to_string(),
+        ],
+        false,
+    );
+
+    if !virtualbox_run_log(
+        log,
+        "bcdedit",
+        &[
+            "/create".to_string(),
+            EWT_VIRTUALBOX_DG_GUID.to_string(),
+            "/d".to_string(),
+            "DGOptOut".to_string(),
+            "/application".to_string(),
+            "osloader".to_string(),
+        ],
+        true,
+    ) {
+        let _ = virtualbox_run_log(
+            log,
+            "mountvol",
+            &[free_drive.clone(), "/d".to_string()],
+            false,
+        );
+        return Err("Failed to create the DGOptOut boot entry.".to_string());
+    }
+
+    let commands = vec![
+        vec![
+            "/set".to_string(),
+            EWT_VIRTUALBOX_DG_GUID.to_string(),
+            "path".to_string(),
+            r"\EFI\Microsoft\Boot\SecConfig.efi".to_string(),
+        ],
+        vec![
+            "/set".to_string(),
+            "{bootmgr}".to_string(),
+            "bootsequence".to_string(),
+            EWT_VIRTUALBOX_DG_GUID.to_string(),
+        ],
+        vec![
+            "/set".to_string(),
+            EWT_VIRTUALBOX_DG_GUID.to_string(),
+            "loadoptions".to_string(),
+            "DISABLE-LSA-ISO,DISABLE-VBS".to_string(),
+        ],
+        vec![
+            "/set".to_string(),
+            EWT_VIRTUALBOX_DG_GUID.to_string(),
+            "device".to_string(),
+            format!("partition={}", free_drive),
+        ],
+    ];
+
+    for args in commands {
+        if !virtualbox_run_log(log, "bcdedit", &args, true) {
+            let _ = virtualbox_run_log(
+                log,
+                "mountvol",
+                &[free_drive.clone(), "/d".to_string()],
+                false,
+            );
+            return Err("Failed to configure the DGOptOut boot entry.".to_string());
+        }
+    }
+
+    let _ = virtualbox_run_log(log, "mountvol", &[free_drive, "/d".to_string()], false);
+    Ok(())
+}
+
+#[allow(dead_code)]
+pub fn virtualbox_check_host_status() -> String {
+    let mut log = String::new();
+    log.push_str("VirtualBox / Hyper-V host check\n");
+    log.push_str("--------------------------------\n");
+
+    let admin = if crate::utils::is_elevated() { "Yes" } else { "No" };
+    let hypervisor_present = virtualbox_wmic_value("computersystem", "HypervisorPresent");
+    let hv_launch = virtualbox_bcd_hypervisorlaunchtype();
+    let feature_hv_all = virtualbox_dism_feature_state("Microsoft-Hyper-V-All");
+    let feature_hypervisor = virtualbox_dism_feature_state("Microsoft-Hyper-V-Hypervisor");
+    let feature_vmp = virtualbox_dism_feature_state("VirtualMachinePlatform");
+    let feature_whp = virtualbox_dism_feature_state("HypervisorPlatform");
+    let feature_ium = virtualbox_dism_feature_state("IsolatedUserMode");
+
+    let vbs_reg = virtualbox_reg_query_value(
+        r"HKLM\SYSTEM\CurrentControlSet\Control\DeviceGuard",
+        "EnableVirtualizationBasedSecurity",
+    )
+    .unwrap_or_else(|| "(missing)".to_string());
+
+    let lsa_cfg = virtualbox_reg_query_value(
+        r"HKLM\SYSTEM\CurrentControlSet\Control\Lsa",
+        "LsaCfgFlags",
+    )
+    .unwrap_or_else(|| "(missing)".to_string());
+
+    let hvci_enabled = virtualbox_reg_query_value(
+        r"HKLM\SYSTEM\CurrentControlSet\Control\DeviceGuard\Scenarios\HypervisorEnforcedCodeIntegrity",
+        "Enabled",
+    )
+    .unwrap_or_else(|| "(missing)".to_string());
+
+    let mut likely_conflict = false;
+
+    if hypervisor_present.eq_ignore_ascii_case("true")
+        || hypervisor_present.eq_ignore_ascii_case("yes")
+    {
+        likely_conflict = true;
+    }
+
+    if !matches!(hv_launch.to_ascii_lowercase().as_str(), "off" | "unknown") {
+        likely_conflict = true;
+    }
+
+    for state in [
+        &feature_hv_all,
+        &feature_hypervisor,
+        &feature_vmp,
+        &feature_whp,
+        &feature_ium,
+    ] {
+        if state.eq_ignore_ascii_case("enabled") || state.eq_ignore_ascii_case("enable pending") {
+            likely_conflict = true;
+        }
+    }
+
+    for value in [&vbs_reg, &lsa_cfg, &hvci_enabled] {
+        let v = value.trim().to_ascii_lowercase();
+        if v == "0x1" || v == "0x2" || v == "1" || v == "2" {
+            likely_conflict = true;
+        }
+    }
+
+    log.push_str(&format!("Admin: {}\n", admin));
+    log.push_str(&format!("Hypervisor present now: {}\n", hypervisor_present));
+    log.push_str(&format!("BCD hypervisorlaunchtype: {}\n", hv_launch));
+    log.push_str(&format!(
+        "Feature Microsoft-Hyper-V-All: {}\n",
+        feature_hv_all
+    ));
+    log.push_str(&format!(
+        "Feature Microsoft-Hyper-V-Hypervisor: {}\n",
+        feature_hypervisor
+    ));
+    log.push_str(&format!("Feature VirtualMachinePlatform: {}\n", feature_vmp));
+    log.push_str(&format!("Feature HypervisorPlatform: {}\n", feature_whp));
+    log.push_str(&format!("Feature IsolatedUserMode: {}\n", feature_ium));
+    log.push_str(&format!(
+        "Registry EnableVirtualizationBasedSecurity: {}\n",
+        vbs_reg
+    ));
+    log.push_str(&format!("Registry LsaCfgFlags: {}\n", lsa_cfg));
+    log.push_str(&format!("Registry HVCI Enabled: {}\n", hvci_enabled));
+    log.push_str(&format!(
+        "Likely VirtualBox slowdown risk: {}\n\n",
+        if likely_conflict { "YES" } else { "NO" }
+    ));
+
+    if likely_conflict {
+        log.push_str("Recommendation: if VirtualBox is slow or shows the green turtle, apply the VirtualBox performance fix and reboot Windows.\n");
+    } else {
+        log.push_str("Recommendation: this host does not currently look Hyper-V / VBS heavy.\n");
+    }
+
+    log
+}
+
+#[allow(dead_code)]
+pub fn virtualbox_apply_performance_fix() -> String {
+    if !crate::utils::is_elevated() {
+        return "ERROR: Run the app as Administrator to apply the VirtualBox performance fix.".to_string();
+    }
+
+    let mut log = String::new();
+    log.push_str("VirtualBox performance fix\n");
+    log.push_str("--------------------------\n");
+    log.push_str("This changes Windows security and virtualization settings. A reboot is required.\n\n");
+
+    let mut ok = true;
+
+    ok &= virtualbox_reg_add_dword(
+        &mut log,
+        r"HKLM\SYSTEM\CurrentControlSet\Control\DeviceGuard",
+        "EnableVirtualizationBasedSecurity",
+        0,
+    );
+    ok &= virtualbox_reg_add_dword(
+        &mut log,
+        r"HKLM\SYSTEM\CurrentControlSet\Control\Lsa",
+        "LsaCfgFlags",
+        0,
+    );
+    ok &= virtualbox_reg_add_dword(
+        &mut log,
+        r"HKLM\SYSTEM\CurrentControlSet\Control\DeviceGuard\Scenarios\HypervisorEnforcedCodeIntegrity",
+        "Enabled",
+        0,
+    );
+    ok &= virtualbox_reg_add_dword(
+        &mut log,
+        r"HKLM\SYSTEM\CurrentControlSet\Control\DeviceGuard\Scenarios\HypervisorEnforcedCodeIntegrity",
+        "Locked",
+        0,
+    );
+
+    ok &= virtualbox_run_log(
+        &mut log,
+        "bcdedit",
+        &[
+            "/set".to_string(),
+            "hypervisorlaunchtype".to_string(),
+            "off".to_string(),
+        ],
+        true,
+    );
+
+    for feature in [
+        "Microsoft-Hyper-V-All",
+        "Microsoft-Hyper-V-Hypervisor",
+        "VirtualMachinePlatform",
+        "HypervisorPlatform",
+        "IsolatedUserMode",
+    ] {
+        ok &= virtualbox_run_log(
+            &mut log,
+            "dism",
+            &[
+                "/Online".to_string(),
+                "/NoRestart".to_string(),
+                "/Disable-Feature".to_string(),
+                format!("/FeatureName:{}", feature),
+            ],
+            false,
+        );
+    }
+
+    match virtualbox_copy_secconfig_to_efi(&mut log) {
+        Ok(()) => {}
+        Err(e) => {
+            ok = false;
+            log.push_str(&format!("{}\n\n", e));
+        }
+    }
+
+    if ok {
+        log.push_str("SUCCESS: VirtualBox performance fix applied.\n");
+        log.push_str("Reboot Windows now.\n");
+        log.push_str("If a pre-boot confirmation screen appears, accept it so VBS / Credential Guard can be fully disabled.\n");
+    } else {
+        log.push_str("ERROR: The fix finished with errors. Review the log above before rebooting.\n");
+    }
+
+    log
+}
+
+#[allow(dead_code)]
+pub fn virtualbox_restore_defaults() -> String {
+    if !crate::utils::is_elevated() {
+        return "ERROR: Run the app as Administrator to restore the Microsoft virtualization defaults.".to_string();
+    }
+
+    let mut log = String::new();
+    log.push_str("Restore Microsoft virtualization defaults\n");
+    log.push_str("---------------------------------------\n");
+    log.push_str("This is a best-effort restore. It cannot guarantee the exact original state of every PC. A reboot is required.\n\n");
+
+    let mut ok = true;
+
+    let _ = virtualbox_reg_delete_value(
+        &mut log,
+        r"HKLM\SYSTEM\CurrentControlSet\Control\DeviceGuard",
+        "EnableVirtualizationBasedSecurity",
+    );
+    let _ = virtualbox_reg_delete_value(
+        &mut log,
+        r"HKLM\SYSTEM\CurrentControlSet\Control\Lsa",
+        "LsaCfgFlags",
+    );
+    let _ = virtualbox_reg_delete_value(
+        &mut log,
+        r"HKLM\SYSTEM\CurrentControlSet\Control\DeviceGuard\Scenarios\HypervisorEnforcedCodeIntegrity",
+        "Enabled",
+    );
+    let _ = virtualbox_reg_delete_value(
+        &mut log,
+        r"HKLM\SYSTEM\CurrentControlSet\Control\DeviceGuard\Scenarios\HypervisorEnforcedCodeIntegrity",
+        "Locked",
+    );
+
+    ok &= virtualbox_run_log(
+        &mut log,
+        "bcdedit",
+        &[
+            "/set".to_string(),
+            "hypervisorlaunchtype".to_string(),
+            "auto".to_string(),
+        ],
+        false,
+    );
+
+    let _ = virtualbox_run_log(
+        &mut log,
+        "bcdedit",
+        &[
+            "/delete".to_string(),
+            EWT_VIRTUALBOX_DG_GUID.to_string(),
+            "/f".to_string(),
+        ],
+        false,
+    );
+
+    for feature in [
+        "Microsoft-Hyper-V-Hypervisor",
+        "VirtualMachinePlatform",
+        "HypervisorPlatform",
+    ] {
+        ok &= virtualbox_run_log(
+            &mut log,
+            "dism",
+            &[
+                "/Online".to_string(),
+                "/NoRestart".to_string(),
+                "/Enable-Feature".to_string(),
+                format!("/FeatureName:{}", feature),
+                "/All".to_string(),
+            ],
+            false,
+        );
+    }
+
+    if ok {
+        log.push_str("SUCCESS: Restore completed. Reboot Windows now.\n");
+    } else {
+        log.push_str("ERROR: Restore completed with warnings. Review the log above before rebooting.\n");
+    }
+
+    log
+}

@@ -97,8 +97,6 @@ static APP_CATALOG: &[AppItem] = &[
     AppItem { name: "WinRAR", winget_id: "RARLab.WinRAR", category: "Utilities", desc: "WinRAR is a popular file archiver utility that supports various compression formats, including RAR and ZIP. It provides a user-friendly interface for creating and managing archives." },
     AppItem { name: "WinZip", winget_id: "Corel.WinZip", category: "Utilities", desc: "WinZip is a file compression and archiving utility that allows users to create, manage, and share compressed files. It supports various formats and provides features like encryption and cloud integration." },
 
-    AppItem { name: "", winget_id: "", category: "", desc: "" },
-
     // Communications
     AppItem { name: "Betterbird", winget_id: "Betterbird.Betterbird", category: "Communications", desc: "Betterbird is a fork of Mozilla Thunderbird with additional features and bugfixes."},
     AppItem { name: "BlueMail", winget_id: "Blix.BlueMail", category: "Communications", desc: "BlueMail is a versatile email client that supports multiple email accounts and provides features like unified inbox, customizable interface, and advanced security options." },

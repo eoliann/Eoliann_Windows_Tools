@@ -65,6 +65,8 @@ pub struct ToolsState {
     pub password_never_expires: Option<bool>,
     pub confirm_toggle: bool,
     pub security_toggle_rx: Option<std::sync::mpsc::Receiver<Result<bool, String>>>,
+    pub confirm_virtualbox_fix: bool,
+    pub confirm_virtualbox_restore: bool,
 }
 
 impl Default for ToolsState {
@@ -93,6 +95,8 @@ impl Default for ToolsState {
             password_never_expires: None,
             confirm_toggle: false,
             security_toggle_rx: None,
+            confirm_virtualbox_fix: false,
+            confirm_virtualbox_restore: false,
             // last_network_check: None,
         }
     }
@@ -1744,4 +1748,174 @@ pub fn show_tools(
         });
     });
 
+    ui.add_space(6.0);
+
+    // ---- VirtualBox / Hyper-V ----
+    ui.group(|ui| {
+        ui.label(RichText::new("VirtualBox / Hyper-V").color(yellow_title).size(18.0));
+
+        ui.colored_label(
+            egui::Color32::YELLOW,
+            "Use this only if VirtualBox is slow or shows the green turtle because Windows is using Hyper-V / VBS.",
+        );
+        ui.label("• Disables Hyper-V / VBS related components that can slow down VirtualBox.");
+        ui.label("• A reboot is required after applying the fix or restore.");
+        ui.label("• On some PCs, a pre-boot confirmation screen may appear once after restart.");
+        ui.colored_label(
+            egui::Color32::RED,
+            "Warning: this can reduce Windows security and may affect Hyper-V, WSL2, Docker Desktop or Windows Sandbox.",
+        );
+
+        ui.add_space(6.0);
+
+        ui.horizontal_wrapped(|ui| {
+            let resp = ui.add_enabled(
+                !global_busy,
+                egui::Button::new("🔍 Check VirtualBox Host Status"),
+            );
+            resp.clone().on_hover_ui(|ui| {
+                ui.vertical(|ui| {
+                    ui.colored_label(
+                        egui::Color32::from_rgb(57, 255, 20),
+                        "Checks Hyper-V / VBS / Credential Guard status relevant to VirtualBox performance.",
+                    );
+                    ui.label("• Reads Hyper-V boot status");
+                    ui.label("• Reads VBS / Credential Guard / HVCI state");
+                    ui.label("• Reads Windows virtualization features");
+                });
+            });
+
+            if resp.clicked() {
+                if let Some(guard) = commands::try_start_global_op("Check VirtualBox Host Status", log) {
+                    let log_clone = log.clone();
+                    thread::spawn(move || {
+                        let _guard = guard;
+                        let result = commands::virtualbox_check_host_status();
+                        let mut lg = log_clone.lock().unwrap();
+                        *lg = result;
+                    });
+                }
+            }
+
+            let fix_btn = egui::Button::new("🐢 Apply VirtualBox Performance Fix")
+                .fill(egui::Color32::from_rgb(150, 0, 0))
+                .stroke(egui::Stroke::new(1.0, egui::Color32::from_rgb(100, 0, 0)));
+
+            let fix_resp = ui.add_enabled(!global_busy && app_state.is_admin, fix_btn);
+            fix_resp.clone().on_hover_ui(|ui| {
+                ui.vertical(|ui| {
+                    ui.colored_label(
+                        egui::Color32::RED,
+                        "Turns off Hyper-V / VBS related settings that commonly make VirtualBox slow.",
+                    );
+                    ui.label("• Sets hypervisorlaunchtype to off");
+                    ui.label("• Disables VBS / Credential Guard / HVCI configuration");
+                    ui.label("• Disables Hyper-V, VirtualMachinePlatform and HypervisorPlatform");
+                    ui.colored_label(
+                        egui::Color32::YELLOW,
+                        "⚠ Reboot required. A firmware / pre-boot confirmation may appear once.",
+                    );
+                });
+            });
+
+            if fix_resp.clicked() {
+                app_state.confirm_virtualbox_fix = true;
+            }
+
+            let restore_btn = egui::Button::new("♻ Restore Microsoft Virtualization Defaults")
+                .fill(egui::Color32::from_rgb(60, 60, 120));
+
+            let restore_resp = ui.add_enabled(!global_busy && app_state.is_admin, restore_btn);
+            restore_resp.clone().on_hover_ui(|ui| {
+                ui.vertical(|ui| {
+                    ui.colored_label(
+                        egui::Color32::LIGHT_BLUE,
+                        "Best-effort restore of the Windows virtualization defaults changed by the VirtualBox fix.",
+                    );
+                    ui.label("• Restores hypervisorlaunchtype to auto");
+                    ui.label("• Re-enables virtualization features where available");
+                    ui.label("• Removes explicit opt-out registry values");
+                    ui.colored_label(
+                        egui::Color32::YELLOW,
+                        "⚠ Reboot required after restore.",
+                    );
+                });
+            });
+
+            if restore_resp.clicked() {
+                app_state.confirm_virtualbox_restore = true;
+            }
+        });
+
+        if !app_state.is_admin {
+            ui.colored_label(
+                egui::Color32::RED,
+                "Run the app as Administrator to apply the VirtualBox fix or restore defaults.",
+            );
+        }
+
+        if app_state.confirm_virtualbox_fix {
+            egui::Window::new("Confirm VirtualBox Performance Fix")
+                .collapsible(false)
+                .resizable(false)
+                .show(ui.ctx(), |ui| {
+                    ui.label("Apply the VirtualBox performance fix?");
+                    ui.label("This will disable Hyper-V / VBS related functionality on the host.");
+                    ui.label("A reboot will be required.");
+                    ui.add_space(6.0);
+
+                    ui.horizontal(|ui| {
+                        if ui.button("Confirm").clicked() {
+                            app_state.confirm_virtualbox_fix = false;
+
+                            if let Some(guard) = commands::try_start_global_op("Apply VirtualBox Performance Fix", log) {
+                                let log_clone = log.clone();
+                                thread::spawn(move || {
+                                    let _guard = guard;
+                                    let result = commands::virtualbox_apply_performance_fix();
+                                    let mut lg = log_clone.lock().unwrap();
+                                    *lg = result;
+                                });
+                            }
+                        }
+
+                        if ui.button("Cancel").clicked() {
+                            app_state.confirm_virtualbox_fix = false;
+                        }
+                    });
+                });
+        }
+
+        if app_state.confirm_virtualbox_restore {
+            egui::Window::new("Confirm Restore")
+                .collapsible(false)
+                .resizable(false)
+                .show(ui.ctx(), |ui| {
+                    ui.label("Restore Microsoft virtualization defaults?");
+                    ui.label("This is a best-effort restore of the settings changed by the VirtualBox fix.");
+                    ui.label("A reboot will be required.");
+                    ui.add_space(6.0);
+
+                    ui.horizontal(|ui| {
+                        if ui.button("Confirm").clicked() {
+                            app_state.confirm_virtualbox_restore = false;
+
+                            if let Some(guard) = commands::try_start_global_op("Restore Microsoft Virtualization Defaults", log) {
+                                let log_clone = log.clone();
+                                thread::spawn(move || {
+                                    let _guard = guard;
+                                    let result = commands::virtualbox_restore_defaults();
+                                    let mut lg = log_clone.lock().unwrap();
+                                    *lg = result;
+                                });
+                            }
+                        }
+
+                        if ui.button("Cancel").clicked() {
+                            app_state.confirm_virtualbox_restore = false;
+                        }
+                    });
+                });
+        }
+    });
 }

@@ -143,7 +143,7 @@ pub fn show_health(
 
         ui.separator();
 
-        ui.label(RichText::new("System restore").strong());
+        ui.label(RichText::new("System restore").color(yellow).size(18.0));
         ui.small(format!(
             "Total used space: {:.2} GB",
             state.system_restore_used_gb

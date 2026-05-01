@@ -248,6 +248,20 @@ cd Eoliann_Windows_Tools
 
 ---
 
+## Troubleshooting
+
+### VCRUNTIME140.dll was not found
+
+If you use the Portable version and Windows shows:
+
+`The code execution cannot proceed because VCRUNTIME140.dll was not found`
+
+install the latest Microsoft Visual C++ Redistributable x64 from Microsoft.
+
+The Installer version of Eoliann Windows Tools includes this prerequisite automatically.
+
+---
+
 ## 💖 Support
 - To morally and mentally support the project, make sure to leave a ⭐️!
 - Support this project with a donation on:

@@ -1,1 +1,6 @@
 /target
+dist/
+target/
+*.exe
+*.zip
+installer/output/

@@ -1,21 +1,24 @@
 #![cfg_attr(target_os = "windows", windows_subsystem = "windows")]
 
 mod app;
-mod tabs;
 mod commands;
-mod utils;
+mod tabs;
 mod ui_helpers;
+mod utils;
+mod vcredist;
 
-
-use eframe::egui; // pentru ViewportBuilder
 use app::App;
+use eframe::egui;
 
 fn main() -> eframe::Result<()> {
+    #[cfg(target_os = "windows")]
+    vcredist::ensure_vc_runtime_x64();
+
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
-            .with_inner_size([1366.0, 768.0])   // dimensiune inițială mai mare
+            .with_inner_size([1366.0, 768.0])
             .with_min_inner_size([800.0, 600.0])
-            .with_position(egui::Pos2::new(50.0, 50.0)), // pornește centrat pe ecran
+            .with_position(egui::Pos2::new(50.0, 50.0)),
         ..Default::default()
     };
 

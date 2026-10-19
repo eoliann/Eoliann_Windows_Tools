@@ -1,8 +1,8 @@
 ; EWT.iss - Eoliann Windows Tools Installer
-; Version: 1.3.5
+; Version: 1.4.0
 
 #define MyAppName "Eoliann Windows Tools"
-#define MyAppVersion "1.3.5"
+#define MyAppVersion "1.4.0"
 #define MyAppPublisher "eoliann"
 #define MyAppExeName "eoliann_windows_tools_w11.exe"
 #define MyAppIconName "icon.ico"
@@ -49,6 +49,9 @@ Filename: "powershell.exe"; \
     Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{tmp}\install_vcredist_if_missing.ps1"""; \
     StatusMsg: "Checking Microsoft Visual C++ Runtime..."; \
     Flags: waituntilterminated
+
+; Silent in-app updates: start the new version again when the installer finishes.
+Filename: "{app}\{#MyAppExeName}"; Flags: nowait; Check: WizardSilent
 
 Filename: "{app}\{#MyAppExeName}"; \
     Description: "{cm:LaunchProgram,Eoliann Windows Tools}"; \

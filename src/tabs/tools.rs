@@ -332,11 +332,6 @@ pub fn show_tools(
                     thread::spawn(move || {
                         let _guard = guard;
                         commands::verify_system_integrity_live(log_clone.clone());
-                        let completed = wait_for_live_completion(&log_clone, 3600); // timeout 1h
-                        if !completed {
-                            let mut lg = log_clone.lock().unwrap();
-                            *lg = format!("{}\nERROR: System integrity check did not finish within timeout.", lg);
-                        }
                     });
                 }
             }
@@ -595,7 +590,7 @@ pub fn show_tools(
                     ui.colored_label(egui::Color32::RED, "Erases recent docs, clipboard, and run history; disables Activity History features.");
                     ui.label("• Sets EnableActivityFeed / PublishUserActivities / UploadUserActivities = 0 under HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows\\System");
                     ui.colored_label(egui::Color32::YELLOW, "⚠ This may remove Timeline and activity sync. A restart is recommended.");
-                    ui.hyperlink("https://christitustech.github.io/Winutil/dev/tweaks/Essential-Tweaks/AH");
+                    ui.hyperlink("https://winutil.christitus.com/");
                 });
             });
             if resp.clicked() {
@@ -638,7 +633,7 @@ pub fn show_tools(
                     ui.colored_label(egui::Color32::RED, "Prevents Storage Sense from automatically deleting temporary files for the current user.");
                     ui.label("• Modifică HKCU:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\StorageSense\\Parameters\\StoragePolicy -> '01' = 0");
                     ui.colored_label(egui::Color32::YELLOW, "ℹ Afectează doar utilizatorul curent (HKCU). Restart nu este strict necesar, dar unele aplicații pot observa schimbarea după reconectare.");
-                    ui.hyperlink("https://christitustech.github.io/Winutil/dev/tweaks/Essential-Tweaks/Storage");
+                    ui.hyperlink("https://winutil.christitus.com/");
                 });
             });
             if resp.clicked() {
@@ -673,6 +668,10 @@ pub fn show_tools(
                     });
                 }
             }
+
+            // Reflect the current Explorer settings (cheap registry reads).
+            app_state.show_hidden_state = commands::read_explorer_advanced_dword("Hidden") == Some(1);
+            app_state.show_file_ext_state = commands::read_explorer_advanced_dword("HideFileExt") == Some(0);
 
             // Show Hidden Files (this function returns Result<String, _> in original code)
             let resp = ui.add_enabled(!global_busy, egui::Button::new(if app_state.show_hidden_state { "🙈 Hide Hidden Files" } else { "👁 Show Hidden Files" }));
@@ -803,7 +802,7 @@ pub fn show_tools(
                     ui.label("• Disables telemetry, recommendations, shopping assistant, widgets and other Edge annoyances.");
                     ui.label("• Applies HKLM Policies under Microsoft\\Edge and EdgeUpdate.");
                     ui.colored_label(egui::Color32::YELLOW, "⚠ Requires Administrator. Restart or logoff may be required.");
-                    ui.hyperlink("https://winutil.christitus.com/dev/tweaks/essential-tweaks/edgedebloat");
+                    ui.hyperlink("https://winutil.christitus.com/");
                 });
             });
             if resp.clicked() {
@@ -969,7 +968,7 @@ pub fn show_tools(
                     ui.colored_label(egui::Color32::YELLOW, "Essential for dual-boot systems: syncs Windows with Linux hardware clock (UTC).");
                     ui.label("• Sets RealTimeIsUniversal = 1 under HKLM\\SYSTEM\\CurrentControlSet\\Control\\TimeZoneInformation");
                     ui.colored_label(egui::Color32::RED, "⚠ Requires Administrator. Reboot recommended for changes to take effect.");
-                    ui.hyperlink("https://christitustech.github.io/Winutil/dev/tweaks/z--Advanced-Tweaks---CAUTION/UTC");
+                    ui.hyperlink("https://winutil.christitus.com/");
                 });
             });
             if resp.clicked() {
@@ -1012,7 +1011,7 @@ pub fn show_tools(
                     ui.colored_label(egui::Color32::RED, "Moves OneDrive files to default home folders and uninstalls OneDrive.");
                     ui.label("• Uses robocopy to move files, deletes remnants, fixes shell folders and explorer pin.");
                     ui.colored_label(egui::Color32::YELLOW, "⚠ HIGH RISK: test before use. Backup recommended. Requires Administrator.");
-                    ui.hyperlink("https://christitustech.github.io/Winutil/dev/tweaks/z--Advanced-Tweaks---CAUTION/RemoveOnedrive");
+                    ui.hyperlink("https://winutil.christitus.com/");
                 });
             });
             if resp.clicked() {
@@ -1048,28 +1047,6 @@ pub fn show_tools(
                 }
             }
 
-            // ---- Explorer Tabs (enable / disable) ----
-            let resp = ui.add_enabled(!global_busy, egui::Button::new("📑 Toggle Explorer Tabs"));
-            resp.clone().on_hover_ui(|ui| {
-                ui.vertical(|ui| {
-                    ui.colored_label(egui::Color32::from_rgb(57, 255, 20), "Enable / Disable tabs in File Explorer");
-                    ui.label("• Toggles tabs feature and restarts Explorer if needed");
-                    ui.colored_label(egui::Color32::YELLOW, "⚠ Requires Administrator for registry changes (if applicable)");
-                });
-            });
-            if resp.clicked() {
-                if let Some(guard) = commands::try_start_global_op("Toggle Explorer Tabs", log) {
-                    let log_clone = log.clone();
-                    thread::spawn(move || {
-                        let _guard = guard; // Ensure the guard is dropped when the thread finishes
-                        let result = commands::toggle_explorer_tabs()
-                            .unwrap_or_else(|e| format!("ERROR: {}", e));
-                        let mut lg = log_clone.lock().unwrap();
-                        if lg.is_empty() { *lg = result; } else { *lg = format!("{}\n{}", lg, result); }
-                    });
-                }
-            }
-
             // Run OO Shutup 10 (CAUTION)
             let resp = ui.add_enabled(!global_busy, egui::Button::new("⚙ Run OO Shutup 10"));
             resp.clone().on_hover_ui(|ui| {
@@ -1078,7 +1055,7 @@ pub fn show_tools(
                     ui.label("• The tool will be downloaded to the current user's %TEMP% and executed.");
                     ui.colored_label(egui::Color32::RED, "⚠ CAUTION: This downloads & runs an .exe from the internet. May trigger AV/SmartScreen/UAC. Test on VM first.");
                     ui.hyperlink("https://dl5.oo-software.com/files/ooshutup10/OOSU10.exe");
-                    ui.hyperlink("https://christitustech.github.io/Winutil/dev/tweaks/z--Advanced-Tweaks---CAUTION/OOSUbutton");
+                    ui.hyperlink("https://winutil.christitus.com/");
                 });
             });
             if resp.clicked() {
@@ -1109,9 +1086,7 @@ pub fn show_tools(
                 "Quad9",
                 "AdGuard_Ads_Trackers",
                 "AdGuard_Ads_Trackers_Malware_Adult",
-                "dns0.eu_Open",
-                "dns0.eu_ZERO",
-                "dns0.eu_KIDS",
+                "Automatic (DHCP)",
             ];
 
             // dropdown state
@@ -1311,7 +1286,7 @@ pub fn show_tools(
                     ui.label("• Exposes Hibernation power options and enables hibernation via powercfg");
                     ui.label("• Modifies two registry Attributes keys under HKLM\\SYSTEM\\CurrentControlSet\\Control\\Power\\PowerSettings");
                     ui.colored_label(egui::Color32::RED, "⚠ Requires Administrator. Restart recommended.");
-                    ui.hyperlink("https://christitustech.github.io/Winutil/dev/tweaks/Essential-Tweaks/LaptopHibernation");
+                    ui.hyperlink("https://winutil.christitus.com/");
                 });
             });
             if resp.clicked() {

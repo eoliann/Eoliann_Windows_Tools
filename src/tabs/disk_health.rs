@@ -20,44 +20,75 @@ pub struct DiskHealthState {
    JSON STRUCTURES
    ======================= */
 
+fn lenient_number<'de, D>(deserializer: D) -> Result<Option<f64>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let value = Option::<serde_json::Value>::deserialize(deserializer)?;
+    Ok(match value {
+        Some(serde_json::Value::Number(n)) => n.as_f64(),
+        Some(serde_json::Value::String(text)) => text.trim().parse::<f64>().ok(),
+        _ => None,
+    })
+}
+
+fn null_as_empty<'de, D, T>(deserializer: D) -> Result<Vec<T>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+    T: Deserialize<'de>,
+{
+    Ok(Option::<Vec<T>>::deserialize(deserializer)?.unwrap_or_default())
+}
+
 #[derive(Debug, Deserialize)]
 struct DiskHealthRoot {
+    #[serde(default, deserialize_with = "null_as_empty")]
     smart_devices: Vec<SmartDevice>,
+    #[serde(default, deserialize_with = "null_as_empty")]
     physical_disks: Vec<PhysicalDisk>,
 }
 
 #[derive(Debug, Deserialize)]
 struct SmartDevice {
-    #[serde(rename = "instance_name")]
-    _instance_name: String,
+    #[serde(default)]
     predict_failure: bool,
+    #[serde(default, deserialize_with = "null_as_empty")]
     attributes: Vec<SmartAttribute>,
 }
 
 #[derive(Debug, Deserialize)]
 struct SmartAttribute {
-    id: u32,
-    #[serde(rename = "name")]
-    _name: Option<String>,
-    raw: u64,
+    #[serde(default, deserialize_with = "lenient_number")]
+    id: Option<f64>,
+    #[serde(default, deserialize_with = "lenient_number")]
+    raw: Option<f64>,
 }
 
 #[allow(dead_code)]
 #[derive(Debug, Deserialize)]
 struct PhysicalDisk {
-    device_id: String,
-    friendly_name: String,
-    model: String,
-    media_type: String,
-    bus_type: String,
-    size_bytes: u64,
-
-    wear_percent_used: u32,   // 0 = new, 100 = worn
-    health_percent: u32,      // 0 = worn, 100 = new
-
-    power_on_hours: Option<u64>, // often null → ignore
-    temperature_c: Option<i32>,
-    total_bytes_written: Option<u64>,
+    #[serde(default)]
+    friendly_name: Option<String>,
+    #[serde(default)]
+    model: Option<String>,
+    #[serde(default)]
+    media_type: Option<String>,
+    #[serde(default)]
+    bus_type: Option<String>,
+    #[serde(default, deserialize_with = "lenient_number")]
+    size_bytes: Option<f64>,
+    /// 0 = new, 100 = worn
+    #[serde(default, deserialize_with = "lenient_number")]
+    wear_percent_used: Option<f64>,
+    /// 0 = worn, 100 = new
+    #[serde(default, deserialize_with = "lenient_number")]
+    health_percent: Option<f64>,
+    #[serde(default, deserialize_with = "lenient_number")]
+    power_on_hours: Option<f64>,
+    #[serde(default, deserialize_with = "lenient_number")]
+    temperature_c: Option<f64>,
+    #[serde(default, deserialize_with = "lenient_number")]
+    total_bytes_written: Option<f64>,
 }
 
 /* =======================
@@ -100,93 +131,86 @@ pub fn show_disk_health(
         return;
     };
 
-    if data.physical_disks.is_empty() || data.smart_devices.is_empty() {
+    if data.physical_disks.is_empty() {
         ui.label("No disks were returned.");
         return;
     }
 
-    // One-to-one mapping (works for your system; extend later if needed)
-    let phys = &data.physical_disks[0];
-    let smart = &data.smart_devices[0];
+    // WMI SMART rows cannot be matched to a physical disk reliably; use them only when there is
+    // exactly one of each (NVMe drives usually have none).
+    let single_smart = if data.physical_disks.len() == 1 && data.smart_devices.len() == 1 {
+        data.smart_devices.first()
+    } else {
+        None
+    };
 
+    for phys in &data.physical_disks {
+        show_disk(ui, phys, single_smart);
+    }
+}
+
+fn show_disk(ui: &mut egui::Ui, phys: &PhysicalDisk, smart: Option<&SmartDevice>) {
     ui.separator();
+    let name = phys.model.clone().or_else(|| phys.friendly_name.clone()).unwrap_or_else(|| "Disk".to_string());
+    let size_gb = phys.size_bytes.map(|b| (b / 1_000_000_000.0).round() as u64).unwrap_or(0);
     ui.label(
         RichText::new(format!(
-            "{}  •  {}  •  {} GB",
-            phys.model,
-            phys.bus_type,
-            phys.size_bytes / 1_000_000_000
+            "{}  •  {}  •  {}  •  {} GB",
+            name,
+            phys.media_type.clone().unwrap_or_default(),
+            phys.bus_type.clone().unwrap_or_default(),
+            size_gb
         ))
         .strong(),
     );
 
     if let Some(temp) = phys.temperature_c {
-        ui.label(format!("Temperature: {} °C", temp));
+        ui.label(format!("Temperature: {:.0} °C", temp));
     }
 
-    ui.separator();
-
-    /* =======================
-       HEALTH
-       ======================= */
-
-    let health = phys.health_percent.min(100);
+    let wear = phys.wear_percent_used.map(|w| w.clamp(0.0, 100.0));
+    let health = phys.health_percent.or_else(|| wear.map(|w| 100.0 - w)).map(|h| h.clamp(0.0, 100.0));
     ui.label(RichText::new("Health").strong());
-    ui.add(egui::ProgressBar::new(health as f32 / 100.0).show_percentage());
-
-    ui.add_space(10.0);
-
-    /* =======================
-       PERFORMANCE
-       ======================= */
-
-    let performance = if smart.predict_failure { 0 } else { 100 };
-    ui.label(RichText::new("Performance").strong());
-    ui.add(egui::ProgressBar::new(performance as f32 / 100.0).show_percentage());
-
-    ui.add_space(14.0);
-
-    /* =======================
-       POWER ON TIME (SMART ID 9)
-       ======================= */
-
-    if let Some(hours) = extract_power_on_hours(smart) {
-        let (days, rem_hours) = hours_to_days(hours);
-        ui.label(RichText::new("Power on time").strong());
-        ui.label(format!(
-            "{} hours  ({} days {} hours)",
-            hours, days, rem_hours
-        ));
-    } else {
-        ui.label("Power on time: N/A");
+    match health {
+        Some(h) => {
+            ui.add(egui::ProgressBar::new(h as f32 / 100.0).show_percentage());
+        }
+        None => {
+            ui.label("N/A (the drive does not report wear data)");
+        }
     }
 
-    ui.add_space(14.0);
+    if let Some(smart) = smart {
+        let status = if smart.predict_failure { "⚠ SMART predicts failure — back up your data" } else { "SMART status: OK" };
+        ui.label(status);
+    }
 
-    /* =======================
-       ESTIMATED REMAINING LIFE
-       ======================= */
+    let power_on = phys.power_on_hours.map(|h| h as u64).or_else(|| smart.and_then(|s| smart_raw(s, 9)));
+    match power_on {
+        Some(hours) => {
+            let (days, rem_hours) = hours_to_days(hours);
+            ui.label(format!("Power on time: {} hours ({} days {} hours)", hours, days, rem_hours));
+        }
+        None => {
+            ui.label("Power on time: N/A");
+        }
+    }
 
-    ui.label(RichText::new("Estimated remaining lifetime").strong());
-    match estimate_remaining_days(
-        extract_power_on_hours(smart),
-        phys.wear_percent_used,
-    ) {
-        Some(days) => ui.label(format!("{days} days")),
-        None => ui.label("N/A"),
+    match estimate_remaining_days(power_on, wear) {
+        Some(days) => ui.label(format!("Estimated remaining lifetime: {days} days")),
+        None => ui.label("Estimated remaining lifetime: N/A"),
     };
 
-    ui.add_space(14.0);
-
-    /* =======================
-       LIFETIME WRITES
-       ======================= */
-
-    ui.label(RichText::new("Lifetime writes").strong());
-    match extract_lifetime_writes(phys, smart) {
-        Some(bytes) => ui.label(format!("{tb:.2} GB ({bytes} bytes)", tb = bytes as f64 / 1_000_000_000.0, bytes = bytes)),
-        None => ui.label("N/A"),
+    let written = phys
+        .total_bytes_written
+        .filter(|v| *v > 0.0)
+        .map(|v| v as u64)
+        .or_else(|| smart.and_then(|s| smart_raw(s, 241)).map(|lba| lba * 512));
+    match written {
+        Some(bytes) => ui.label(format!("Lifetime writes: {:.2} GB", bytes as f64 / 1_000_000_000.0)),
+        None => ui.label("Lifetime writes: N/A"),
     };
+    ui.add_space(8.0);
 }
 
 /* =======================
@@ -258,44 +282,25 @@ fn extract_json_object(s: &str) -> Option<String> {
     }
 }
 
-fn extract_power_on_hours(smart: &SmartDevice) -> Option<u64> {
+fn smart_raw(smart: &SmartDevice, id: u32) -> Option<u64> {
     smart
         .attributes
         .iter()
-        .find(|a| a.id == 9)
-        .map(|a| a.raw)
+        .find(|a| a.id.map(|v| v as u32) == Some(id))
+        .and_then(|a| a.raw)
+        .map(|v| v as u64)
 }
 
 fn hours_to_days(hours: u64) -> (u64, u64) {
     (hours / 24, hours % 24)
 }
 
-fn estimate_remaining_days(power_on: Option<u64>, wear_used: u32) -> Option<u64> {
-    let used = wear_used.min(100);
-    if used == 0 {
+fn estimate_remaining_days(power_on: Option<u64>, wear_used: Option<f64>) -> Option<u64> {
+    let used = wear_used?.min(100.0);
+    if used <= 0.0 {
         return None;
     }
-
-    let hours = power_on?;
-    let total_expected = hours as f64 * (100.0 / used as f64);
-    let remaining = total_expected - hours as f64;
-    Some((remaining / 24.0).floor() as u64)
-}
-
-fn extract_lifetime_writes(
-    phys: &PhysicalDisk,
-    smart: &SmartDevice,
-) -> Option<u64> {
-    if let Some(v) = phys.total_bytes_written {
-        if v > 0 {
-            return Some(v);
-        }
-    }
-
-    // SMART fallback: ID 241 (Total LBAs Written)
-    smart
-        .attributes
-        .iter()
-        .find(|a| a.id == 241)
-        .map(|a| a.raw * 512)
+    let hours = power_on? as f64;
+    let total_expected = hours * (100.0 / used);
+    Some(((total_expected - hours) / 24.0).floor().max(0.0) as u64)
 }

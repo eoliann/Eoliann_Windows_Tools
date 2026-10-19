@@ -54,7 +54,7 @@ pub fn show_settings(ui: &mut egui::Ui, log_output: &Arc<Mutex<String>>) {
                     "⚠ May require Explorer restart to be visible."
                 );
                 ui.hyperlink(
-                    "https://christitustech.github.io/Winutil/dev/tweaks/Customize-Preferences/TaskbarAlignment"
+                    "https://winutil.christitus.com/"
                 );
             });
         });

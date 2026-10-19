@@ -13,7 +13,7 @@ use std::collections::BTreeMap;
 use std::path::PathBuf;
 use std::process::Output;
 use std::sync::{Arc, Mutex};
-use std::{env, fs, io, time::{SystemTime, UNIX_EPOCH}};
+use std::{fs, io};
 
 use dirs;
 use eframe::egui::{self, RichText};
@@ -218,65 +218,40 @@ fn set_taskbar_search_in_registry(enabled: bool) -> Result<String, String> {
     }
 }
 
+const WIDGETS_POLICY_KEY: &str = r#"HKLM\SOFTWARE\Policies\Microsoft\Dsh"#;
+
 fn read_taskbar_widgets_from_registry() -> Option<bool> {
+    // The policy wins over the per-user button setting.
+    if let Some(policy) = reg_query_value(WIDGETS_POLICY_KEY, "AllowNewsAndInterests").and_then(|v| v.parse::<i32>().ok()) {
+        return Some(policy != 0);
+    }
     reg_query_value(r#"HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced"#, "TaskbarDa")
         .and_then(|v| v.parse::<i32>().ok().map(|n| n != 0))
+        .or(Some(true))
 }
 
+/// HKCU TaskbarDa is protected by the UCPD driver on current Windows 11 builds (writes are
+/// denied, also through regedit), so Widgets are controlled with the official policy instead.
 fn set_taskbar_widgets_in_registry(enabled: bool) -> Result<String, String> {
-    let value = if enabled { "1" } else { "0" };
-    let args = [
-        "add",
-        r#"HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced"#,
-        "/v",
-        "TaskbarDa",
-        "/t",
-        "REG_DWORD",
-        "/d",
-        value,
-        "/f",
-    ];
-    let out = run_hidden("reg", &args).map_err(|e| format!("failed to spawn reg: {}", e))?;
-    if out.status.success() {
-        return Ok(String::from_utf8_lossy(&out.stdout).to_string());
+    if enabled {
+        let out = run_hidden("reg", &["delete", WIDGETS_POLICY_KEY, "/v", "AllowNewsAndInterests", "/f"])
+            .map_err(|e| format!("failed to spawn reg: {}", e))?;
+        let stderr = String::from_utf8_lossy(&out.stderr).to_string();
+        // "unable to find" means the policy was not set: nothing to remove.
+        if !out.status.success() && !stderr.to_lowercase().contains("unable to find") && !stderr.trim().is_empty() {
+            return Err(stderr);
+        }
+        let _ = run_hidden("reg", &["add", r#"HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced"#, "/v", "TaskbarDa", "/t", "REG_DWORD", "/d", "1", "/f"]);
+        Ok("Widgets policy removed. If the button is still hidden, enable Widgets in Settings > Personalization > Taskbar.".to_string())
+    } else {
+        let out = run_hidden("reg", &["add", WIDGETS_POLICY_KEY, "/v", "AllowNewsAndInterests", "/t", "REG_DWORD", "/d", "0", "/f"])
+            .map_err(|e| format!("failed to spawn reg: {}", e))?;
+        if out.status.success() {
+            Ok("Widgets disabled by policy (HKLM\\SOFTWARE\\Policies\\Microsoft\\Dsh). Sign out or restart Explorer to apply.".to_string())
+        } else {
+            Err(String::from_utf8_lossy(&out.stderr).to_string())
+        }
     }
-
-    let stderr = String::from_utf8_lossy(&out.stderr).to_string();
-    if !stderr.to_lowercase().contains("access is denied") {
-        return Err(stderr);
-    }
-
-    let dw: u32 = if enabled { 1 } else { 0 };
-    let hex = format!("{:08x}", dw);
-    let reg_text = format!(
-        "Windows Registry Editor Version 5.00\r\n\r\n[HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced]\r\n\"TaskbarDa\"=dword:{}\r\n",
-        hex
-    );
-
-    let mut tmp = env::temp_dir();
-    let ts = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_millis();
-    tmp.push(format!("ewt_taskbar_widgets_{}.reg", ts));
-
-    if let Err(e) = fs::write(&tmp, reg_text) {
-        return Err(format!("Failed to write temporary .reg file: {}", e));
-    }
-
-    let ps_cmd = format!(
-        "Start-Process regedit.exe -ArgumentList '/s','{}' -Verb runas -Wait",
-        tmp.display()
-    );
-    let ps_args = ["-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command", &ps_cmd];
-    let ps_out =
-        run_hidden("powershell", &ps_args).map_err(|e| format!("failed to spawn PowerShell for regedit fallback: {}", e))?;
-    if !ps_out.status.success() {
-        let ps_stderr = String::from_utf8_lossy(&ps_out.stderr).to_string();
-        let _ = fs::remove_file(&tmp);
-        return Err(format!("Failed to import .reg via elevated regedit: {}\nps_err: {}", stderr, ps_stderr));
-    }
-
-    let _ = run_hidden("rundll32.exe", &["user32.dll,UpdatePerUserSystemParameters"]);
-    let _ = fs::remove_file(&tmp);
-    Ok("Imported .reg via regedit (fallback).".to_string())
 }
 
 fn read_snap_from_registry() -> Option<bool> {
@@ -446,13 +421,41 @@ fn parse_manage_bde_status(stdout: &str) -> Vec<BitlockerVolume> {
     vols
 }
 
+/// Reads volumes with Get-BitLockerVolume as JSON: manage-bde text output is localized
+/// ("Protection Status" is translated) and "Protection Off" also contains "on".
 fn list_bitlocker_volumes() -> Result<Vec<BitlockerVolume>, String> {
-    let out = run_hidden("manage-bde", &["-status"])?;
+    let script = "@(Get-BitLockerVolume -ErrorAction Stop | ForEach-Object { [PSCustomObject]@{ Mount = [string]$_.MountPoint; Status = [int]$_.ProtectionStatus } }) | ConvertTo-Json -Compress";
+    let out = run_hidden("powershell", &["-NoProfile", "-NonInteractive", "-Command", script])?;
     if !out.status.success() {
         return Err(format!("{}", String::from_utf8_lossy(&out.stderr)));
     }
-    let s = String::from_utf8_lossy(&out.stdout).to_string();
-    Ok(parse_manage_bde_status(&s))
+    let text = String::from_utf8_lossy(&out.stdout).trim().to_string();
+    if text.is_empty() {
+        return Ok(Vec::new());
+    }
+    let value: serde_json::Value = serde_json::from_str(&text).map_err(|e| format!("Invalid BitLocker data: {}", e))?;
+    let items = match value {
+        serde_json::Value::Array(items) => items,
+        other => vec![other],
+    };
+    let mut vols: Vec<BitlockerVolume> = items
+        .iter()
+        .filter_map(|item| {
+            let mount = item.get("Mount")?.as_str()?.trim().to_string();
+            // Only drive letters ("C:"); skip volume GUID paths.
+            if mount.len() != 2 || !mount.ends_with(':') {
+                return None;
+            }
+            let protection_on = match item.get("Status").and_then(|s| s.as_i64()) {
+                Some(1) => Some(true),
+                Some(0) => Some(false),
+                _ => None,
+            };
+            Some(BitlockerVolume { mount, protection_on, desired_on: None })
+        })
+        .collect();
+    vols.sort_by(|a, b| a.mount.cmp(&b.mount));
+    Ok(vols)
 }
 
 // IMPORTANT: This toggles *protection* (suspend/resume) rather than encrypt/decrypt.

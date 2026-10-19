@@ -2,8 +2,10 @@
 
 mod app;
 mod commands;
+mod debloat;
 mod tabs;
 mod ui_helpers;
+mod updater;
 mod utils;
 mod vcredist;
 

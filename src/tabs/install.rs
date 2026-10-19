@@ -539,12 +539,12 @@ fn spawn_task(what: DoWhat, log: Arc<Mutex<String>>) {
         return;
     }
 
-    if !commands::ensure_winget_ready(log.clone()) {
-        log_line(&log, "ERROR: winget not ready; aborting task.");
-        return;
-    }
-
     std::thread::spawn(move || {
+        if !commands::ensure_winget_ready(log.clone()) {
+            log_line(&log, "ERROR: winget not ready; aborting task.");
+            return;
+        }
+
         {
             let mut p = progress.lock().unwrap();
             p.running = true;
@@ -687,16 +687,27 @@ fn chrome_is_installed() -> bool {
 fn install_chrome_with_winget() -> (bool, String) {
     match Command::new("winget").arg("--version").output() {
         Ok(out) if out.status.success() => {
-            let res = Command::new("winget")
+            let mut command = Command::new("winget");
+            command
                 .args(&[
                     "install",
                     "--id",
                     "Google.Chrome",
                     "-e",
+                    "--silent",
                     "--accept-source-agreements",
                     "--accept-package-agreements",
+                    "--disable-interactivity",
                 ])
-                .status();
+                .stdin(std::process::Stdio::null())
+                .stdout(std::process::Stdio::null())
+                .stderr(std::process::Stdio::null());
+            #[cfg(windows)]
+            {
+                use std::os::windows::process::CommandExt;
+                command.creation_flags(0x08000000);
+            }
+            let res = command.status();
 
             match res {
                 Ok(s) if s.success() => (true, "winget: install command returned success".to_string()),
@@ -791,14 +802,13 @@ pub fn show_chrome_panel(ui: &mut egui::Ui, log: &Arc<Mutex<String>>) {
                 let btn_label = if !installed { "Install Chrome (winget)" } else { "Reinstall/Repair Chrome (winget)" };
                 let resp = draw_action_btn(ui, btn_label, true);
                 if resp.clicked() {
-                    let (ok, msg) = install_chrome_with_winget();
-                    if let Ok(mut lg) = log.lock() {
-                        if !installed {
-                            lg.push_str(&format!("Installing Chrome: ok={} msg={}\n", ok, msg));
-                        } else {
-                            lg.push_str(&format!("Reinstall attempted: ok={} msg={}\n", ok, msg));
-                        }
-                    }
+                    let log_clone = log.clone();
+                    let action = if installed { "Reinstall" } else { "Install" };
+                    log_line(&log_clone, format!("⬇ {} Chrome with winget (running in background)...", action));
+                    std::thread::spawn(move || {
+                        let (ok, msg) = install_chrome_with_winget();
+                        log_line(&log_clone, format!("{} {} Chrome: {}", if ok { "✅" } else { "❌" }, action, msg));
+                    });
                 }
             });
 

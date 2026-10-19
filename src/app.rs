@@ -185,22 +185,10 @@ impl Default for App {
 
 impl App {
     pub fn new() -> Self {
-        let current_version = env!("CARGO_PKG_VERSION");
-
-        let mut update_available = false;
-        let mut latest_release = None;
-
-        if let Some(release) = crate::utils::check_latest_version() {
-            if crate::utils::is_update_available(current_version, &release.tag_name) {
-                update_available = true;
-                latest_release = Some(release);
-            }
-        }
+        // Runs in the background; the result is picked up in update().
+        crate::updater::start_check(false);
 
         Self {
-            latest_release,
-            update_available,
-            show_update_window: update_available,
             info_state: Arc::new(Mutex::new(InfoState::new())),
             ..Self::default()
         }
@@ -308,18 +296,15 @@ impl App {
         if self.update_available {
             ui.horizontal(|ui| {
                 ui.colored_label(Color32::from_rgb(0, 255, 140), "⬆ Update available");
-                if ui.small_button("Open").clicked() {
-                    if let Some(release) = &self.latest_release {
-                        let _ = webbrowser::open(release.html_url.as_str());
-                    } else {
-                        let _ = webbrowser::open("https://github.com/eoliann/");
-                    }
-                }
                 if ui.small_button("Details").clicked() {
                     self.show_update_window = true;
                 }
             });
             ui.add_space(6.0);
+        }
+        if ui.small_button("🔄 Check for updates").clicked() {
+            crate::updater::start_check(true);
+            self.show_update_window = true;
         }
 
         ui.add_space(10.0);
@@ -461,26 +446,71 @@ impl eframe::App for App {
             });
         });
 
+        if let Some(release) = crate::updater::take_new_release() {
+            self.latest_release = Some(release);
+            self.update_available = true;
+            self.show_update_window = true;
+        }
+
         if self.show_update_window {
-            egui::Window::new("Update Available")
+            let phase = crate::updater::phase();
+            let mut open = true;
+            egui::Window::new("Updates")
                 .collapsible(false)
                 .resizable(false)
+                .open(&mut open)
                 .show(ctx, |ui| {
-                    ui.label("A new version is available!");
-                    if let Some(release) = &self.latest_release {
-                        ui.label(format!("Latest version: {}", release.tag_name));
-                        if ui.button("Open release on GitHub").clicked() {
-                            let _ = webbrowser::open(release.html_url.as_str());
+                    ui.label(format!("Current version: {}", env!("CARGO_PKG_VERSION")));
+                    match &phase {
+                        crate::updater::Phase::Idle => {
+                            ui.label("Click \"Check for updates\" to look for a new version.");
                         }
-                    } else {
-                        if ui.button("Open GitHub").clicked() {
-                            let _ = webbrowser::open("https://github.com/eoliann/");
+                        crate::updater::Phase::Checking => {
+                            ui.horizontal(|ui| {
+                                ui.spinner();
+                                ui.label("Checking GitHub for updates...");
+                            });
                         }
-                    }
-                    if ui.button("Close").clicked() {
-                        self.show_update_window = false;
+                        crate::updater::Phase::UpToDate => {
+                            ui.colored_label(Color32::from_rgb(0, 255, 140), "✅ You are running the latest version.");
+                        }
+                        crate::updater::Phase::Available(release) => {
+                            ui.colored_label(Color32::from_rgb(0, 255, 140), format!("A new version is available: {}", release.tag_name));
+                            ui.horizontal(|ui| {
+                                if ui.button("⬇ Download & install").clicked() {
+                                    crate::updater::start_install(release.clone());
+                                }
+                                if ui.button("Release notes").clicked() {
+                                    let _ = webbrowser::open(release.html_url.as_str());
+                                }
+                            });
+                            ui.colored_label(Color32::GRAY, "The installer is verified against the SHA-256 checksum published on GitHub, then the app restarts.");
+                        }
+                        crate::updater::Phase::Installing(message) => {
+                            ui.horizontal(|ui| {
+                                ui.spinner();
+                                ui.label(message);
+                            });
+                        }
+                        crate::updater::Phase::Failed(error) => {
+                            ui.colored_label(Color32::from_rgb(255, 90, 90), error);
+                            ui.horizontal(|ui| {
+                                if ui.button("Try again").clicked() {
+                                    crate::updater::start_check(true);
+                                }
+                                if ui.button("Download manually").clicked() {
+                                    let _ = webbrowser::open(crate::updater::RELEASES_PAGE);
+                                }
+                            });
+                        }
                     }
                 });
+            if !open {
+                self.show_update_window = false;
+            }
+            if matches!(phase, crate::updater::Phase::Checking | crate::updater::Phase::Installing(_)) {
+                ctx.request_repaint_after(std::time::Duration::from_millis(200));
+            }
         }
 
         egui::TopBottomPanel::bottom("log_bottom_panel")

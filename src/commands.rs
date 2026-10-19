@@ -161,6 +161,13 @@ pub struct RestorePointInfo {
 // ---------- Stream runners (cu citire STDOUT + STDERR în paralel) ----------
 
 /// Rulează un proces, citește stdout+stderr în paralel, scrie în `log` cu prefix și așteaptă să iasă.
+/// sfc.exe writes UTF-16LE to pipes; dropping the NUL bytes turns its (ASCII) text back into
+/// readable lines, and plain UTF-8/ASCII output is unaffected.
+fn decode_console_line(bytes: &[u8]) -> String {
+    let cleaned: Vec<u8> = bytes.iter().copied().filter(|b| *b != 0 && *b != b'\r').collect();
+    String::from_utf8_lossy(&cleaned).to_string()
+}
+
 fn run_command_stream_and_wait(log: Arc<Mutex<String>>, cmd: &str, args: &[&str]) -> std::io::Result<i32> {
     let prefix = format!("{} {}", cmd, args.join(" "));
  
@@ -184,7 +191,11 @@ fn run_command_stream_and_wait(log: Arc<Mutex<String>>, cmd: &str, args: &[&str]
     let out_handle = if let Some(stdout) = child.stdout.take() {
         Some(thread::spawn(move || {
             let reader = BufReader::new(stdout);
-            for line in reader.lines().flatten() {
+            for chunk in reader.split(b'\n').flatten() {
+                let line = decode_console_line(&chunk);
+                if line.trim().is_empty() {
+                    continue;
+                }
                 let msg = format!("[OUT] [{}] {}", out_prefix, line);
                 push_line(&out_log, &msg);
             }
@@ -197,7 +208,11 @@ fn run_command_stream_and_wait(log: Arc<Mutex<String>>, cmd: &str, args: &[&str]
     let err_handle = if let Some(stderr) = child.stderr.take() {
         Some(thread::spawn(move || {
             let reader = BufReader::new(stderr);
-            for line in reader.lines().flatten() {
+            for chunk in reader.split(b'\n').flatten() {
+                let line = decode_console_line(&chunk);
+                if line.trim().is_empty() {
+                    continue;
+                }
                 let msg = format!("[ERR] [{}] {}", err_prefix, line);
                 push_line(&err_log, &msg);
             }
@@ -274,53 +289,35 @@ pub fn toggle_context_menu() -> String {
 }
 
 pub fn verify_system_integrity_live(log: Arc<Mutex<String>>) {
-    thread::spawn(move || {
-        {
-            let mut l = log.lock().unwrap();
-            l.clear();
-            l.push_str("🔍 Starting system integrity verification...\n\n");
-            l.push_str("Note: For best results, run the app as Administrator.\n\n");
+    {
+        let mut l = log.lock().unwrap();
+        l.clear();
+        l.push_str("🔍 Starting system integrity verification (DISM + SFC)...\n\n");
+    }
+
+    let steps: [(&str, &[&str]); 4] = [
+        ("DISM", &["/Online", "/Cleanup-Image", "/CheckHealth"]),
+        ("DISM", &["/Online", "/Cleanup-Image", "/ScanHealth"]),
+        ("DISM", &["/Online", "/Cleanup-Image", "/RestoreHealth"]),
+        ("sfc", &["/scannow"]),
+    ];
+    let mut failed = Vec::new();
+    for (cmd, args) in steps {
+        push_line(&log, &format!("\n→ {} {}", cmd, args.join(" ")));
+        match run_command_stream_and_wait(log.clone(), cmd, args) {
+            Ok(0) => {}
+            // sfc returns 1 when it found and repaired corrupt files.
+            Ok(1) if cmd == "sfc" => {}
+            Ok(code) => failed.push(format!("{} {} (exit code {})", cmd, args.join(" "), code)),
+            Err(e) => failed.push(format!("{} {} ({})", cmd, args.join(" "), e)),
         }
+    }
 
-        // Rulare secvențială ca să știi clar progresul și să eviți suprapuneri grele în log
-        let _ = run_command_stream_and_wait(log.clone(), "DISM", &["/Online", "/Cleanup-Image", "/CheckHealth"][..]);
-        let _ = run_command_stream_and_wait(log.clone(), "DISM", &["/Online", "/Cleanup-Image", "/ScanHealth"][..]);
-        let _ = run_command_stream_and_wait(log.clone(), "DISM", &["/Online", "/Cleanup-Image", "/RestoreHealth"][..]);
-        let _ = run_command_stream_and_wait(log.clone(), "sfc", &["/scannow"][..]);
-
-        // log.lock().unwrap().push_str("\n→ Fixing SysWOW64 compatibility...\n");
-        if let Ok(mut log_guard) = log.lock() {
-            log_guard.push_str("\n→ Fixing SysWOW64 compatibility...\n");
-        }
-
-        // let fix_cmd = r#"cmd /c "
-        // if exist %windir%\System32\GroupPolicy (
-        // xcopy %windir%\System32\GroupPolicy %windir%\SysWOW64\GroupPolicy /E /I /Y
-        // )
-        // if exist %windir%\System32\GroupPolicyUsers (
-        // xcopy %windir%\System32\GroupPolicyUsers %windir%\SysWOW64\GroupPolicyUsers /E /I /Y
-        // )
-        // if exist %windir%\System32\gpedit.msc (
-        // xcopy %windir%\System32\gpedit.msc %windir%\SysWOW64\ /Y
-        // )
-        // "#;
-
-        // log.lock().unwrap().push_str(&run_command(fix_cmd));
-
-
-        // let cmd = r#"cmd /c "
-        //     dir /b %SystemRoot%\servicing\Packages\Microsoft-Windows-GroupPolicy-ClientTools-Package~*.mum > %TEMP%\gpedit.txt
-        //     dir /b %SystemRoot%\servicing\Packages\Microsoft-Windows-GroupPolicy-ClientExtensions-Package~*.mum >> %TEMP%\gpedit.txt
-        //     for /f %%i in ('findstr /i . %TEMP%\gpedit.txt 2^>nul') do dism /online /norestart /add-package:"%SystemRoot%\servicing\Packages\%%i"
-        //     del %TEMP%\gpedit.txt
-        //     "#;        
-
-        let cmd = r#"cmd /c "dir /b %SystemRoot%\servicing\Packages\Microsoft-Windows-GroupPolicy-ClientTools-Package~*.mum > %TEMP%\gpedit.txt && dir /b %SystemRoot%\servicing\Packages\Microsoft-Windows-GroupPolicy-ClientExtensions-Package~*.mum >> %TEMP%\gpedit.txt && for /f %%i in ('findstr /i . %TEMP%\gpedit.txt 2^>nul') do dism /online /norestart /add-package:"%SystemRoot%\servicing\Packages\%%i" && del %TEMP%\gpedit.txt""#;
-
-        log.lock().unwrap().push_str(&run_command(cmd));
-
-        push_line(&log, "✅ Verification finished.");
-    });
+    if failed.is_empty() {
+        push_line(&log, "\nSUCCESS: System integrity verification finished. Restart Windows if repairs were made.");
+    } else {
+        push_line(&log, &format!("\nERROR: Some steps failed: {}", failed.join("; ")));
+    }
 }
 
 #[allow(dead_code)]
@@ -333,8 +330,7 @@ pub fn clean_temporary_files() -> String {
     cmd.args(&[
         "-Command",
         "Remove-Item -Path $env:TEMP\\* -Recurse -Force -ErrorAction SilentlyContinue; \
-         Remove-Item -Path C:\\Windows\\Temp\\* -Recurse -Force -ErrorAction SilentlyContinue; \
-         Remove-Item -Path C:\\Windows\\Prefetch\\* -Recurse -Force -ErrorAction SilentlyContinue",
+         Remove-Item -Path C:\\Windows\\Temp\\* -Recurse -Force -ErrorAction SilentlyContinue",
     ]);
     #[cfg(windows)]
     { cmd.creation_flags(CREATE_NO_WINDOW); }
@@ -356,10 +352,13 @@ pub fn clean_temporary_files() -> String {
 pub fn empty_recycle_bin() -> String {
     // Varianta verbose: COM Shell.Application + mesaj pentru fiecare item
     let ps_script = r#"
-$bin = (New-Object -ComObject Shell.Application).NameSpace(10)
-$bin.Items() | ForEach-Object {
-  Write-Output ('Deleting ' + $_.Name + ' from Recycle Bin')
-  try { Remove-Item $_.Path -Recurse -Force -ErrorAction SilentlyContinue } catch {}
+$count = @((New-Object -ComObject Shell.Application).NameSpace(10).Items()).Count
+try {
+  Clear-RecycleBin -Force -ErrorAction Stop
+  Write-Output "Recycle Bin emptied ($count item(s) removed)."
+} catch {
+  if ($count -eq 0) { Write-Output 'Recycle Bin is already empty.' }
+  else { Write-Output ('Could not empty the Recycle Bin: ' + $_.Exception.Message) }
 }
 "#;
 
@@ -410,10 +409,10 @@ pub fn power_plan_switcher(guid: &str) -> String {
 pub fn change_theme(mode: &str) -> String {
     match mode {
         "dark" => run_command(
-            "reg add HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize /v AppsUseLightTheme /t REG_DWORD /d 0 /f"
+            "reg add HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize /v AppsUseLightTheme /t REG_DWORD /d 0 /f && reg add HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize /v SystemUsesLightTheme /t REG_DWORD /d 0 /f"
         ),
         "light" => run_command(
-            "reg add HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize /v AppsUseLightTheme /t REG_DWORD /d 1 /f"
+            "reg add HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize /v AppsUseLightTheme /t REG_DWORD /d 1 /f && reg add HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize /v SystemUsesLightTheme /t REG_DWORD /d 1 /f"
         ),
         _ => "Invalid mode".to_string(),
     }
@@ -837,7 +836,7 @@ pub fn disable_wifi_sense() -> String {
 pub fn disable_consumer_features() -> String {
     let ps_script = r#"
     Write-Host 'Disabling Windows Consumer Features...'
-    New-Item -Path 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\CloudContent' -Force | Out-Null
+    if (-not (Test-Path 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\CloudContent')) { New-Item -Path 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\CloudContent' -Force | Out-Null }
     Set-ItemProperty -Path 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\CloudContent' -Name 'DisableWindowsConsumerFeatures' -Value 1 -Type DWord -Force
     Write-Output '✅ DisableWindowsConsumerFeatures set to 1. Some default Store apps may become inaccessible. A restart may be required.'
     "#;
@@ -848,7 +847,7 @@ pub fn disable_consumer_features() -> String {
 pub fn enable_consumer_features() -> String {
     let ps_script = r#"
     Write-Host 'Enabling Windows Consumer Features (restoring policy)...'
-    New-Item -Path 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\CloudContent' -Force | Out-Null
+    if (-not (Test-Path 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\CloudContent')) { New-Item -Path 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\CloudContent' -Force | Out-Null }
     Set-ItemProperty -Path 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\CloudContent' -Name 'DisableWindowsConsumerFeatures' -Value 0 -Type DWord -Force
     Write-Output '✅ DisableWindowsConsumerFeatures set to 0. A restart may be required for full effect.'
     "#;
@@ -864,7 +863,7 @@ pub fn enable_end_task_right_click() -> String {
         $value = 1
 
         if (-not (Test-Path $path)) {
-            New-Item -Path $path -Force | Out-Null
+            if (-not (Test-Path $path)) { New-Item -Path $path -Force | Out-Null }
         }
 
         New-ItemProperty -Path $path -Name $name -PropertyType DWord -Value $value -Force | Out-Null
@@ -883,7 +882,7 @@ pub fn disable_end_task_right_click() -> String {
         $value = 0
 
         if (-not (Test-Path $path)) {
-            New-Item -Path $path -Force | Out-Null
+            if (-not (Test-Path $path)) { New-Item -Path $path -Force | Out-Null }
         }
 
         New-ItemProperty -Path $path -Name $name -PropertyType DWord -Value $value -Force | Out-Null
@@ -905,12 +904,9 @@ pub fn disable_end_task_right_click() -> String {
 pub fn disable_recall() -> String {
     let ps_script = r#"
         Write-Host 'Disable Recall'
-        New-Item -Path 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsAI' -Force | Out-Null
+        if (-not (Test-Path 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsAI')) { New-Item -Path 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsAI' -Force | Out-Null }
         Set-ItemProperty -Path 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsAI' -Name 'DisableAIDataAnalysis' -Value 1 -Type DWord
         Set-ItemProperty -Path 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsAI' -Name 'AllowRecallEnablement' -Value 0 -Type DWord
-
-        New-Item -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\CI\Policy' -Force | Out-Null
-        Set-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\CI\Policy' -Name 'VerifiedAndReputablePolicyState' -Value 0 -Type DWord
 
         DISM /Online /Disable-Feature /FeatureName:Recall /Quiet /NoRestart
         Write-Host 'Please restart your computer in order for the changes to be fully applied.'
@@ -923,6 +919,8 @@ pub fn disable_recall() -> String {
 pub fn enable_recall() -> String {
     let ps_script = r#"
         Write-Host 'Enable Recall'
+        Remove-ItemProperty -Path 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsAI' -Name 'DisableAIDataAnalysis' -ErrorAction SilentlyContinue
+        Remove-ItemProperty -Path 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsAI' -Name 'AllowRecallEnablement' -ErrorAction SilentlyContinue
         DISM /Online /Enable-Feature /FeatureName:Recall /Quiet /NoRestart
         Write-Host 'Please restart your computer in order for the changes to be fully applied.'
     "#;
@@ -937,11 +935,11 @@ pub fn debloat_edge() -> String {
         Write-Host 'Applying Debloat Edge Tweaks...'
 
         # Edge Update - disable desktop shortcut
-        New-Item -Path 'HKLM:\SOFTWARE\Policies\Microsoft\EdgeUpdate' -Force | Out-Null
+        if (-not (Test-Path 'HKLM:\SOFTWARE\Policies\Microsoft\EdgeUpdate')) { New-Item -Path 'HKLM:\SOFTWARE\Policies\Microsoft\EdgeUpdate' -Force | Out-Null }
         Set-ItemProperty -Path 'HKLM:\SOFTWARE\Policies\Microsoft\EdgeUpdate' -Name 'CreateDesktopShortcutDefault' -Value 0 -Type DWord
 
         # Edge policies
-        New-Item -Path 'HKLM:\SOFTWARE\Policies\Microsoft\Edge' -Force | Out-Null
+        if (-not (Test-Path 'HKLM:\SOFTWARE\Policies\Microsoft\Edge')) { New-Item -Path 'HKLM:\SOFTWARE\Policies\Microsoft\Edge' -Force | Out-Null }
 
         $settings = @{
             EdgeEnhanceImagesEnabled = 0
@@ -976,7 +974,7 @@ pub fn debloat_edge() -> String {
 #[allow(dead_code)]
 // === Adobe Network Block ===
 pub fn adobe_network_block() -> String {
-    run_command(r#"powershell -Command "
+    crate::utils::run_powershell(r#"
         $remoteHostsUrl = 'https://raw.githubusercontent.com/Ruddernation-Designs/Adobe-URL-Block-List/master/hosts'
         $localHostsPath = 'C:\Windows\System32\drivers\etc\hosts'
         $tempHostsPath = 'C:\Windows\System32\drivers\etc\temp_hosts'
@@ -1014,13 +1012,14 @@ pub fn adobe_network_block() -> String {
         } catch {
             Write-Output 'Failed to flush DNS cache.'
         }
-    ""#)
+    
+    "#)
 }
 
 #[allow(dead_code)]
 // === Adobe Debloat ===
 pub fn adobe_debloat() -> String {
-    run_command(r#"powershell -NoProfile -ExecutionPolicy Bypass -Command "
+    crate::utils::run_powershell(r#"
         function CCStopper {
             $path = 'C:\Program Files (x86)\Common Files\Adobe\Adobe Desktop Common\ADS\Adobe Desktop Service.exe'
             if (Test-Path $path) {
@@ -1044,7 +1043,7 @@ pub fn adobe_debloat() -> String {
                     Set-ItemProperty -Path $fullPath -Name Mode -Value 0
                     Write-Output '✅ Acrobat Updates disabled.'
                 } catch {
-                    Write-Output \"⚠️ Registry Key for Acrobat Updates not found: $fullPath\"
+                    Write-Output "⚠️ Registry Key for Acrobat Updates not found: $fullPath"
                 }
             }
         }
@@ -1059,23 +1058,24 @@ pub fn adobe_debloat() -> String {
             try {
                 Set-Service -Name $svc -StartupType Disabled -ErrorAction SilentlyContinue
                 Stop-Service -Name $svc -Force -ErrorAction SilentlyContinue
-                Write-Output \"✅ Disabled service: $svc\"
+                Write-Output "✅ Disabled service: $svc"
             } catch {
-                Write-Output \"⚠️ Failed to disable service: $svc\"
+                Write-Output "⚠️ Failed to disable service: $svc"
             }
         }
-    ""#)
+    
+    "#)
 }
 
 #[allow(dead_code)]
 // === Disable Microsoft Copilot ===
 pub fn disable_copilot() -> String {
-    run_command(r##"powershell -NoProfile -ExecutionPolicy Bypass -Command "
+    crate::utils::run_powershell(r##"
         Write-Output '🛑 Removing Microsoft Copilot...'
 
         # Registry tweaks
         try {
-            New-Item -Path 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsCopilot' -Force | Out-Null
+            if (-not (Test-Path 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsCopilot')) { New-Item -Path 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsCopilot' -Force | Out-Null }
             Set-ItemProperty -Path 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsCopilot' -Name 'TurnOffWindowsCopilot' -Value 1 -Type DWord
             Write-Output '✅ Copilot disabled via HKLM policy.'
         } catch {
@@ -1083,7 +1083,7 @@ pub fn disable_copilot() -> String {
         }
 
         try {
-            New-Item -Path 'HKCU:\Software\Policies\Microsoft\Windows\WindowsCopilot' -Force | Out-Null
+            if (-not (Test-Path 'HKCU:\Software\Policies\Microsoft\Windows\WindowsCopilot')) { New-Item -Path 'HKCU:\Software\Policies\Microsoft\Windows\WindowsCopilot' -Force | Out-Null }
             Set-ItemProperty -Path 'HKCU:\Software\Policies\Microsoft\Windows\WindowsCopilot' -Name 'TurnOffWindowsCopilot' -Value 1 -Type DWord
             Write-Output '✅ Copilot disabled via HKCU policy.'
         } catch {
@@ -1112,7 +1112,7 @@ pub fn disable_copilot() -> String {
 #[allow(dead_code)]
 // === Set Display for Performance ===
 pub fn set_display_for_performance() -> String {
-    run_command(r##"powershell -NoProfile -ExecutionPolicy Bypass -Command "
+    crate::utils::run_powershell(r##"
         Write-Output '🎛️ Applying Display Performance Tweaks...'
 
         # Registry changes
@@ -1127,7 +1127,6 @@ pub fn set_display_for_performance() -> String {
             Set-ItemProperty -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\VisualEffects' -Name 'VisualFXSetting' -Value 3 -Type DWord
             Set-ItemProperty -Path 'HKCU:\Software\Microsoft\Windows\DWM' -Name 'EnableAeroPeek' -Value 0 -Type DWord
             Set-ItemProperty -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced' -Name 'TaskbarMn' -Value 0 -Type DWord
-            Set-ItemProperty -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced' -Name 'TaskbarDa' -Value 0 -Type DWord
             Set-ItemProperty -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced' -Name 'ShowTaskViewButton' -Value 0 -Type DWord
             Set-ItemProperty -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Search' -Name 'SearchboxTaskbarMode' -Value 0 -Type DWord
             Write-Output '✅ Registry tweaks applied.'
@@ -1193,7 +1192,7 @@ pub fn ensure_winget_ready(log: Arc<Mutex<String>>) -> bool {
 
 /// Verifică dacă un id winget este instalat (winget list --id).
 pub fn winget_is_installed(id: &str) -> bool {
-    match run_hidden("winget", &["list", "--id", id, "-e"][..]) {
+    match run_hidden("winget", &["list", "--id", id, "-e", "--accept-source-agreements", "--disable-interactivity"][..]) {
         Ok(o) => {
             let out = String::from_utf8_lossy(&o.stdout);
             // winget scrie „No installed package found…” când nu găsește nimic
@@ -1205,7 +1204,7 @@ pub fn winget_is_installed(id: &str) -> bool {
 
 /// Instalează pachetul (silent) și streamează în log.
 pub fn winget_install(id: &str, log: Arc<Mutex<String>>) -> i32 {
-    let args = ["install", "--id", id, "-e", "--silent", "--accept-package-agreements", "--accept-source-agreements"];
+    let args = ["install", "--id", id, "-e", "--silent", "--accept-package-agreements", "--accept-source-agreements", "--disable-interactivity"];
     match run_command_stream_and_wait(log, "winget", &args[..]) {
         Ok(code) => code,
         Err(_) => -1,
@@ -1214,7 +1213,7 @@ pub fn winget_install(id: &str, log: Arc<Mutex<String>>) -> i32 {
 
 /// Dezinstalează pachetul (unde se poate) și streamează în log.
 pub fn winget_uninstall(id: &str, log: Arc<Mutex<String>>) -> i32 {
-    let args = ["uninstall", "--id", id, "-e", "--silent"];
+    let args = ["uninstall", "--id", id, "-e", "--silent", "--accept-source-agreements", "--disable-interactivity"];
     match run_command_stream_and_wait(log, "winget", &args[..]) {
         Ok(code) => code,
         Err(_) => -1,
@@ -1223,7 +1222,7 @@ pub fn winget_uninstall(id: &str, log: Arc<Mutex<String>>) -> i32 {
 
 /// Upgrade pentru pachet (silent) și streamează în log.
 pub fn winget_upgrade(id: &str, log: Arc<Mutex<String>>) -> i32 {
-    let args = ["upgrade", "--id", id, "-e", "--silent", "--accept-package-agreements", "--accept-source-agreements"];
+    let args = ["upgrade", "--id", id, "-e", "--silent", "--accept-package-agreements", "--accept-source-agreements", "--disable-interactivity"];
     match run_command_stream_and_wait(log, "winget", &args[..]) {
         Ok(code) => code,
         Err(_) => -1,
@@ -1241,9 +1240,6 @@ pub fn set_dns(provider: &str) -> String {
         "Quad9" => run_dns("9.9.9.9", "149.112.112.112"),
         "AdGuard_Ads_Trackers" => run_dns("94.140.14.14", "94.140.15.15"),
         "AdGuard_Ads_Trackers_Malware_Adult" => run_dns("94.140.14.15", "94.140.15.16"),
-        "dns0.eu_Open" => run_dns("193.110.81.254", "185.253.5.254"),
-        "dns0.eu_ZERO" => run_dns("193.110.81.9", "185.253.5.9"),
-        "dns0.eu_KIDS" => run_dns("193.110.81.1", "185.253.5.1"),
         "Automatic (DHCP)" => reset_dns(),
         _ => "❌ Unknown DNS provider".to_string(),
     }
@@ -1448,10 +1444,8 @@ pub fn upgrade_all_apps_with_log(output_log: SharedOutput) {
         update_winget(&output_log);
     }
 
-    if !choco_installed {
-        log_message(&output_log, "Installing Chocolatey...");
-        install_chocolatey(&output_log);
-    } else {
+    // Chocolatey is only used when the user already has it installed.
+    if choco_installed {
         log_message(&output_log, "Updating Chocolatey...");
         run_command_and_log("choco", &["upgrade", "chocolatey", "-y"][..], &output_log);
     }
@@ -1473,7 +1467,11 @@ pub fn upgrade_all_apps_with_log(output_log: SharedOutput) {
 
     if winget_ready {
         log_message(&output_log, "\n=== Upgrading apps via Winget ===");
-        run_command_and_log("winget", &["upgrade", "--all", "--silent"][..], &output_log);
+        run_command_and_log(
+            "winget",
+            &["upgrade", "--all", "--silent", "--include-unknown", "--accept-source-agreements", "--accept-package-agreements", "--disable-interactivity"][..],
+            &output_log,
+        );
     }
 
     log_message(&output_log, "\n=== Upgrade process completed ===");
@@ -1512,7 +1510,7 @@ fn install_winget(output_log: &SharedOutput) {
     // Descarcă și instalează App Installer de pe GitHub
     let url = "https://github.com/microsoft/winget-cli/releases/latest/download/Microsoft.DesktopAppInstaller_8wekyb3d8bbwe.msixbundle";
     
-    let cmd = format!("Add-AppxPackage -Path (Invoke-WebRequest -Uri '{}' -OutFile '$env:TEMP\\winget.msixbundle' -PassThru).Path", url);
+    let cmd = format!("$ProgressPreference = 'SilentlyContinue'; Add-AppxPackage -RegisterByFamilyName -MainPackage Microsoft.DesktopAppInstaller_8wekyb3d8bbwe -ErrorAction SilentlyContinue; if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {{ $p = Join-Path $env:TEMP 'winget.msixbundle'; Invoke-WebRequest -Uri '{}' -OutFile $p -UseBasicParsing; Add-AppxPackage -Path $p }}", url);
     run_command_and_log(
         "powershell",
         &["-Command", cmd.as_str()][..],
@@ -1603,44 +1601,25 @@ pub fn create_restore_point_live(log: Arc<Mutex<String>>) {
                 Write-Output ("WARNING: Could not explicitly enable System Restore: " + $_.Exception.Message)
             }
 
-            # Allow multiple restore points per day if the policy key doesn't exist
-            $exists = Get-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\SystemRestore" -Name "SystemRestorePointCreationFrequency" -ErrorAction SilentlyContinue
-            if ($null -eq $exists) {
-                Write-Output "INFO: Changing system to allow multiple restore points per day..."
-                try {
-                    Set-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\SystemRestore" -Name "SystemRestorePointCreationFrequency" -Value 0 -Type DWord -Force -ErrorAction Stop
-                } catch {
-                    Write-Output ("WARNING: Failed to set SystemRestorePointCreationFrequency: " + $_.Exception.Message)
-                }
-            }
-
-            # Try to import module (Get-ComputerRestorePoint)
+            $key = "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\SystemRestore"
+            $before = [int64](Get-ComputerRestorePoint -ErrorAction SilentlyContinue | Measure-Object -Property SequenceNumber -Maximum).Maximum
+            $previous = (Get-ItemProperty -Path $key -Name SystemRestorePointCreationFrequency -ErrorAction SilentlyContinue).SystemRestorePointCreationFrequency
+            Set-ItemProperty -Path $key -Name SystemRestorePointCreationFrequency -Value 0 -Type DWord -ErrorAction SilentlyContinue
+            $description = "Eoliann Windows Tools $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')"
             try {
-                Import-Module Microsoft.PowerShell.Management -ErrorAction Stop
+                Checkpoint-Computer -Description $description -RestorePointType "MODIFY_SETTINGS" -ErrorAction Stop -WarningAction SilentlyContinue
             } catch {
-                Write-Output ("ERROR: Failed to load Microsoft.PowerShell.Management module: " + $_.Exception.Message)
-                exit 1
+                Write-Output ("ERROR: Failed to create restore point: " + $_.Exception.Message)
+            } finally {
+                if ($null -eq $previous) { Remove-ItemProperty -Path $key -Name SystemRestorePointCreationFrequency -ErrorAction SilentlyContinue }
+                else { Set-ItemProperty -Path $key -Name SystemRestorePointCreationFrequency -Value $previous -Type DWord -ErrorAction SilentlyContinue }
             }
-
-            # Get restore points for today
-            try {
-                $existingRestorePoints = Get-ComputerRestorePoint | Where-Object { $_.CreationTime.Date -eq (Get-Date).Date }
-            } catch {
-                Write-Output ("ERROR: Failed to retrieve restore points: " + $_.Exception.Message)
-                exit 1
-            }
-
-            if ($existingRestorePoints.Count -eq 0) {
-                $description = "System Restore Point created by Eoliann Windows Tools on $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')"
-                try {
-                    Checkpoint-Computer -Description $description -RestorePointType "MODIFY_SETTINGS" -ErrorAction Stop
-                    Write-Output "SUCCESS: System Restore Point Created Successfully"
-                } catch {
-                    Write-Output ("ERROR: Failed to create restore point: " + $_.Exception.Message)
-                    exit 1
-                }
+            $after = [int64](Get-ComputerRestorePoint -ErrorAction SilentlyContinue | Measure-Object -Property SequenceNumber -Maximum).Maximum
+            if ($after -gt $before) {
+                Write-Output "SUCCESS: System Restore Point created (#$after)."
             } else {
-                Write-Output "INFO: A restore point already exists for today; skipping creation."
+                Write-Output "ERROR: Windows did not create a new restore point. Make sure System Protection is turned on for the system drive."
+                exit 1
             }
             "#;
 
@@ -1790,7 +1769,7 @@ pub fn try_start_global_op(op_name: &str, log: &Arc<Mutex<String>>) -> Option<Gl
 pub fn disable_activity_history() -> String {
     let ps = r#"
     Write-Host 'Disabling Activity History policies...'
-    New-Item -Path 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\System' -Force | Out-Null
+    if (-not (Test-Path 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\System')) { New-Item -Path 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\System' -Force | Out-Null }
     Set-ItemProperty -Path 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\System' -Name 'EnableActivityFeed' -Value 0 -Type DWord -Force
     Set-ItemProperty -Path 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\System' -Name 'PublishUserActivities' -Value 0 -Type DWord -Force
     Set-ItemProperty -Path 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\System' -Name 'UploadUserActivities' -Value 0 -Type DWord -Force
@@ -1813,7 +1792,7 @@ pub fn disable_activity_history() -> String {
 pub fn enable_activity_history() -> String {
     let ps = r#"
     Write-Host 'Restoring Activity History policies...'
-    New-Item -Path 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\System' -Force | Out-Null
+    if (-not (Test-Path 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\System')) { New-Item -Path 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\System' -Force | Out-Null }
     Set-ItemProperty -Path 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\System' -Name 'EnableActivityFeed' -Value 1 -Type DWord -Force
     Set-ItemProperty -Path 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\System' -Name 'PublishUserActivities' -Value 1 -Type DWord -Force
     Set-ItemProperty -Path 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\System' -Name 'UploadUserActivities' -Value 1 -Type DWord -Force
@@ -1828,7 +1807,7 @@ pub fn enable_activity_history() -> String {
 pub fn disable_storage_sense() -> String {
     let ps = r#"
     Write-Host 'Disabling Storage Sense for current user...'
-    New-Item -Path 'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\StorageSense\Parameters\StoragePolicy' -Force | Out-Null
+    if (-not (Test-Path 'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\StorageSense\Parameters\StoragePolicy')) { New-Item -Path 'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\StorageSense\Parameters\StoragePolicy' -Force | Out-Null }
     Set-ItemProperty -Path 'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\StorageSense\Parameters\StoragePolicy' -Name '01' -Value 0 -Type DWord -Force
     Write-Output '✅ Storage Sense disabled (StoragePolicy[01] = 0) for current user. Temporary files will no longer be auto-deleted by Storage Sense.'
     "#;
@@ -1840,7 +1819,7 @@ pub fn disable_storage_sense() -> String {
 pub fn enable_storage_sense() -> String {
     let ps = r#"
     Write-Host 'Enabling Storage Sense for current user (restoring)...'
-    New-Item -Path 'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\StorageSense\Parameters\StoragePolicy' -Force | Out-Null
+    if (-not (Test-Path 'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\StorageSense\Parameters\StoragePolicy')) { New-Item -Path 'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\StorageSense\Parameters\StoragePolicy' -Force | Out-Null }
     Set-ItemProperty -Path 'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\StorageSense\Parameters\StoragePolicy' -Name '01' -Value 1 -Type DWord -Force
     Write-Output '✅ Storage Sense enabled (StoragePolicy[01] = 1) for current user.'
     "#;
@@ -1856,10 +1835,10 @@ pub fn set_hibernation_default() -> String {
     Write-Host 'Setting Hibernation as default (applying registry tweaks and powercfg settings)...'
 
     # Expose Hibernation powersettings in Power Options (Attributes = 2)
-    New-Item -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\Power\PowerSettings\238C9FA8-0AAD-41ED-83F4-97BE242C8F20\7bc4a2f9-d8fc-4469-b07b-33eb785aaca0' -Force | Out-Null
+    if (-not (Test-Path 'HKLM:\SYSTEM\CurrentControlSet\Control\Power\PowerSettings\238C9FA8-0AAD-41ED-83F4-97BE242C8F20\7bc4a2f9-d8fc-4469-b07b-33eb785aaca0')) { New-Item -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\Power\PowerSettings\238C9FA8-0AAD-41ED-83F4-97BE242C8F20\7bc4a2f9-d8fc-4469-b07b-33eb785aaca0' -Force | Out-Null }
     Set-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\Power\PowerSettings\238C9FA8-0AAD-41ED-83F4-97BE242C8F20\7bc4a2f9-d8fc-4469-b07b-33eb785aaca0' -Name 'Attributes' -Value 2 -Type DWord -Force
 
-    New-Item -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\Power\PowerSettings\abfc2519-3608-4c2a-94ea-171b0ed546ab\94ac6d29-73ce-41a6-809f-6363ba21b47e' -Force | Out-Null
+    if (-not (Test-Path 'HKLM:\SYSTEM\CurrentControlSet\Control\Power\PowerSettings\abfc2519-3608-4c2a-94ea-171b0ed546ab\94ac6d29-73ce-41a6-809f-6363ba21b47e')) { New-Item -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\Power\PowerSettings\abfc2519-3608-4c2a-94ea-171b0ed546ab\94ac6d29-73ce-41a6-809f-6363ba21b47e' -Force | Out-Null }
     Set-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\Power\PowerSettings\abfc2519-3608-4c2a-94ea-171b0ed546ab\94ac6d29-73ce-41a6-809f-6363ba21b47e' -Name 'Attributes' -Value 2 -Type DWord -Force
 
     # Turn on hibernation and tweak default timeouts to prefer hibernate (good for battery)
@@ -1870,7 +1849,7 @@ pub fn set_hibernation_default() -> String {
     Start-Process -FilePath powercfg -ArgumentList '/change standby-timeout-ac 60' -NoNewWindow -Wait
     Start-Process -FilePath powercfg -ArgumentList '/change standby-timeout-dc 60' -NoNewWindow -Wait
     Start-Process -FilePath powercfg -ArgumentList '/change monitor-timeout-ac 10' -NoNewWindow -Wait
-    Start-Process -FilePath powercfg -ArgumentList '/change monitor-timeout-dc 1' -NoNewWindow -Wait
+    Start-Process -FilePath powercfg -ArgumentList '/change monitor-timeout-dc 5' -NoNewWindow -Wait
 
     Write-Output '✅ Hibernation enabled and defaults applied. A restart is recommended for all changes to take full effect.'
     "#;
@@ -1886,22 +1865,22 @@ pub fn restore_hibernation_defaults() -> String {
 
     # Restore Attributes to original values (as per manifest defaults)
     # First path: original was 1
-    New-Item -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\Power\PowerSettings\238C9FA8-0AAD-41ED-83F4-97BE242C8F20\7bc4a2f9-d8fc-4469-b07b-33eb785aaca0' -Force | Out-Null
+    if (-not (Test-Path 'HKLM:\SYSTEM\CurrentControlSet\Control\Power\PowerSettings\238C9FA8-0AAD-41ED-83F4-97BE242C8F20\7bc4a2f9-d8fc-4469-b07b-33eb785aaca0')) { New-Item -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\Power\PowerSettings\238C9FA8-0AAD-41ED-83F4-97BE242C8F20\7bc4a2f9-d8fc-4469-b07b-33eb785aaca0' -Force | Out-Null }
     Set-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\Power\PowerSettings\238C9FA8-0AAD-41ED-83F4-97BE242C8F20\7bc4a2f9-d8fc-4469-b07b-33eb785aaca0' -Name 'Attributes' -Value 1 -Type DWord -Force
 
     # Second path: original was 0
-    New-Item -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\Power\PowerSettings\abfc2519-3608-4c2a-94ea-171b0ed546ab\94ac6d29-73ce-41a6-809f-6363ba21b47e' -Force | Out-Null
+    if (-not (Test-Path 'HKLM:\SYSTEM\CurrentControlSet\Control\Power\PowerSettings\abfc2519-3608-4c2a-94ea-171b0ed546ab\94ac6d29-73ce-41a6-809f-6363ba21b47e')) { New-Item -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\Power\PowerSettings\abfc2519-3608-4c2a-94ea-171b0ed546ab\94ac6d29-73ce-41a6-809f-6363ba21b47e' -Force | Out-Null }
     Set-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\Power\PowerSettings\abfc2519-3608-4c2a-94ea-171b0ed546ab\94ac6d29-73ce-41a6-809f-6363ba21b47e' -Name 'Attributes' -Value 0 -Type DWord -Force
 
-    # Turn off hibernation (if you want to disable)
-    Write-Host 'Turning off hibernation...'
-    Start-Process -FilePath powercfg -ArgumentList '/hibernate off' -NoNewWindow -Wait
+    # Windows default: hibernation file present (needed by Fast Startup)
+    Write-Host 'Turning on hibernation (Windows default)...'
+    Start-Process -FilePath powercfg -ArgumentList '/hibernate on' -NoNewWindow -Wait
 
-    # Restore timeouts to conservative defaults (example values)
-    Start-Process -FilePath powercfg -ArgumentList '/change standby-timeout-ac 15' -NoNewWindow -Wait
+    # Windows 11 Balanced plan defaults
+    Start-Process -FilePath powercfg -ArgumentList '/change standby-timeout-ac 30' -NoNewWindow -Wait
     Start-Process -FilePath powercfg -ArgumentList '/change standby-timeout-dc 15' -NoNewWindow -Wait
-    Start-Process -FilePath powercfg -ArgumentList '/change monitor-timeout-ac 15' -NoNewWindow -Wait
-    Start-Process -FilePath powercfg -ArgumentList '/change monitor-timeout-dc 15' -NoNewWindow -Wait
+    Start-Process -FilePath powercfg -ArgumentList '/change monitor-timeout-ac 10' -NoNewWindow -Wait
+    Start-Process -FilePath powercfg -ArgumentList '/change monitor-timeout-dc 5' -NoNewWindow -Wait
 
     Write-Output '✅ Hibernation and power settings restored to defaults. A restart is recommended.'
     "#;
@@ -1914,7 +1893,7 @@ pub fn restore_hibernation_defaults() -> String {
 pub fn set_time_utc() -> String {
     let ps = r#"
     Write-Host 'Setting RealTimeIsUniversal = 1 (use UTC for hardware clock)...'
-    New-Item -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\TimeZoneInformation' -Force | Out-Null
+    if (-not (Test-Path 'HKLM:\SYSTEM\CurrentControlSet\Control\TimeZoneInformation')) { New-Item -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\TimeZoneInformation' -Force | Out-Null }
     Set-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\TimeZoneInformation' -Name 'RealTimeIsUniversal' -Value 1 -Type DWord -Force
     Write-Output '✅ RealTimeIsUniversal set to 1. The hardware clock will be treated as UTC (good for dual-boot with Linux). A reboot is recommended.'
     "#;
@@ -1927,7 +1906,7 @@ pub fn set_time_utc() -> String {
 pub fn restore_time_local() -> String {
     let ps = r#"
     Write-Host 'Restoring RealTimeIsUniversal = 0 (use local time for hardware clock)...'
-    New-Item -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\TimeZoneInformation' -Force | Out-Null
+    if (-not (Test-Path 'HKLM:\SYSTEM\CurrentControlSet\Control\TimeZoneInformation')) { New-Item -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\TimeZoneInformation' -Force | Out-Null }
     Set-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\TimeZoneInformation' -Name 'RealTimeIsUniversal' -Value 0 -Type DWord -Force
     Write-Output '✅ RealTimeIsUniversal set to 0. The hardware clock will be treated as local time. A reboot is recommended.'
     "#;
@@ -2013,8 +1992,8 @@ pub fn remove_onedrive() -> String {
 
         Write-Host "Remove OneDrive from explorer sidebar"
         try {
-            Set-ItemProperty -Path "HKCR:\CLSID\{018D5C66-4533-4307-9B53-224DE2ED1FE6}" -Name "System.IsPinnedToNameSpaceTree" -Value 0 -ErrorAction SilentlyContinue
-            Set-ItemProperty -Path "HKCR:\Wow6432Node\CLSID\{018D5C66-4533-4307-9B53-224DE2ED1FE6}" -Name "System.IsPinnedToNameSpaceTree" -Value 0 -ErrorAction SilentlyContinue
+            Set-ItemProperty -Path "Registry::HKEY_CLASSES_ROOT\CLSID\{018D5C66-4533-4307-9B53-224DE2ED1FE6}" -Name "System.IsPinnedToNameSpaceTree" -Value 0 -ErrorAction SilentlyContinue
+            Set-ItemProperty -Path "Registry::HKEY_CLASSES_ROOT\Wow6432Node\CLSID\{018D5C66-4533-4307-9B53-224DE2ED1FE6}" -Name "System.IsPinnedToNameSpaceTree" -Value 0 -ErrorAction SilentlyContinue
         } catch { }
 
         Write-Host "Removing run hook for new users"
@@ -2079,8 +2058,9 @@ pub fn install_onedrive() -> String {
     let ps = r#"
     Write-Host "Install OneDrive via winget"
     try {
-        Start-Process -FilePath winget -ArgumentList "install -e --accept-source-agreements --accept-package-agreements --silent Microsoft.OneDrive" -NoNewWindow -Wait
-        Write-Output "✅ OneDrive installation (winget) completed."
+        $p = Start-Process -FilePath winget -ArgumentList "install -e --id Microsoft.OneDrive --accept-source-agreements --accept-package-agreements --silent --disable-interactivity" -NoNewWindow -Wait -PassThru
+        if ($p.ExitCode -eq 0) { Write-Output "✅ OneDrive installation (winget) completed." }
+        else { Write-Output ("❌ winget exited with code " + $p.ExitCode) }
     } catch {
         Write-Output "❌ OneDrive installation failed: $_"
     }
@@ -2112,18 +2092,20 @@ pub fn run_ooshutup10() -> String {
 }
 
 /// Reads HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Advanced\TaskbarAl
-/// Returns true when value == 1 (center), false otherwise.
+/// Returns false only when the value is 0 (left); a missing value is the Windows 11 default (center).
+/// Read directly from the registry: this runs on every UI frame.
 pub fn get_taskbar_alignment() -> bool {
-    let ps = r#"
-        try {
-            $v = Get-ItemPropertyValue -Path 'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Advanced' -Name 'TaskbarAl' -ErrorAction Stop
-            if ($v -eq 1) { Write-Output '1' } else { Write-Output '0' }
-        } catch {
-            Write-Output '0'
-        }
-        "#;
-    let out = crate::utils::run_powershell(ps);
-    out.lines().rev().find(|s| !s.trim().is_empty()).unwrap_or("0").trim() == "1"
+    read_explorer_advanced_dword("TaskbarAl").map(|v| v != 0).unwrap_or(true)
+}
+
+/// Reads a DWORD from HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced.
+pub fn read_explorer_advanced_dword(name: &str) -> Option<u32> {
+    use winreg::enums::HKEY_CURRENT_USER;
+    winreg::RegKey::predef(HKEY_CURRENT_USER)
+        .open_subkey(r"Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced")
+        .ok()?
+        .get_value::<u32, _>(name)
+        .ok()
 }
 
 /// Set Taskbar alignment robustly: try Set-ItemProperty, fallback to reg.exe if needed.
@@ -2445,7 +2427,7 @@ pub fn brave_debloat() -> String {
         let script = r#"
             $path = 'HKLM:\SOFTWARE\Policies\BraveSoftware\Brave'
             if (-not (Test-Path $path)) {
-                New-Item -Path $path -Force | Out-Null
+                if (-not (Test-Path $path)) { New-Item -Path $path -Force | Out-Null }
             }
             Try {
                 New-ItemProperty -Path $path -Name BraveRewardsDisabled -PropertyType DWord -Value 1 -Force | Out-Null
@@ -2500,8 +2482,8 @@ pub fn wpftweaks_edge_debloat() -> String {
         Write-Host 'Applying WPFTweaks Edge Debloat...'
 
         # Ensure parent keys exist
-        New-Item -Path 'HKLM:\SOFTWARE\Policies\Microsoft\EdgeUpdate' -Force | Out-Null
-        New-Item -Path 'HKLM:\SOFTWARE\Policies\Microsoft\Edge' -Force | Out-Null
+        if (-not (Test-Path 'HKLM:\SOFTWARE\Policies\Microsoft\EdgeUpdate')) { New-Item -Path 'HKLM:\SOFTWARE\Policies\Microsoft\EdgeUpdate' -Force | Out-Null }
+        if (-not (Test-Path 'HKLM:\SOFTWARE\Policies\Microsoft\Edge')) { New-Item -Path 'HKLM:\SOFTWARE\Policies\Microsoft\Edge' -Force | Out-Null }
 
         # EdgeUpdate
         Set-ItemProperty -Path 'HKLM:\SOFTWARE\Policies\Microsoft\EdgeUpdate' -Name 'CreateDesktopShortcutDefault' -Value 0 -Type DWord -Force
@@ -2535,11 +2517,11 @@ pub fn wpftweaks_disable_edge() -> String {
         Write-Host 'Applying WPFTweaks Disable Edge...'
 
         # Ensure parent policy keys exist
-        New-Item -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Policies\Explorer' -Force | Out-Null
-        New-Item -Path 'HKLM:\Software\Microsoft\Windows\CurrentVersion\Policies\Explorer' -Force | Out-Null
+        if (-not (Test-Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Policies\Explorer')) { New-Item -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Policies\Explorer' -Force | Out-Null }
+        if (-not (Test-Path 'HKLM:\Software\Microsoft\Windows\CurrentVersion\Policies\Explorer')) { New-Item -Path 'HKLM:\Software\Microsoft\Windows\CurrentVersion\Policies\Explorer' -Force | Out-Null }
 
         # Ensure DisallowRun subkey exists under HKCU
-        New-Item -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Policies\Explorer\DisallowRun' -Force | Out-Null
+        if (-not (Test-Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Policies\Explorer\DisallowRun')) { New-Item -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Policies\Explorer\DisallowRun' -Force | Out-Null }
 
         # Add string value to block msedge.exe via DisallowRun list (name: DisableEdge, value: msedge.exe)
         Try {
@@ -3461,8 +3443,6 @@ pub fn updates_default_settings() -> String {
         Get-ScheduledTask -TaskPath $p -ErrorAction SilentlyContinue | Enable-ScheduledTask -ErrorAction SilentlyContinue
         }
 
-        Write-Output "Windows Local Policies Reset to Default"
-        secedit /configure /cfg "$Env:SystemRoot\inf\defltbase.inf" /db defltbase.sdb
 
         Write-Output "==================================================="
         Write-Output "---  Windows Update Settings Reset to Default   ---"
@@ -3479,12 +3459,12 @@ pub fn updates_disable_all() -> String {
 
         Write-Output "Configuring registry settings..."
 
-        New-Item -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU" -Force | Out-Null
+        if (-not (Test-Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU")) { New-Item -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU" -Force | Out-Null }
 
         Set-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU" -Name "NoAutoUpdate" -Type DWord -Value 1
         Set-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU" -Name "AUOptions" -Type DWord -Value 1
 
-        New-Item -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\DeliveryOptimization\Config" -Force | Out-Null
+        if (-not (Test-Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\DeliveryOptimization\Config")) { New-Item -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\DeliveryOptimization\Config" -Force | Out-Null }
         Set-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\DeliveryOptimization\Config" -Name "DODownloadMode" -Type DWord -Value 0
 
         Write-Output "Disabling services..."
@@ -3534,27 +3514,29 @@ pub fn updates_security_settings() -> String {
 
         Write-Output "Disabling driver offering through Windows Update..."
 
-        New-Item -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\Device Metadata" -Force | Out-Null
+        if (-not (Test-Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\Device Metadata")) { New-Item -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\Device Metadata" -Force | Out-Null }
         Set-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\Device Metadata" -Name "PreventDeviceMetadataFromNetwork" -Type DWord -Value 1
 
-        New-Item -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\DriverSearching" -Force | Out-Null
+        if (-not (Test-Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\DriverSearching")) { New-Item -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\DriverSearching" -Force | Out-Null }
         Set-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\DriverSearching" -Name "DontPromptForWindowsUpdate" -Type DWord -Value 1
         Set-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\DriverSearching" -Name "DontSearchWindowsUpdate" -Type DWord -Value 1
         Set-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\DriverSearching" -Name "DriverUpdateWizardWuSearchEnabled" -Type DWord -Value 0
 
-        New-Item -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate" -Force | Out-Null
+        if (-not (Test-Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate")) { New-Item -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate" -Force | Out-Null }
         Set-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate" -Name "ExcludeWUDriversInQualityUpdate" -Type DWord -Value 1
 
         Write-Output "Deferring feature updates (365 days) and quality updates (4 days)..."
 
-        New-Item -Path "HKLM:\SOFTWARE\Microsoft\WindowsUpdate\UX\Settings" -Force | Out-Null
-        Set-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\WindowsUpdate\UX\Settings" -Name "BranchReadinessLevel" -Type DWord -Value 20
-        Set-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\WindowsUpdate\UX\Settings" -Name "DeferFeatureUpdatesPeriodInDays" -Type DWord -Value 365
-        Set-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\WindowsUpdate\UX\Settings" -Name "DeferQualityUpdatesPeriodInDays" -Type DWord -Value 4
+        $wu = "HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate"
+        Set-ItemProperty -Path $wu -Name "DeferFeatureUpdates" -Type DWord -Value 1
+        Set-ItemProperty -Path $wu -Name "DeferFeatureUpdatesPeriodInDays" -Type DWord -Value 365
+        Set-ItemProperty -Path $wu -Name "DeferQualityUpdates" -Type DWord -Value 1
+        Set-ItemProperty -Path $wu -Name "DeferQualityUpdatesPeriodInDays" -Type DWord -Value 4
+        Write-Output "Note: update deferral policies are ignored on Windows Home editions."
 
         Write-Output "Disabling Windows Update automatic restart..."
 
-        New-Item -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU" -Force | Out-Null
+        if (-not (Test-Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU")) { New-Item -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU" -Force | Out-Null }
         Set-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU" -Name "NoAutoRebootWithLoggedOnUsers" -Type DWord -Value 1
         Set-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU" -Name "AUPowerManagement" -Type DWord -Value 0
 
@@ -4197,90 +4179,7 @@ pub fn restore_secure_defaults() -> String {
 }
 
 pub fn open_registry_editor() {
-    // Pas 1: Deschide Run dialog (Win + R)
-    send_key_combo(VK_LWIN, VIRTUAL_KEY(0x52));  // Win + R
-
-    // Așteptăm puțin ca dialogul să apară (important!)
-    std::thread::sleep(std::time::Duration::from_millis(150));
-
-    // Pas 2: Tastează "regedit"
-    let text = "regedit";
-    for c in text.chars() {
-        let vk = match c.to_ascii_uppercase() {
-            'R' => VIRTUAL_KEY(0x52),
-            'E' => VIRTUAL_KEY(0x45),
-            'G' => VIRTUAL_KEY(0x47),
-            'D' => VIRTUAL_KEY(0x44),
-            'I' => VIRTUAL_KEY(0x49),
-            'T' => VIRTUAL_KEY(0x54),
-            _ => continue,
-        };
-
-        unsafe {
-            let input_down = INPUT {
-                r#type: INPUT_KEYBOARD,
-                Anonymous: INPUT_0 {
-                    ki: KEYBDINPUT {
-                        wVk: vk,
-                        wScan: 0,
-                        dwFlags: Default::default(),
-                        time: 0,
-                        dwExtraInfo: 0,
-                    },
-                },
-            };
-
-            let input_up = INPUT {
-                r#type: INPUT_KEYBOARD,
-                Anonymous: INPUT_0 {
-                    ki: KEYBDINPUT {
-                        wVk: vk,
-                        wScan: 0,
-                        dwFlags: KEYEVENTF_KEYUP,
-                        time: 0,
-                        dwExtraInfo: 0,
-                    },
-                },
-            };
-
-            let inputs = [input_down, input_up];
-            SendInput(&inputs, size_of::<INPUT>() as i32);
-        }
-
-        std::thread::sleep(std::time::Duration::from_millis(30)); // ritm natural
-    }
-
-    // Pas 3: Apasă Enter
-    unsafe {
-        let enter_down = INPUT {
-            r#type: INPUT_KEYBOARD,
-            Anonymous: INPUT_0 {
-                ki: KEYBDINPUT {
-                    wVk: VIRTUAL_KEY(0x0D), // VK_RETURN
-                    wScan: 0,
-                    dwFlags: Default::default(),
-                    time: 0,
-                    dwExtraInfo: 0,
-                },
-            },
-        };
-
-        let enter_up = INPUT {
-            r#type: INPUT_KEYBOARD,
-            Anonymous: INPUT_0 {
-                ki: KEYBDINPUT {
-                    wVk: VIRTUAL_KEY(0x0D),
-                    wScan: 0,
-                    dwFlags: KEYEVENTF_KEYUP,
-                    time: 0,
-                    dwExtraInfo: 0,
-                },
-            },
-        };
-
-        let inputs = [enter_down, enter_up];
-        SendInput(&inputs, size_of::<INPUT>() as i32);
-    }
+    let _ = std::process::Command::new("regedit.exe").spawn();
 }
 
 pub fn open_group_policy_editor() {
@@ -4340,22 +4239,64 @@ pub fn enable_group_policy_editor() -> String {
     log.push_str("Starting automatic activation...\n\n");
     log.push_str("This may take 30–90 seconds. Please wait...\n\n");
 
-    // Comanda 1
-    log.push_str("→ Adding GroupPolicy-ClientTools package...\n");
-    let cmd1 = r#"cmd /c "FOR %%F IN ("%SystemRoot%\servicing\Packages\Microsoft-Windows-GroupPolicy-ClientTools-Package~*.mum") DO dism /online /norestart /add-package:"%F""#;
-    log.push_str(&run_command(cmd1));
-    log.push_str("\n\n");
-
-    // Comanda 2
-    log.push_str("→ Adding GroupPolicy-ClientExtensions package...\n");
-    let cmd2 = r#"cmd /c "FOR %%F IN ("%SystemRoot%\servicing\Packages\Microsoft-Windows-GroupPolicy-ClientExtensions-Package~*.mum") DO dism /online /norestart /add-package:"%F""#;
-    log.push_str(&run_command(cmd2));
-
-    log.push_str("\n\n✅ SUCCESS: Group Policy Editor has been activated!\n");
-    log.push_str("🔄 Please restart your computer now.\n");
-    log.push_str("After restart, press Win + R and type: gpedit.msc");
+    match add_group_policy_packages() {
+        Ok(report) => {
+            log.push_str(&report);
+            log.push_str("\n\n✅ SUCCESS: Group Policy Editor has been activated!\n");
+            log.push_str("🔄 Please restart your computer now.\n");
+            log.push_str("After restart, press Win + R and type: gpedit.msc");
+        }
+        Err(report) => {
+            log.push_str(&report);
+            log.push_str("\n\n❌ ERROR: Group Policy Editor could not be activated (see DISM output above).");
+        }
+    }
 
     log
+}
+
+fn add_group_policy_packages() -> Result<String, String> {
+    let system_root = std::env::var("SystemRoot").unwrap_or_else(|_| r"C:\Windows".to_string());
+    let folder = std::path::Path::new(&system_root).join("servicing").join("Packages");
+    let mut packages: Vec<std::path::PathBuf> = std::fs::read_dir(&folder)
+        .map_err(|e| format!("Cannot read {}: {}", folder.display(), e))?
+        .flatten()
+        .map(|entry| entry.path())
+        .filter(|path| {
+            let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("").to_ascii_lowercase();
+            name.ends_with(".mum")
+                && (name.starts_with("microsoft-windows-grouppolicy-clienttools-package~")
+                    || name.starts_with("microsoft-windows-grouppolicy-clientextensions-package~"))
+        })
+        .collect();
+    packages.sort();
+    if packages.is_empty() {
+        return Err("No Group Policy packages were found in the Windows servicing store.".into());
+    }
+
+    let mut report = String::new();
+    let mut failed = 0;
+    for package in &packages {
+        let arg = format!("/add-package:{}", package.display());
+        let output = StdCommand::new("dism.exe")
+            .args(["/online", "/norestart", &arg])
+            .creation_flags(CREATE_NO_WINDOW)
+            .output();
+        let name = package.file_name().and_then(|n| n.to_str()).unwrap_or("");
+        match output {
+            // 3010 = success, restart required
+            Ok(o) if matches!(o.status.code(), Some(0) | Some(3010)) => report.push_str(&format!("✔ {}\n", name)),
+            Ok(o) => {
+                failed += 1;
+                report.push_str(&format!("✖ {} (exit code {:?})\n{}\n", name, o.status.code(), String::from_utf8_lossy(&o.stdout).trim()));
+            }
+            Err(e) => {
+                failed += 1;
+                report.push_str(&format!("✖ {}: {}\n", name, e));
+            }
+        }
+    }
+    if failed == 0 { Ok(report) } else { Err(report) }
 }
 
 // ============================
@@ -4818,11 +4759,9 @@ pub fn open_battery_report(path: &str) -> Result<String, String> {
 
 #[allow(dead_code)]
 pub fn launch_memory_diagnostic() -> String {
-    let out = run_command("mdsched.exe");
-    if out.trim().is_empty() {
-        "Windows Memory Diagnostic launched.".to_string()
-    } else {
-        out
+    match StdCommand::new("mdsched.exe").spawn() {
+        Ok(_) => "Windows Memory Diagnostic launched.".to_string(),
+        Err(e) => format!("Failed to launch Windows Memory Diagnostic: {}", e),
     }
 }
 
@@ -4913,7 +4852,8 @@ if ($list -notmatch [regex]::Escape($dst)) {{
     powercfg /changename $dst "EWT Ultimate Performance" | Out-Null
 }}
 powercfg /setactive $dst | Out-Null
-Write-Output "Ultimate performance enabled."
+if ((powercfg /getactivescheme) -match [regex]::Escape($dst)) {{ Write-Output "Ultimate performance enabled." }}
+else {{ Write-Output "ERROR: Ultimate performance could not be activated on this system." ; exit 1 }}
 "#,
             src = EWT_ULTIMATE_SOURCE_GUID,
             dst = EWT_ULTIMATE_APP_GUID
@@ -5027,6 +4967,13 @@ pub fn get_background_apps_enabled() -> Result<bool, String> {
 
 #[allow(dead_code)]
 pub fn set_background_apps_enabled(enable: bool) -> String {
+    if let Err(err) = set_policy_dword(
+        r"SOFTWARE\Policies\Microsoft\Windows\AppPrivacy",
+        "LetAppsRunInBackground",
+        if enable { None } else { Some(2) },
+    ) {
+        return err;
+    }
     match write_dword(
         HKEY_CURRENT_USER,
         r"Software\Microsoft\Windows\CurrentVersion\BackgroundAccessApplications",
@@ -5064,7 +5011,7 @@ pub fn set_visual_effects_for_performance_enabled(enable: bool) -> String {
         set_display_for_performance()
     } else {
         let script = r#"
-New-Item -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\VisualEffects' -Force | Out-Null
+if (-not (Test-Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\VisualEffects')) { New-Item -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\VisualEffects' -Force | Out-Null }
 Set-ItemProperty -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\VisualEffects' -Name 'VisualFXSetting' -Value 0 -Type DWord -Force
 Set-ItemProperty -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced' -Name 'TaskbarAnimations' -Value 1 -Type DWord -Force
 Set-ItemProperty -Path 'HKCU:\Software\Microsoft\Windows\DWM' -Name 'EnableAeroPeek' -Value 1 -Type DWord -Force
@@ -5160,7 +5107,7 @@ pub fn set_windowed_optimizations_enabled(enable: bool) -> String {
         r#"
 $path = 'HKCU:\Software\Microsoft\DirectX\UserGpuPreferences'
 $name = 'DirectXUserGlobalSettings'
-New-Item -Path $path -Force | Out-Null
+if (-not (Test-Path $path)) {{ New-Item -Path $path -Force | Out-Null }}
 $current = (Get-ItemProperty -Path $path -Name $name -ErrorAction SilentlyContinue).$name
 if ([string]::IsNullOrWhiteSpace($current)) {{ $current = '' }}
 $current = [regex]::Replace($current, 'SwapEffectUpgradeEnable=\d+;?', '')
@@ -5264,12 +5211,38 @@ pub fn set_delivery_optimization_enabled(enable: bool) -> String {
         if enable { 1 } else { 0 },
     );
 
-    let svc = set_service_enabled("DoSvc", enable, "Manual");
+    let policy = set_policy_dword(
+        r"SOFTWARE\Policies\Microsoft\Windows\DeliveryOptimization",
+        "DODownloadMode",
+        if enable { None } else { Some(0) },
+    );
 
-    match (reg, svc) {
-        (Ok(_), Ok(_)) => format!("Delivery Optimization {}.", if enable { "enabled" } else { "disabled" }),
+    match (reg, policy) {
+        (Ok(_), Ok(_)) => format!(
+            "Delivery Optimization {}.",
+            if enable { "restored to Windows defaults" } else { "peer-to-peer sharing disabled (HTTP-only downloads)" }
+        ),
         (Err(e), _) => e,
         (_, Err(e)) => e,
+    }
+}
+
+/// Sets (Some) or removes (None) a DWORD policy value under HKLM.
+fn set_policy_dword(path: &str, name: &str, value: Option<u32>) -> Result<(), String> {
+    let hklm = winreg::RegKey::predef(HKEY_LOCAL_MACHINE);
+    match value {
+        Some(v) => {
+            let (key, _) = hklm.create_subkey(path).map_err(|e| format!("Cannot open HKLM\\{}: {}", path, e))?;
+            key.set_value(name, &v).map_err(|e| format!("Cannot set {}: {}", name, e))
+        }
+        None => match hklm.open_subkey_with_flags(path, winreg::enums::KEY_SET_VALUE) {
+            Ok(key) => match key.delete_value(name) {
+                Ok(_) => Ok(()),
+                Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
+                Err(e) => Err(format!("Cannot remove {}: {}", name, e)),
+            },
+            Err(_) => Ok(()),
+        },
     }
 }
 
@@ -5390,7 +5363,7 @@ pub fn set_startup_app_enabled(scope: &str, name: &str, enabled: bool) -> Result
     let script = format!(
         r#"
 $path = '{path}'
-New-Item -Path $path -Force | Out-Null
+if (-not (Test-Path $path)) {{ New-Item -Path $path -Force | Out-Null }}
 Set-ItemProperty -Path $path -Name '{name}' -Type Binary -Value {bytes} -Force
 Write-Output 'Startup app state updated.'
 "#,
@@ -5552,22 +5525,10 @@ fn virtualbox_dism_feature_state(name: &str) -> String {
 }
 
 fn virtualbox_wmic_value(class_name: &str, property: &str) -> String {
-    let args = vec![
-        class_name.to_string(),
-        "get".to_string(),
-        property.to_string(),
-        "/value".to_string(),
-    ];
-
-    match virtualbox_run_capture("wmic", &args) {
-        Ok((true, out)) => {
-            for line in out.lines() {
-                if let Some(v) = line.strip_prefix(&format!("{}=", property)) {
-                    return v.trim().to_string();
-                }
-            }
-            "Unknown".to_string()
-        }
+    let script = format!("(Get-CimInstance -ClassName Win32_{}).{}", class_name, property);
+    let args = vec!["-NoProfile".to_string(), "-NonInteractive".to_string(), "-Command".to_string(), script];
+    match virtualbox_run_capture("powershell", &args) {
+        Ok((true, out)) if !out.trim().is_empty() => out.trim().to_string(),
         _ => "Unknown".to_string(),
     }
 }

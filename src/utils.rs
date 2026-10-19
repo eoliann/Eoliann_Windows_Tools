@@ -78,50 +78,7 @@ pub fn run_powershell(script: &str) -> String {
     }
 }
 
-use reqwest::blocking::Client;
-use serde_json::Value;
-#[allow(unused_imports)]
-use semver::Version;
-
-#[derive(Debug)]
-pub struct GithubRelease {
-    pub tag_name: String,
-    #[allow(dead_code)]
-    pub html_url: String,
-}
-
-/// Verifică ultima versiune disponibilă pe GitHub Releases.
-pub fn check_latest_version() -> Option<GithubRelease> {
-    let url = "https://api.github.com/repos/eoliann/Eoliann_Windows_Tools/releases/latest";
-    let client = Client::new();
-
-    let resp = client
-        .get(url)
-        .header("User-Agent", "EoliannWindowsTools")
-        .send()
-        .ok()?;
-
-    let text = resp.text().ok()?;
-    let v: Value = serde_json::from_str(&text).ok()?;
-
-    let tag_name = v.get("tag_name")?.as_str()?.to_string();
-    let html_url = v
-        .get("html_url")
-        .and_then(|s| s.as_str())
-        .unwrap_or_default()
-        .to_string();
-
-    Some(GithubRelease { tag_name, html_url })
-}
-
-/// Compară versiunea curentă cu ultima versiune.
-/// Returnează `true` dacă există o versiune mai nouă pe GitHub.
-pub fn is_update_available(current: &str, latest: &str) -> bool {
-    let cur = Version::parse(current).unwrap_or_else(|_| Version::new(0, 0, 0));
-    let lat = Version::parse(latest.trim_start_matches('v'))
-        .unwrap_or_else(|_| Version::new(0, 0, 0));
-    cur < lat
-}
+pub use crate::updater::GithubRelease;
 
 
 // src/utils.rs (sau adaugă în utils existent)

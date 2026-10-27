@@ -2,6 +2,19 @@ name: Notify Telegram on Release
 
 on:
   workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag (empty = latest release)"
+        default: ""
+        required: false
+      chats:
+        description: "Send only to these chats (comma-separated, e.g. @eoliannwindowstool); empty = all configured chats"
+        default: ""
+        required: false
+      dry_run:
+        description: "Only check that the bot can reach every chat (no message is sent)"
+        type: boolean
+        default: false
   release:
     types: [published]
 
@@ -11,17 +24,53 @@ jobs:
 
     env:
       TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
-      TG_CHATS: ${{ secrets.TG_CHATS }}
-      RELEASE_NAME: ${{ github.event.release.name || github.event.repository.name }}
-      RELEASE_TAG: ${{ github.event.release.tag_name || github.ref_name }}
-      RELEASE_URL: ${{ github.event.release.html_url || format('{0}/{1}/releases/latest', github.server_url, github.repository) }}
+      TG_CHATS: ${{ inputs.chats || secrets.TG_CHATS }}
 
     steps:
-      - name: Send Telegram notifications
+      - name: Read release details
         env:
-          ASSET_URL1: ${{ github.event.release.assets && github.event.release.assets[0] && github.event.release.assets[0].browser_download_url || '' }}
-          ASSET_URL2: ${{ github.event.release.assets && github.event.release.assets[1] && github.event.release.assets[1].browser_download_url || '' }}
+          GH_TOKEN: ${{ github.token }}
+          INPUT_TAG: ${{ inputs.tag }}
         run: |
+          if [ "${GITHUB_EVENT_NAME}" = "release" ]; then
+            jq '.release' "$GITHUB_EVENT_PATH" > release.json
+          elif [ -n "$INPUT_TAG" ]; then
+            gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${INPUT_TAG}" > release.json
+          else
+            gh api "repos/${GITHUB_REPOSITORY}/releases/latest" > release.json
+          fi
+          jq -r '"Release: \(.name) (\(.tag_name)) \(.html_url)", (.assets[] | "Asset: \(.name)")' release.json
+
+      - name: Check chats (dry run)
+        if: ${{ inputs.dry_run }}
+        run: |
+          IFS=',' read -r -a CHAT_ARRAY <<< "${TG_CHATS}"
+          FAILED=0
+          for ITEM in "${CHAT_ARRAY[@]}"; do
+            CHAT_ID="$(echo "${ITEM%%:*}" | xargs)"
+            [ -z "$CHAT_ID" ] && continue
+            RESPONSE="$(curl -sS "https://api.telegram.org/bot${TG_BOT_TOKEN}/getChat" -d chat_id="${CHAT_ID}")"
+            if [ "$(echo "$RESPONSE" | jq -r '.ok')" = "true" ]; then
+              echo "OK: $(echo "$RESPONSE" | jq -r '.result | "\(.title) (\(.id)) forum=\(.is_forum // false)"')"
+            else
+              echo "::error::Cannot reach chat ${CHAT_ID}: $(echo "$RESPONSE" | jq -r '.description')"
+              FAILED=1
+            fi
+          done
+          exit $FAILED
+
+      - name: Send Telegram notifications
+        if: ${{ !inputs.dry_run }}
+        run: |
+          if [ -z "${TG_BOT_TOKEN}" ] || [ -z "${TG_CHATS}" ]; then
+            echo "::error::TG_BOT_TOKEN or TG_CHATS secret is missing."
+            exit 1
+          fi
+
+          RELEASE_NAME="$(jq -r '.name // .tag_name' release.json)"
+          RELEASE_TAG="$(jq -r '.tag_name' release.json)"
+          RELEASE_URL="$(jq -r '.html_url' release.json)"
+
           # Construim textul cu newline-uri reale (Telegram HTML nu acceptă <br>)
           TEXT="$(printf '%s\n' \
             '📢 <b>Eoliann Windows Tools are o nouă versiune pe GitHub!</b>' \
@@ -32,42 +81,40 @@ jobs:
             "" \
             "👉 <a href=\"${RELEASE_URL}\">Mergi la pagina noii versiuni</a>" \
           )"
-          
-          # Adăugăm link-urile de descărcare doar dacă există
-          if [ -n "$ASSET_URL1" ]; then
-            TEXT+=$'\n'"⬇️ <a href=\"${ASSET_URL1}\">Descarcă fișierul de instalare</a>"
-          fi
-          
-          if [ -n "$ASSET_URL2" ]; then
-            TEXT+=$'\n'"⬇️ <a href=\"${ASSET_URL2}\">Descarcă fișierul portabil</a>"
-          fi
+
+          # Link-uri de descărcare după numele fișierului: setup/installer = instalare, restul .exe = portabil
+          while IFS=$'\t' read -r NAME URL; do
+            [ -z "$URL" ] && continue
+            if echo "$NAME" | grep -qiE 'setup|installer'; then
+              LABEL="Descarcă fișierul de instalare"
+            else
+              LABEL="Descarcă fișierul portabil"
+            fi
+            TEXT+=$'\n'"⬇️ <a href=\"${URL}\">${LABEL}</a>"
+          done < <(jq -r '.assets[] | select(.name | test("[.](exe|msi|zip)$"; "i")) | [.name, .browser_download_url] | @tsv' release.json)
 
           IFS=',' read -r -a CHAT_ARRAY <<< "${TG_CHATS}"
 
-          echo "TG_CHATS raw: >${TG_CHATS}<"
-
+          SENT=0
           for ITEM in "${CHAT_ARRAY[@]}"; do
             ITEM_TRIM=$(echo "$ITEM" | xargs)
             [ -z "$ITEM_TRIM" ] && continue
 
+            ARGS=(-d parse_mode="HTML" --data-urlencode "text=${TEXT}")
             if [[ "$ITEM_TRIM" == *":"* ]]; then
-              CHAT_ID="${ITEM_TRIM%%:*}"
-              THREAD_ID="${ITEM_TRIM##*:}"
-              curl -X POST "https://api.telegram.org/bot${TG_BOT_TOKEN}/sendMessage" \
-                -d chat_id="${CHAT_ID}" \
-                -d message_thread_id="${THREAD_ID}" \
-                -d parse_mode="HTML" \
-                --data-urlencode "text=${TEXT}"
+              ARGS+=(-d chat_id="${ITEM_TRIM%%:*}" -d message_thread_id="${ITEM_TRIM##*:}")
             else
-              CHAT_ID="$ITEM_TRIM"
-              curl -X POST "https://api.telegram.org/bot${TG_BOT_TOKEN}/sendMessage" \
-                -d chat_id="${CHAT_ID}" \
-                -d parse_mode="HTML" \
-                --data-urlencode "text=${TEXT}"
+              ARGS+=(-d chat_id="${ITEM_TRIM}")
+            fi
+
+            RESPONSE="$(curl -sS -X POST "https://api.telegram.org/bot${TG_BOT_TOKEN}/sendMessage" "${ARGS[@]}")"
+            if [ "$(echo "$RESPONSE" | jq -r '.ok')" = "true" ]; then
+              SENT=$((SENT+1))
+              echo "Sent to ${ITEM_TRIM}"
+            else
+              echo "::error::Telegram rejected the message for ${ITEM_TRIM}: $(echo "$RESPONSE" | jq -r '.description')"
             fi
           done
 
-
-
-
-
+          echo "Messages sent: ${SENT}"
+          [ "$SENT" -gt 0 ]

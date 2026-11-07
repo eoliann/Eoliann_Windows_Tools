@@ -1,8 +1,8 @@
 ; EWT.iss - Eoliann Windows Tools Installer
-; Version: 1.4.0
+; Version: 1.4.1
 
 #define MyAppName "Eoliann Windows Tools"
-#define MyAppVersion "1.4.0"
+#define MyAppVersion "1.4.1"
 #define MyAppPublisher "eoliann"
 #define MyAppExeName "eoliann_windows_tools_w11.exe"
 #define MyAppIconName "icon.ico"

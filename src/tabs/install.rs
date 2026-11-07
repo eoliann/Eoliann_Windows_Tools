@@ -25,6 +25,34 @@ struct AppItem {
     desc: &'static str,
 }
 
+enum CatalogEntry {
+    WinGet(&'static AppItem),
+    Download {
+        name: &'static str,
+        desc: &'static str,
+        url: &'static str,
+    },
+}
+
+impl CatalogEntry {
+    fn name(&self) -> &'static str {
+        match self {
+            Self::WinGet(app) => app.name,
+            Self::Download { name, .. } => name,
+        }
+    }
+
+    fn matches(&self, query: &str) -> bool {
+        let desc = match self {
+            Self::WinGet(app) => app.desc,
+            Self::Download { desc, .. } => desc,
+        };
+        query.is_empty()
+            || self.name().to_lowercase().contains(query)
+            || desc.to_lowercase().contains(query)
+    }
+}
+
 /// ORIGINAL COMPLETE APP_CATALOG (restored)
 static APP_CATALOG: &[AppItem] = &[
     // Browsers
@@ -36,6 +64,7 @@ static APP_CATALOG: &[AppItem] = &[
     AppItem { name: "Firefox", winget_id: "Mozilla.Firefox", category: "Browsers", desc: "Mozilla Firefox is an open-source web browser known for its customization options, privacy features, and extensions." },
     AppItem { name: "Firefox ESR", winget_id: "Mozilla.Firefox.ESR", category: "Browsers", desc: "Mozilla Firefox is an open-source web browser known for its customization options, privacy features, and extensions. Firefox ESR (Extended Support Release) receives major updates every 42 weeks with minor updates such as crash fixes, security fixes and policy updates as needed, but at least every four weeks." },
     AppItem { name: "Floorp", winget_id: "Ablaze.Floorp", category: "Browsers", desc: "Floorp is an open-source web browser project that aims to provide a simple and fast browsing experience." },
+    AppItem { name: "Helium", winget_id: "ImputNet.Helium", category: "Browsers", desc: "A Chromium-based browser with built-in content blocking." },
     AppItem { name: "LibreWolf", winget_id: "LibreWolf.LibreWolf", category: "Browsers", desc: "LibreWolf is a privacy-focused web browser based on Firefox, with additional privacy and security enhancements." },
     AppItem { name: "Mullvad Browser", winget_id: "MullvadVPN.MullvadBrowser", category: "Browsers", desc: "Mullvad Browser is a privacy-focused web browser, developed in partnership with the Tor Project." },
     AppItem { name: "Opera", winget_id: "Opera.Opera", category: "Browsers", desc: "Opera is a feature-rich web browser known for its built-in ad blocker, VPN, and various productivity tools." },
@@ -62,6 +91,7 @@ static APP_CATALOG: &[AppItem] = &[
     AppItem { name: "Bulk Crap Uninstaller", winget_id: "Klocman.BulkCrapUninstaller", category: "Utilities", desc: "Bulk Crap Uninstaller (BCUninstaller) is a free and open-source program uninstaller for Windows. It allows users to uninstall multiple programs at once, as well as remove leftover files and registry entries." },
     AppItem { name: "Bulk Rename Utility", winget_id: "TGRMNSoftware.BulkRenameUtility", category: "Utilities", desc: "Bulk Rename Utility allows you to easily rename files and folders recursively based upon find-replace, character place, fields, sequences, regular expressions, EXIF data, and more." },
     AppItem { name: "CCleaner", winget_id: "Piriform.CCleaner", category: "Utilities", desc: "CCleaner is a utility program used to clean potentially unwanted files and invalid Windows Registry entries from a computer. It helps improve system performance and free up disk space." },
+    AppItem { name: "Cloudflare WARP", winget_id: "Cloudflare.Warp", category: "Utilities", desc: "The Cloudflare One Client routes device traffic through the Cloudflare network." },
     AppItem { name: "CPU-Z", winget_id: "CPUID.CPU-Z", category: "Utilities", desc: "CPU-Z is a system monitoring and diagnostic tool for Windows. It provides detailed information about the computer's hardware components, including the CPU, memory, and motherboard." },
     AppItem { name: "CrystalDiskInfo", winget_id: "CrystalDewWorld.CrystalDiskInfo", category: "Utilities", desc: "Crystal Disk Info is a disk health monitoring tool that provides information about the status and performance of hard drives. It helps users anticipate potential issues and monitor drive health." },
     AppItem { name: "CrystalDiskMark", winget_id: "CrystalDewWorld.CrystalDiskMark", category: "Utilities", desc: "Crystal Disk Mark is a disk benchmarking tool that measures the read and write speeds of storage devices. It helps users assess the performance of their hard drives and SSDs." },
@@ -123,8 +153,13 @@ static APP_CATALOG: &[AppItem] = &[
     AppItem { name: "Atom", winget_id: "GitHub.Atom", category: "Development", desc: "Atom is a free and open-source text editor developed by GitHub. It is highly customizable and supports various programming languages and extensions." },
     AppItem { name: "AutoIt", winget_id: "AutoIt.AutoIt", category: "Development", desc: "AutoIt is a scripting language designed for automating the Windows GUI and general scripting. It allows users to create scripts for automating repetitive tasks and creating custom applications." },
     AppItem { name: "Brackets", winget_id: "Adobe.Brackets", category: "Development", desc: "Brackets is a modern, open-source text editor designed for web development. It offers features like live preview, inline editing, and preprocessor support." },
+    AppItem { name: "ChatGPT Desktop", winget_id: "OpenAI.ChatGPT", category: "Development", desc: "The official OpenAI desktop app for ChatGPT, including Codex." },
+    AppItem { name: "Claude Code", winget_id: "Anthropic.ClaudeCode", category: "Development", desc: "Anthropic's coding assistant for the terminal." },
+    AppItem { name: "Claude Desktop", winget_id: "Anthropic.Claude", category: "Development", desc: "The official Anthropic desktop app for Claude." },
     AppItem { name: "CMake", winget_id: "Kitware.CMake", category: "Development", desc: "CMake is an open-source, cross-platform family of tools designed to build, test, and package software. It is used to control the software compilation process using simple platform and compiler-independent configuration files." },
     AppItem { name: "Code::Blocks with MinGW", winget_id: "CodeBlocks.CodeBlocks.MinGW", category: "Development", desc: "Code::Blocks is a free, open-source cross-platform IDE that supports multiple compilers, including MinGW. It provides a user-friendly interface for C, C++, and Fortran development." },
+    AppItem { name: "Codex CLI", winget_id: "OpenAI.Codex", category: "Development", desc: "OpenAI's coding agent for the terminal." },
+    AppItem { name: "Cursor", winget_id: "Anysphere.Cursor", category: "Development", desc: "An AI-powered code editor." },
     AppItem { name: "Docker Desktop", winget_id: "Docker.DockerDesktop", category: "Development", desc: "Docker Desktop is an application that enables developers to build, share, and run containerized applications on their local machine. It provides a user-friendly interface for managing Docker containers and images." },
     AppItem { name: "Eclipse IDE for c/C++ Dev", winget_id: "EclipseFoundation.Eclipse.CPP", category: "Development", desc: "Eclipse IDE for C/C++ Developers is a powerful, open-source integrated development environment (IDE) for C and C++ programming. It provides tools for code editing, debugging, and project management." },
     AppItem { name: "Eclipse IDE for Java Dev", winget_id: "EclipseFoundation.Eclipse.Java", category: "Development", desc: "Eclipse IDE for Java Developers is a powerful, open-source integrated development environment (IDE) for Java programming. It provides tools for code editing, debugging, and project management." },
@@ -139,12 +174,14 @@ static APP_CATALOG: &[AppItem] = &[
     AppItem { name: "Gitify", winget_id: "Gitify.Gitify", category: "Development", desc: "Gitify is a desktop application that provides notifications and quick access to GitHub repositories. It helps developers stay updated on repository activity and manage their projects efficiently." },
     AppItem { name: "IntelliJ IDEA Community", winget_id: "JetBrains.IntelliJIDEA.Community", category: "Development", desc: "IntelliJ IDEA Community Edition is a free and open-source IDE for Java, Kotlin, Groovy, Scala, and Android development. It offers a range of features for code editing, debugging, and version control." },
     AppItem { name: "Jetbrains Toolbox", winget_id: "JetBrains.Toolbox", category: "Development", desc: "JetBrains Toolbox is a management tool that allows users to install, update, and manage JetBrains development tools and IDEs from a single interface." },
+    AppItem { name: "Lua", winget_id: "DEVCOM.Lua", category: "Development", desc: "The Lua scripting language and command-line interpreter." },
     AppItem { name: "NetBeans", winget_id: "Apache.NetBeans", category: "Development", desc: "Apache NetBeans is a free and open-source integrated development environment (IDE) for Java, JavaScript, PHP, and other programming languages. It provides tools for code editing, debugging, and project management." },
     AppItem { name: "Neovim", winget_id: "Neovim.Neovim", category: "Development", desc: "Neovim is a highly extensible text editor and an improvement over the original Vim editor." },
     AppItem { name: "NodeJS Current", winget_id: "OpenJS.NodeJS", category: "Development", desc: "Node.js is a JavaScript runtime built on Chrome's V8 JavaScript engine. It allows developers to build scalable and high-performance server-side applications using JavaScript." },
     AppItem { name: "NodeJS LTS", winget_id: "OpenJS.NodeJS.LTS", category: "Development", desc: "Node.js is a JavaScript runtime built on Chrome's V8 JavaScript engine. It allows developers to build scalable and high-performance server-side applications using JavaScript. The LTS (Long-Term Support) version is recommended for most users as it provides stability and extended support." },
     AppItem { name: "Node Version Manager (nvm)", winget_id: "CoreyButler.NVMforWindows", category: "Development", desc: "Node Version Manager (nvm) is a version manager for Node.js that allows users to easily switch between different versions of Node.js on their system." },
     AppItem { name: "Oh My Posh (Prompt)", winget_id: "JanDeDobbeleer.OhMyPosh", category: "Development", desc: "Oh My Posh is a prompt theme engine for PowerShell and other shells. It allows users to customize their command prompt with various themes and styles." },
+    AppItem { name: "OpenCode", winget_id: "Anomaly.OpenCode", category: "Development", desc: "An open-source AI coding agent for the terminal." },
     AppItem { name: "PHPStorm", winget_id: "JetBrains.PhpStorm", category: "Development", desc: "PhpStorm is a commercial, cross-platform IDE for PHP, built by JetBrains. It provides tools and features for efficient PHP development, including code completion, debugging, and version control integration." },
     AppItem { name: "Postman", winget_id: "Postman.Postman", category: "Development", desc: "Postman is a collaboration platform for API development. It provides tools for designing, testing, and documenting APIs, making it easier for developers to work with APIs." },
     AppItem { name: "Pulsar", winget_id: "Pulsar-Edit.Pulsar", category: "Development", desc: "A Community-led Hyper-Hackable Text Editor, Forked from Atom, built on Electron. Designed to be deeply customizable, but still approachable using the default configuration." },
@@ -156,6 +193,7 @@ static APP_CATALOG: &[AppItem] = &[
     AppItem { name: "Thonny Python IDE", winget_id: "AivarAnnamaa.Thonny", category: "Development", desc: "Thony Python IDE is a Python IDE for beginners" },
     AppItem { name: "Vim", winget_id: "vim.vim", category: "Development", desc: "Vim is a highly configurable text editor built to enable efficient text editing. It is an improved version of the vi editor and is widely used by programmers and system administrators." },
     AppItem { name: "Visual Studio 2022", winget_id: "Microsoft.VisualStudio.2022.Community", category: "Development", desc: "Visual Studio 2022 is an integrated development environment (IDE) from Microsoft. It provides a comprehensive set of tools for developing applications across various platforms, including web, mobile, and desktop." },
+    AppItem { name: "Visual Studio 2026 Community", winget_id: "Microsoft.VisualStudio.Community", category: "Development", desc: "Microsoft's IDE for building and debugging applications." },
     AppItem { name: "VS Code", winget_id: "Microsoft.VisualStudioCode", category: "Development", desc: "Visual Studio Code (VS Code) is a lightweight, open-source code editor developed by Microsoft. It supports various programming languages and provides features like debugging, version control, and extensions." },
     AppItem { name: "VS Codium", winget_id: "VSCodium.VSCodium", category: "Development", desc: "VSCodium is a community-driven, freely-licensed binary distribution of Microsoft's VS Code editor. It removes telemetry and branding, providing a more privacy-focused alternative." },
     AppItem { name: "Zed", winget_id: "Zed.Zed", category: "Development", desc: "Zed is a modern, high-performance code editor designed from the ground for and collabotation." },
@@ -166,7 +204,6 @@ static APP_CATALOG: &[AppItem] = &[
     // Document
     AppItem { name: "Adobe Acrobat Reader", winget_id: "Adobe.Acrobat.Reader.64-bit", category: "Document", desc: "Adobe Acrobat Reader is a free software application developed by Adobe Inc. that allows users to view, print, and annotate PDF (Portable Document Format) files. It is widely used for reading and interacting with PDF documents." },
     AppItem { name: "AFFiNE", winget_id: "ToEverything.AFFiNE", category: "Document", desc: "AFFiNE is a privacy-focused, local-first, open-source, and ready-to-use alternative for Notion & Miro. One hyper-fused platform for wildly creative minds." },
-    AppItem { name: "Calibre", winget_id: "calibre.calibre", category: "Document", desc: "Calibre is a free and open-source e-book management software that allows users to organize, convert, and read e-books. It supports a wide range of e-book formats and provides tools for managing e-book libraries." },
     AppItem { name: "Foxit PDF Editor", winget_id: "Foxit.PhantomPDF", category: "Document", desc: "Foxit PDF Editor is a powerful PDF editing software that allows users to create, edit, and manage PDF documents. It provides features like text editing, annotation, and form filling." },
     AppItem { name: "Foxit PDF Reader", winget_id: "Foxit.FoxitReader", category: "Document", desc: "Foxit PDF Reader is a lightweight and fast PDF viewer that allows users to view, annotate, and sign PDF documents. It provides features like tabbed viewing, text highlighting, and form filling." },
     AppItem { name: "Grammarly for Windows", winget_id: "Grammarly.Grammarly", category: "Document", desc: "Grammarly for Windows is a writing assistant that helps users improve their writing by providing grammar, spelling, and style suggestions. It integrates with various applications and platforms to enhance writing quality." },
@@ -189,6 +226,7 @@ static APP_CATALOG: &[AppItem] = &[
     AppItem { name: "AIMP (Music Player)", winget_id: "AIMP.AIMP", category: "Multimedia Tools", desc: "AIMP is a free and feature-rich music player that supports various audio formats and provides a customizable interface. It offers features like playlist management, audio effects, and internet radio support." },
     AppItem { name: "Audacity", winget_id: "Audacity.Audacity", category: "Multimedia Tools", desc: "Audacity is a free and open-source digital audio editor and recording application. It provides tools for recording, editing, and mixing audio tracks, making it suitable for podcasting, music production, and sound design." },
     AppItem { name: "Blender (3D Graphics)", winget_id: "BlenderFoundation.Blender", category: "Multimedia Tools", desc: "Blender is a free and open-source 3D creation suite that supports the entire 3D pipeline, including modeling, rigging, animation, simulation, rendering, compositing, and motion tracking. It is widely used for creating 3D graphics, animations, and visual effects." },
+    AppItem { name: "Calibre", winget_id: "calibre.calibre", category: "Multimedia Tools", desc: "Calibre is a free and open-source e-book management software that allows users to organize, convert, and read e-books. It supports a wide range of e-book formats and provides tools for managing e-book libraries." },
     AppItem { name: "Clementine", winget_id: "Clementine.Clementine", category: "Multimedia Tools", desc: "Clementine is a free and open-source music player and library organizer. It provides a user-friendly interface for managing and playing music collections, as well as features like internet radio support and playlist creation." },
     AppItem { name: "EarTrumpet (Audio)", winget_id: "File-New-Project.EarTrumpet", category: "Multimedia Tools", desc: "EarTrumpet is a free and open-source volume control app for Windows that provides advanced audio management features. It allows users to control the volume of individual applications and provides a more intuitive interface for managing audio devices." },
     AppItem { name: "FFmpeg (full)", winget_id: "Gyan.FFmpeg", category: "Multimedia Tools", desc: "FFmpeg is a free and open-source multimedia framework that allows users to record, convert, and stream audio and video files. It supports a wide range of formats and provides powerful command-line tools for multimedia processing." },
@@ -202,6 +240,7 @@ static APP_CATALOG: &[AppItem] = &[
     AppItem { name: "K-Lite Codec Standard", winget_id: "CodecGuide.K-LiteCodecPack.Standard", category: "Multimedia Tools", desc: "K-Lite Codec Pack is a collection of audio and video codecs that allows users to play a wide range of multimedia formats on their Windows system. The Standard version includes essential codecs for common formats." },
     AppItem { name: "Kodi Media Center", winget_id: "XBMCFoundation.Kodi", category: "Multimedia Tools", desc: "Kodi is a free and open-source media center software that allows users to play and organize digital media files, including videos, music, and photos. It supports various plugins and add-ons for extended functionality." },
     AppItem { name: "Krita (Image Editor)", winget_id: "KDE.Krita", category: "Multimedia Tools", desc: "Krita is a free and open-source digital painting and illustration software. It provides a wide range of tools and features for artists, including brushes, layers, and color management." },
+    AppItem { name: "mpv", winget_id: "shinchiro.mpv", category: "Multimedia Tools", desc: "A lightweight media player with support for many audio and video formats." },
     AppItem { name: "OBS Studio", winget_id: "OBSProject.OBSStudio", category: "Multimedia Tools", desc: "OBS Studio (Open Broadcaster Software) is a free and open-source software for video recording and live streaming. It provides a user-friendly interface for capturing and mixing video and audio sources, making it popular among content creators and streamers." },
     AppItem { name: "Paint.NET", winget_id: "dotPDN.PaintDotNet", category: "Multimedia Tools", desc: "Paint.NET is a free and user-friendly image editing software that provides a range of tools and features for photo manipulation and graphic design. It offers a simple interface and supports layers, effects, and plugins." },
     AppItem { name: "Plex Desktop", winget_id: "Plex.Plex", category: "Multimedia Tools", desc: "Plex is a media server software that allows users to organize, stream, and share their digital media files, including movies, TV shows, music, and photos. It provides a user-friendly interface and supports various devices for media playback." },
@@ -217,11 +256,16 @@ static APP_CATALOG: &[AppItem] = &[
     // Games/platforms
     AppItem { name: "EA App", winget_id: "ElectronicArts.EADesktop", category: "Games", desc: "The EA App is a digital distribution platform developed by Electronic Arts (EA) for purchasing and playing video games. It serves as a hub for EA's game library, providing access to popular titles such as The Sims, FIFA, Battlefield, and more. The app offers features like game downloads, updates, social integration, and exclusive content for EA games." },
     AppItem { name: "Battle.net", winget_id: "Blizzard.BattleNet", category: "Games", desc: "Battle.net is an online gaming platform developed by Blizzard Entertainment. It serves as a hub for Blizzard's game library, including popular titles like World of Warcraft, Overwatch, Diablo, and StarCraft. The platform offers features such as game downloads, updates, social integration, and access to multiplayer gaming." },
+    AppItem { name: "EmulationStation Desktop Edition", winget_id: "ES-DE.EmulationStation-DE", category: "Games", desc: "A frontend for browsing and launching games from an emulation library." },
     AppItem { name: "Epic Games Launcher", winget_id: "EpicGames.EpicGamesLauncher", category: "Games", desc: "The Epic Games Launcher is a digital distribution platform developed by Epic Games for purchasing and playing video games. It serves as a hub for Epic Games' game library, including popular titles like Fortnite, Unreal Tournament, and more. The launcher offers features such as game downloads, updates, social integration, and access to exclusive content and free games." },
     AppItem { name: "GOG Galaxy", winget_id: "GOG.Galaxy", category: "Games", desc: "GOG Galaxy is a digital distribution platform developed by GOG.com for purchasing and playing video games. It serves as a hub for GOG's game library, which includes DRM-free titles from various developers and publishers. The platform offers features such as game downloads, updates, cloud saves, achievements, and social integration." },
+    AppItem { name: "Heroic Games Launcher", winget_id: "HeroicGamesLauncher.HeroicGamesLauncher", category: "Games", desc: "An open-source launcher for Epic Games, GOG, and Amazon Games libraries." },
+    AppItem { name: "Playnite", winget_id: "Playnite.Playnite", category: "Games", desc: "A game library manager that combines titles from multiple platforms." },
     AppItem { name: "PS Remote Play", winget_id: "PlayStation.PSRemotePlay", category: "Games", desc: "PS Remote Play is an application developed by Sony that allows users to stream and play PlayStation games on their PC or mobile devices. It enables players to connect to their PlayStation console remotely and access their game library, providing a seamless gaming experience outside of the console." },
+    AppItem { name: "Roblox", winget_id: "Roblox.Roblox", category: "Games", desc: "The Roblox Player for joining and playing Roblox experiences." },
     AppItem { name: "Steam", winget_id: "Valve.Steam", category: "Games", desc: "Steam is a digital distribution platform developed by Valve Corporation for purchasing and playing video games. It serves as a hub for a vast library of games from various developers and publishers, offering features such as game downloads, updates, cloud saves, achievements, and social integration." },
     AppItem { name: "Ubisoft Connect", winget_id: "Ubisoft.Connect", category: "Games", desc: "Ubisoft Connect is a digital distribution platform developed by Ubisoft for purchasing and playing video games. It serves as a hub for Ubisoft's game library, including popular titles like Assassin's Creed, Far Cry, and Rainbow Six. The platform offers features such as game downloads, updates, cloud saves, achievements, and social integration." },    
+    AppItem { name: "Virtual Desktop Streamer", winget_id: "VirtualDesktop.Streamer", category: "Games", desc: "Streams a Windows desktop and PC VR games to compatible headsets." },
 
     // Microsoft tools
     AppItem { name: "Autoruns", winget_id: "Microsoft.Sysinternals.Autoruns", category: "Microsoft Tools", desc: "Autoruns is a free utility from Microsoft Sysinternals that provides detailed information about the programs and services that are configured to run automatically when a Windows system starts. It allows users to manage and disable startup items, helping to improve system performance and troubleshoot issues." },
@@ -231,10 +275,12 @@ static APP_CATALOG: &[AppItem] = &[
     AppItem { name: ".NET Desktop Runtime 7", winget_id: "Microsoft.DotNet.DesktopRuntime.7", category: "Microsoft Tools", desc: ".NET Desktop Runtime 7 is a software framework developed by Microsoft that allows users to run desktop applications built using the .NET framework. It provides the necessary runtime components and libraries for executing .NET applications on Windows systems." },
     AppItem { name: ".NET Desktop Runtime 8", winget_id: "Microsoft.DotNet.DesktopRuntime.8", category: "Microsoft Tools", desc: ".NET Desktop Runtime 8 is a software framework developed by Microsoft that allows users to run desktop applications built using the .NET framework. It provides the necessary runtime components and libraries for executing .NET applications on Windows systems." },
     AppItem { name: ".NET Desktop Runtime 9", winget_id: "Microsoft.DotNet.DesktopRuntime.9", category: "Microsoft Tools", desc: ".NET Desktop Runtime 9 is a software framework developed by Microsoft that allows users to run desktop applications built using the .NET framework. It provides the necessary runtime components and libraries for executing .NET applications on Windows systems." },
+    AppItem { name: ".NET Desktop Runtime 10", winget_id: "Microsoft.DotNet.DesktopRuntime.10", category: "Microsoft Tools", desc: "The runtime for Windows desktop applications built with .NET 10." },
     AppItem { name: "NuGet Package Manager", winget_id: "Microsoft.NuGet", category: "Microsoft Tools", desc: "NuGet Package Manager is a free and open-source package manager for the Microsoft development platform, including .NET. It allows developers to easily manage and install third-party libraries and tools in their projects, simplifying the process of adding functionality and dependencies." },
     AppItem { name: "Microsoft OneDrive", winget_id: "Microsoft.OneDrive", category: "Microsoft Tools", desc: "Microsoft OneDrive is a cloud storage service that allows users to store, sync, and share files and folders online. It provides seamless integration with Windows and Microsoft Office applications, enabling users to access their files from any device with an internet connection." },
     AppItem { name: "Microsoft Visual C++ Redistributable 2015-2022", winget_id: "Microsoft.VCRedist.2015+.x64", category: "Microsoft Tools", desc: "The Microsoft Visual C++ Redistributable is a package of runtime components required to run applications developed with Visual C++. It includes libraries such as the C Runtime (CRT), Standard C++, MFC, and others. Installing the redistributable ensures that applications built with Visual C++ can run properly on a system without needing to install the full development environment." },
     AppItem { name: "Microsoft Visual C++ Redistributable 2015-2022 (x86)", winget_id: "Microsoft.VCRedist.2015+.x86", category: "Microsoft Tools", desc: "The Microsoft Visual C++ Redistributable is a package of runtime components required to run applications developed with Visual C++. It includes libraries such as the C Runtime (CRT), Standard C++, MFC, and others. Installing the redistributable ensures that applications built with Visual C++ can run properly on a system without needing to install the full development environment." },
+    AppItem { name: "NTLite", winget_id: "Nlitesoft.NTLite", category: "Microsoft Tools", desc: "A tool for customizing Windows installation images." },
     AppItem { name: "PowerShell", winget_id: "Microsoft.PowerShell", category: "Microsoft Tools", desc: "PowerShell is a task automation and configuration management framework developed by Microsoft. It consists of a command-line shell and a scripting language that allows users to automate administrative tasks and manage system configurations." },
     AppItem { name: "PowerToys", winget_id: "Microsoft.PowerToys", category: "Microsoft Tools", desc: "PowerToys is a set of free and open-source utilities developed by Microsoft that enhance the Windows operating system. It provides additional features and tools for power users, such as window management, keyboard shortcuts, and file renaming." },
     AppItem { name: "Windows Terminal", winget_id: "Microsoft.WindowsTerminal", category: "Microsoft Tools", desc: "Windows Terminal is a modern, feature-rich terminal application developed by Microsoft. It provides a multi-tabbed interface for accessing various command-line tools and shells, including PowerShell, Command Prompt, and WSL (Windows Subsystem for Linux). Windows Terminal offers customization options, such as themes, fonts, and keyboard shortcuts, making it a powerful tool for developers and system administrators." },
@@ -453,11 +499,22 @@ pub fn show_install(ui: &mut egui::Ui, log: &Arc<Mutex<String>>) {
 
     // Lista aplicatiilor filtrata
     let query = search_query().lock().unwrap().to_lowercase();
-    let mut by_cat: BTreeMap<&'static str, Vec<&'static AppItem>> = BTreeMap::new();
-    for item in APP_CATALOG.iter() {
-        if query.is_empty() || item.name.to_lowercase().contains(&query) || item.desc.to_lowercase().contains(&query) {
-            by_cat.entry(item.category).or_default().push(item);
+    let artcraft = CatalogEntry::Download {
+        name: "ArtCraft Launcher (official download)",
+        desc: "Download the official Windows MSI to install the launcher for the Craft App Suite.",
+        url: "https://github.com/storytold/craft-launcher/releases/",
+    };
+    let mut by_cat: BTreeMap<&str, Vec<CatalogEntry>> = BTreeMap::new();
+    for (category, entry) in APP_CATALOG.iter()
+        .map(|app| (app.category, CatalogEntry::WinGet(app)))
+        .chain(std::iter::once(("Document", artcraft)))
+    {
+        if entry.matches(&query) {
+            by_cat.entry(category).or_default().push(entry);
         }
+    }
+    for entries in by_cat.values_mut() {
+        entries.sort_by_cached_key(|entry| entry.name().to_lowercase());
     }
 
     // === două coloane independente cu scroll separat ===
@@ -478,9 +535,16 @@ pub fn show_install(ui: &mut egui::Ui, log: &Arc<Mutex<String>>) {
                     ui_left.set_min_width(left_w);
 
                     // conținutul listei (folosește by_cat calculat anterior)
-                    for (category, items) in by_cat.clone().into_iter() {
+                    for (&category, entries) in &by_cat {
                         ui_left.collapsing(category, |ui_cat| {
-                            for app in items {
+                            for entry in entries {
+                                let app = match entry {
+                                    CatalogEntry::WinGet(app) => app,
+                                    CatalogEntry::Download { name, desc, url } => {
+                                        ui_cat.hyperlink_to(*name, *url).on_hover_text(*desc);
+                                        continue;
+                                    }
+                                };
                                 // folosește variabilă locală pentru checkbox; actualizează state la schimbare
                                 let mut checked = state().lock().unwrap().selected.contains(app.winget_id);
                                 let resp = ui_cat.checkbox(&mut checked, app.name).on_hover_text(app.desc);

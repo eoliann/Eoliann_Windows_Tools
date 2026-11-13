@@ -17,7 +17,7 @@
 ![](https://img.shields.io/github/downloads/eoliann/Eoliann_Windows_Tools/latest/Eoliann_Windows_Tools_Installer.exe?displayAssetName=true&style=plastic&color=red)
 [![Downloads latest](https://img.shields.io/github/downloads/eoliann/Eoliann_Windows_Tools/latest/total?style=plastic)](https://github.com/eoliann/Eoliann_Windows_Tools/releases/latest/download/eoliann_windows_tools_w11.exe)
 
-<p align="center"><img src=".github/downloads/chart.svg" alt="Progres descărcări" width="760"></p>
+<p align="center"><img src=".github/downloads/chart.svg" alt="Download progress" width="760"></p>
 
 # 🟢 Eoliann Windows Tools
 
